@@ -14,10 +14,12 @@ import 'video_fixture.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('mixed media → preview → MP4 → gallery → reopen backup',
-      (tester) async {
+  testWidgets('mixed media → preview → MP4 → gallery → reopen backup', (
+    tester,
+  ) async {
     final root = Directory(
-        '${(await getApplicationDocumentsDirectory()).path}/integration-${newId()}');
+      '${(await getApplicationDocumentsDirectory()).path}/integration-${newId()}',
+    );
     final store = ProjectStore(root: root);
     await store.initialize();
     Future<String> photo(String name, Color color) async {
@@ -42,45 +44,58 @@ void main() {
     expect(source['hasAudio'], true);
     expect(source['duration'], greaterThanOrEqualTo(3));
     final project = ReelProject(
-        title: 'Export integration',
-        place: PlaceDetails(
-            name: 'Mockareel Test Cafe',
-            category: 'Coffee shop',
-            rating: '4.7',
-            address: 'Makati, Philippines'),
-        clips: [
-          ReelClip(
-              id: 'red',
-              path: red,
-              name: 'Red photo',
-              isVideo: false,
-              duration: .5,
-              caption: 'Photo scene'),
-          ReelClip(
-              id: 'video',
-              path: video.path,
-              name: 'Blue video',
-              isVideo: true,
-              duration: .75,
-              trimStart: 1,
-              sourceDuration: (source['duration'] as num).toDouble(),
-              caption: 'Trimmed video'),
-          ReelClip(
-              id: 'green',
-              path: green,
-              name: 'Green photo',
-              isVideo: false,
-              duration: .5,
-              caption: 'Final scene'),
-        ]);
+      title: 'Export integration',
+      place: PlaceDetails(
+        name: 'Mockareel Test Cafe',
+        category: 'Coffee shop',
+        rating: '4.7',
+        address: 'Makati, Philippines',
+      ),
+      clips: [
+        ReelClip(
+          id: 'red',
+          path: red,
+          name: 'Red photo',
+          isVideo: false,
+          duration: .5,
+          caption: 'Photo scene',
+        ),
+        ReelClip(
+          id: 'video',
+          path: video.path,
+          name: 'Blue video',
+          isVideo: true,
+          duration: .75,
+          trimStart: 1,
+          sourceDuration: (source['duration'] as num).toDouble(),
+          caption: 'Trimmed video',
+        ),
+        ReelClip(
+          id: 'green',
+          path: green,
+          name: 'Green photo',
+          isVideo: false,
+          duration: .5,
+          caption: 'Final scene',
+        ),
+      ],
+    );
     await store.save(project);
     // Missing inputs must fail cleanly without leaving the renderer busy.
-    final missing = ReelProject(clips: [
-      ReelClip(
-          id: 'missing', path: '/missing.mp4', name: 'Missing', isVideo: true)
-    ]);
+    final missing = ReelProject(
+      clips: [
+        ReelClip(
+          id: 'missing',
+          path: '/missing.mp4',
+          name: 'Missing',
+          isVideo: true,
+        ),
+      ],
+    );
     await expectLater(
-        renderer.export(missing, [red]), throwsA(isA<PlatformException>()));
+      renderer.export(missing, [red]),
+      throwsA(isA<PlatformException>()),
+    );
     await tester.pumpWidget(MockareelApp(store: store));
     Future<void> waitFor(Finder finder, {int seconds = 120}) async {
       final deadline = DateTime.now().add(Duration(seconds: seconds));
@@ -99,8 +114,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('Render MP4'));
     await waitFor(find.text('Your reel is ready'), seconds: 240);
-    final page =
-        tester.widget<ExportedVideoPage>(find.byType(ExportedVideoPage));
+    final page = tester.widget<ExportedVideoPage>(
+      find.byType(ExportedVideoPage),
+    );
     final output = await renderer.inspect(page.path);
     expect(output['width'], 720);
     expect(output['height'], 1280);
@@ -113,8 +129,11 @@ void main() {
     await waitFor(find.text('Saved to Movies/Mockareel'));
     final backup = await store.backup(project);
     final restored = await store.importBackup(backup);
-    expect(restored.clips.map((c) => c.caption),
-        ['Photo scene', 'Trimmed video', 'Final scene']);
+    expect(restored.clips.map((c) => c.caption), [
+      'Photo scene',
+      'Trimmed video',
+      'Final scene',
+    ]);
     expect(restored.clips[1].trimStart, 1);
     for (final c in restored.clips) {
       expect(await File(c.path).exists(), true);

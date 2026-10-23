@@ -43,3 +43,9 @@ The device test creates a photo → trimmed video with source audio → photo pr
 ## Download
 
 The `apk-preview` branch holds the installable preview APK separately from application source. Open its `mockareel-preview.apk` file while signed into GitHub with repository access and choose **Download raw file**.
+
+## Current verification
+
+`flutter analyze`, all eight unit/widget tests, and the Android release build pass. APK signing and alignment are checked before publishing. The real-device integration test is included, but it has **not passed in this cloud environment**: the unaccelerated Android emulator's system services crash while installing the app, before the test can start. MP4 encoding, native video playback, media picking and gallery saving therefore still need verification on a physical Android device. Do not describe those native paths as device-tested based only on a successful build.
+
+The original reference attachment is no longer available in the running workspace. This version uses the Maps-style place layout already established in the editor; exact matching of the supplied video and its scrolling transition remains separate work.

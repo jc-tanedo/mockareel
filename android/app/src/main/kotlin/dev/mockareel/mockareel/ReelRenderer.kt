@@ -2,8 +2,6 @@ package dev.mockareel.mockareel
 
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -18,6 +16,7 @@ import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -40,7 +39,6 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
     private var transformer: Transformer? = null
     private var pending: MethodChannel.Result? = null
     private var output: File? = null
-    private val bitmaps = mutableListOf<Bitmap>()
     private val progress = object : Runnable {
         override fun run() {
             val active = transformer ?: return
@@ -113,16 +111,20 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 media.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
                     .setStartPositionMs(startMs).setEndPositionMs(startMs + durationMs).build())
             } else { media.setImageDurationMs(durationMs) }
-            val bitmap = requireNotNull(BitmapFactory.decodeFile(overlays[index])) { "Could not read the place overlay" }
-            bitmaps.add(bitmap)
+            val overlayFile = File(overlays[index])
+            require(overlayFile.isFile) { "Could not read the place overlay" }
             val effects = mutableListOf<androidx.media3.common.Effect>(
-                Presentation.createForWidthAndHeight(720, 1280, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)
+                Presentation.createForWidthAndHeight(720, 604, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)
             )
             if (!isVideo) effects.add(MatrixTransformation { timeUs ->
                 val scale = 1f + .04f * (timeUs.toFloat() / (durationMs * 1000f)).coerceIn(0f, 1f)
                 Matrix().apply { postScale(scale, scale) }
             })
-            effects.add(OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(bitmap))))
+            // Fit into the 360×302 media window of the shared 360×640 template,
+            // then move its center from y=640 to y=486 in the 720×1280 output.
+            effects.add(Presentation.createForWidthAndHeight(720, 1280, Presentation.LAYOUT_SCALE_TO_FIT))
+            effects.add(MatrixTransformation { Matrix().apply { postTranslate(0f, .240625f) } })
+            effects.add(OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(context, Uri.fromFile(overlayFile), StaticOverlaySettings.Builder().build()))))
             EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()
         }
@@ -159,8 +161,6 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         pending = null
         if (deleteOutput) output?.delete()
         output = null
-        bitmaps.forEach { it.recycle() }
-        bitmaps.clear()
     }
     fun cancel() { if (pending != null) finishError("CANCELLED", "Export cancelled") }
     fun close() { cancel(); worker.shutdown() }

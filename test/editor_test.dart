@@ -20,8 +20,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('real editor and export empty state fit a narrow phone',
-      (tester) async {
+  testWidgets('real editor and export empty state fit a narrow phone', (
+    tester,
+  ) async {
     await open(tester);
     expect(find.text('MAPS PLACE STORY · 9:16'), findsOneWidget);
     for (final tab in ['Timeline', 'Export', 'Place']) {
@@ -31,14 +32,16 @@ void main() {
     }
     await tester.tap(find.text('Export').last);
     await tester.pumpAndSettle();
-    final renderButton = tester
-        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Render MP4'));
+    final renderButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Render MP4'),
+    );
     expect(renderButton.onPressed, isNull);
     expect(find.textContaining('Add at least one photo'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
-  testWidgets('edited place persists and restores with the project',
-      (tester) async {
+  testWidgets('edited place persists and restores with the project', (
+    tester,
+  ) async {
     await open(tester);
     final field = find.widgetWithText(TextField, 'Place name');
     await tester.ensureVisible(field);
@@ -49,25 +52,30 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await open(tester);
     expect(
-        tester
-            .widget<TextField>(find.widgetWithText(TextField, 'Place name'))
-            .controller!
-            .text,
-        'Weekend cafe');
+      tester
+          .widget<TextField>(find.widgetWithText(TextField, 'Place name'))
+          .controller!
+          .text,
+      'Weekend cafe',
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
-  testWidgets('timeline uses real clip count and independent timing',
-      (tester) async {
+  testWidgets('timeline uses real clip count and independent timing', (
+    tester,
+  ) async {
     final p = ReelProject(
-        clips: List.generate(
-            7,
-            (i) => ReelClip(
-                id: '$i',
-                path: '/missing/$i.jpg',
-                name: 'Photo $i',
-                isVideo: false,
-                duration: i + 1)));
+      clips: List.generate(
+        7,
+        (i) => ReelClip(
+          id: '$i',
+          path: '/missing/$i.jpg',
+          name: 'Photo $i',
+          isVideo: false,
+          duration: i + 1,
+        ),
+      ),
+    );
     await store.save(p);
     await open(tester);
     await tester.tap(find.text('Timeline').last);

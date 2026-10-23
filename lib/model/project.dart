@@ -6,25 +6,27 @@ String newId() =>
 class PlaceDetails {
   String name, category, rating, address;
   String? placeId;
-  PlaceDetails(
-      {this.name = '',
-      this.category = '',
-      this.rating = '',
-      this.address = '',
-      this.placeId});
+  PlaceDetails({
+    this.name = '',
+    this.category = '',
+    this.rating = '',
+    this.address = '',
+    this.placeId,
+  });
   factory PlaceDetails.fromJson(Map<String, dynamic> json) => PlaceDetails(
-      name: json['name'] as String? ?? '',
-      category: (json['category'] ?? json['subtitle']) as String? ?? '',
-      rating: json['rating']?.toString() ?? '',
-      address: json['address'] as String? ?? '',
-      placeId: json['placeId'] as String?);
+    name: json['name'] as String? ?? '',
+    category: (json['category'] ?? json['subtitle']) as String? ?? '',
+    rating: json['rating']?.toString() ?? '',
+    address: json['address'] as String? ?? '',
+    placeId: json['placeId'] as String?,
+  );
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'category': category,
-        'rating': rating,
-        'address': address,
-        'placeId': placeId
-      };
+    'name': name,
+    'category': category,
+    'rating': rating,
+    'address': address,
+    'placeId': placeId,
+  };
 }
 
 class ReelClip {
@@ -33,15 +35,16 @@ class ReelClip {
   final double sourceDuration;
   double duration, trimStart;
   String caption;
-  ReelClip(
-      {required this.id,
-      required this.path,
-      required this.name,
-      required this.isVideo,
-      this.sourceDuration = 0,
-      this.duration = 3.5,
-      this.trimStart = 0,
-      this.caption = ''}) {
+  ReelClip({
+    required this.id,
+    required this.path,
+    required this.name,
+    required this.isVideo,
+    this.sourceDuration = 0,
+    this.duration = 3.5,
+    this.trimStart = 0,
+    this.caption = '',
+  }) {
     normalize();
   }
   double get maxDuration =>
@@ -57,24 +60,25 @@ class ReelClip {
   }
 
   factory ReelClip.fromJson(Map<String, dynamic> json) => ReelClip(
-      id: json['id'] as String? ?? newId(),
-      path: json['path'] as String,
-      name: json['name'] as String? ?? 'Media',
-      isVideo: json['isVideo'] == true,
-      sourceDuration: (json['sourceDuration'] as num?)?.toDouble() ?? 0,
-      duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
-      trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
-      caption: json['caption'] as String? ?? '');
+    id: json['id'] as String? ?? newId(),
+    path: json['path'] as String,
+    name: json['name'] as String? ?? 'Media',
+    isVideo: json['isVideo'] == true,
+    sourceDuration: (json['sourceDuration'] as num?)?.toDouble() ?? 0,
+    duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
+    trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
+    caption: json['caption'] as String? ?? '',
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'path': path,
-        'name': name,
-        'isVideo': isVideo,
-        'sourceDuration': sourceDuration,
-        'duration': duration,
-        'trimStart': trimStart,
-        'caption': caption
-      };
+    'id': id,
+    'path': path,
+    'name': name,
+    'isVideo': isVideo,
+    'sourceDuration': sourceDuration,
+    'duration': duration,
+    'trimStart': trimStart,
+    'caption': caption,
+  };
 }
 
 class ReelProject {
@@ -83,16 +87,16 @@ class ReelProject {
   PlaceDetails place;
   final List<ReelClip> clips;
   DateTime updatedAt;
-  ReelProject(
-      {String? id,
-      this.title = 'Untitled reel',
-      PlaceDetails? place,
-      List<ReelClip>? clips,
-      DateTime? updatedAt})
-      : id = id ?? newId(),
-        place = place ?? PlaceDetails(),
-        clips = clips ?? [],
-        updatedAt = updatedAt ?? DateTime.now();
+  ReelProject({
+    String? id,
+    this.title = 'Untitled reel',
+    PlaceDetails? place,
+    List<ReelClip>? clips,
+    DateTime? updatedAt,
+  }) : id = id ?? newId(),
+       place = place ?? PlaceDetails(),
+       clips = clips ?? [],
+       updatedAt = updatedAt ?? DateTime.now();
   double get duration => clips.fold(0, (sum, clip) => sum + clip.duration);
   int clipAt(double seconds) {
     var end = 0.0;
@@ -106,21 +110,23 @@ class ReelProject {
   double startOf(int index) =>
       clips.take(index).fold(0, (sum, c) => sum + c.duration);
   factory ReelProject.fromJson(Map<String, dynamic> json) => ReelProject(
-      id: json['id'] as String?,
-      title: json['title'] as String? ?? 'My place reel',
-      place: PlaceDetails.fromJson(
-          Map<String, dynamic>.from(json['place'] as Map? ?? {})),
-      clips: (json['clips'] as List? ?? [])
-          .map((e) => ReelClip.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''));
+    id: json['id'] as String?,
+    title: json['title'] as String? ?? 'My place reel',
+    place: PlaceDetails.fromJson(
+      Map<String, dynamic>.from(json['place'] as Map? ?? {}),
+    ),
+    clips: (json['clips'] as List? ?? [])
+        .map((e) => ReelClip.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList(),
+    updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+  );
   Map<String, dynamic> toJson() => {
-        'version': 2,
-        'id': id,
-        'title': title,
-        'template': 'maps-place',
-        'place': place.toJson(),
-        'clips': clips.map((e) => e.toJson()).toList(),
-        'updatedAt': updatedAt.toIso8601String()
-      };
+    'version': 2,
+    'id': id,
+    'title': title,
+    'template': 'maps-place',
+    'place': place.toJson(),
+    'clips': clips.map((e) => e.toJson()).toList(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 }

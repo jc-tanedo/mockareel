@@ -8,7 +8,8 @@ class NativeRenderer {
       events.receiveBroadcastStream().map((e) => (e as num).toDouble());
   Future<Map<String, dynamic>> inspect(String path) async =>
       Map<String, dynamic>.from(
-          await channel.invokeMethod<Map>('inspect', {'path': path}) ?? {});
+        await channel.invokeMethod<Map>('inspect', {'path': path}) ?? {},
+      );
   Future<String> export(ReelProject project, List<String> overlays) async {
     final path = await channel.invokeMethod<String>('export', {
       'clips': project.clips.map((c) => c.toJson()).toList(),

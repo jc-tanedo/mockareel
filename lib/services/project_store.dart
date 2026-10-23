@@ -11,7 +11,8 @@ class ProjectStore {
   ProjectStore({this.root});
   Future<void> initialize() async {
     root ??= Directory(
-        '${(await getApplicationDocumentsDirectory()).path}/mockareel');
+      '${(await getApplicationDocumentsDirectory()).path}/mockareel',
+    );
     for (final name in ['projects', 'media', 'exports']) {
       await Directory('${root!.path}/$name').create(recursive: true);
     }
@@ -34,8 +35,10 @@ class ProjectStore {
       final temp = File('$target.tmp');
       await temp.writeAsString(data, flush: true);
       await temp.rename(target);
-      await (await SharedPreferences.getInstance())
-          .setString('currentProject', project.id);
+      await (await SharedPreferences.getInstance()).setString(
+        'currentProject',
+        project.id,
+      );
     });
     _writes = next;
     return next;
@@ -47,8 +50,11 @@ class ProjectStore {
     await for (final entry in Directory('${root!.path}/projects').list()) {
       if (entry is! File || !entry.path.endsWith('.json')) continue;
       try {
-        results.add(ReelProject.fromJson(
-            jsonDecode(await entry.readAsString()) as Map<String, dynamic>));
+        results.add(
+          ReelProject.fromJson(
+            jsonDecode(await entry.readAsString()) as Map<String, dynamic>,
+          ),
+        );
       } on FormatException {
         /* Keep other projects accessible if one file is damaged. */
       }
@@ -69,24 +75,30 @@ class ProjectStore {
       try {
         final data = jsonDecode(old) as Map<String, dynamic>;
         final p = ReelProject(
-            place: PlaceDetails.fromJson(
-                Map<String, dynamic>.from(data['place'] as Map? ?? data)));
+          place: PlaceDetails.fromJson(
+            Map<String, dynamic>.from(data['place'] as Map? ?? data),
+          ),
+        );
         final durations =
             (data['clipDurationsSeconds'] ?? data['durations']) as List? ?? [];
         for (final path in data['media'] as List? ?? []) {
           if (path is! String || !await File(path).exists()) continue;
           final name = path.split('/').last;
-          p.clips.add(ReelClip(
+          p.clips.add(
+            ReelClip(
               id: newId(),
               path: await retainMedia(path, name),
               name: name,
-              isVideo:
-                  RegExp(r'\.(mp4|mov|m4v|webm|mkv)$', caseSensitive: false)
-                      .hasMatch(name),
+              isVideo: RegExp(
+                r'\.(mp4|mov|m4v|webm|mkv)$',
+                caseSensitive: false,
+              ).hasMatch(name),
               duration: durations.isEmpty
                   ? 3.5
                   : (durations[p.clips.length % durations.length] as num)
-                      .toDouble()));
+                        .toDouble(),
+            ),
+          );
         }
         await save(p);
         return p;
@@ -136,10 +148,12 @@ class ProjectStore {
       final written = <File>[];
       try {
         for (final clip in clips) {
+          clip['id'] = newId();
           final entry = archive.findFile(clip['path'] as String);
           if (entry == null || !entry.isFile) {
             throw const FormatException(
-                'A media file is missing from this backup.');
+              'A media file is missing from this backup.',
+            );
           }
           // Archive paths never become destination paths, preventing path traversal.
           final ext = (clip['path'] as String)

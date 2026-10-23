@@ -31,21 +31,27 @@ class MockareelApp extends StatelessWidget {
   const MockareelApp({super.key, this.store});
   @override
   Widget build(BuildContext context) => MaterialApp(
-      title: 'Mockareel',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: ink,
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: mint, brightness: Brightness.dark),
-          inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: panel,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none))),
-      home: EditorPage(store: store));
+    title: 'Mockareel',
+    debugShowCheckedModeBanner: false,
+    theme: ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: ink,
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: mint,
+        brightness: Brightness.dark,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: panel,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    ),
+    home: EditorPage(store: store),
+  );
 }
 
 class EditorPage extends StatefulWidget {
@@ -55,7 +61,7 @@ class EditorPage extends StatefulWidget {
   State<EditorPage> createState() => _EditorPageState();
 }
 
-class _EditorPageState extends State<EditorPage> {
+class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   late final ProjectStore _store = widget.store ?? ProjectStore();
   final _renderer = NativeRenderer();
   final _captureKey = GlobalKey();
@@ -74,7 +80,15 @@ class _EditorPageState extends State<EditorPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initialize();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_ready && _dirty && state != AppLifecycleState.resumed) {
+      unawaited(_save(silent: true));
+    }
   }
 
   Future<void> _initialize() async {
@@ -113,8 +127,10 @@ class _EditorPageState extends State<EditorPage> {
     _editRevision++;
     setState(() => _dirty = true);
     _autosave?.cancel();
-    _autosave =
-        Timer(const Duration(milliseconds: 700), () => _save(silent: true));
+    _autosave = Timer(
+      const Duration(milliseconds: 700),
+      () => _save(silent: true),
+    );
   }
 
   Future<void> _save({bool silent = false}) async {
@@ -151,23 +167,28 @@ class _EditorPageState extends State<EditorPage> {
       for (final file in files) {
         String? retained;
         try {
-          final video = file.mimeType?.startsWith('video/') == true ||
-              RegExp(r'\.(mp4|mov|m4v|webm|mkv|3gp)$', caseSensitive: false)
-                  .hasMatch(file.name);
-          final metadata =
-              video ? await _renderer.inspect(file.path) : <String, dynamic>{};
+          final video =
+              file.mimeType?.startsWith('video/') == true ||
+              RegExp(
+                r'\.(mp4|mov|m4v|webm|mkv|3gp)$',
+                caseSensitive: false,
+              ).hasMatch(file.name);
+          final metadata = video
+              ? await _renderer.inspect(file.path)
+              : <String, dynamic>{};
           final length = (metadata['duration'] as num?)?.toDouble() ?? 0;
           if (video && length <= 0) {
             throw const FormatException('Video duration is unavailable');
           }
           retained = await _store.retainMedia(file.path, file.name);
           final clip = ReelClip(
-              id: newId(),
-              path: retained,
-              name: file.name,
-              isVideo: video,
-              sourceDuration: length,
-              duration: video ? min(3.5, length) : 3.5);
+            id: newId(),
+            path: retained,
+            name: file.name,
+            isVideo: video,
+            sourceDuration: length,
+            duration: video ? min(3.5, length) : 3.5,
+          );
           if (!mounted) return;
           _project.clips.add(clip);
           _selected = _project.clips.length - 1;
@@ -182,7 +203,8 @@ class _EditorPageState extends State<EditorPage> {
       }
       if (failures > 0) {
         _toast(
-            '$failures files could not be opened. Try JPG/PNG images or MP4 video.');
+          '$failures files could not be opened. Try JPG/PNG images or MP4 video.',
+        );
       }
     } catch (e) {
       _toast(_error(e));
@@ -194,42 +216,50 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _settings() async {
     final controller = TextEditingController(text: _key);
     final value = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-                title: const Text('Google Places key'),
-                content: SingleChildScrollView(
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      const Text(
-                          'Enable Places API (New) and billing in your Google Cloud project. The key is stored on this device and used only for place search.'),
-                      const SizedBox(height: 14),
-                      TextField(
-                          controller: controller,
-                          obscureText: true,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          decoration:
-                              const InputDecoration(labelText: 'API key')),
-                      const SizedBox(height: 10),
-                      const Text(
-                          'Manual place editing and video export work without a key.',
-                          style:
-                              TextStyle(color: Colors.white60, fontSize: 12)),
-                    ])),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(ctx, controller.text.trim()),
-                      child: const Text('Save key'))
-                ]));
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Google Places key'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enable Places API (New) and billing in your Google Cloud project. The key is stored on this device and used only for place search.',
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(labelText: 'API key'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Manual place editing and video export work without a key.',
+                style: TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Save key'),
+          ),
+        ],
+      ),
+    );
     if (value != null) {
-      await (await SharedPreferences.getInstance())
-          .setString('mapsApiKey', value);
+      await (await SharedPreferences.getInstance()).setString(
+        'mapsApiKey',
+        value,
+      );
       if (mounted) setState(() => _key = value);
     }
     // The route's closing animation still references the controller; let its field own teardown.
@@ -241,8 +271,9 @@ class _EditorPageState extends State<EditorPage> {
       if (_key.isEmpty || !mounted) return;
     }
     final place = await showDialog<PlaceDetails>(
-        context: context,
-        builder: (_) => PlaceSearchDialog(apiKey: _key, initial: _name.text));
+      context: context,
+      builder: (_) => PlaceSearchDialog(apiKey: _key, initial: _name.text),
+    );
     if (place == null || !mounted) return;
     setState(() {
       _project.place = place;
@@ -260,43 +291,63 @@ class _EditorPageState extends State<EditorPage> {
     final projects = await _store.projects();
     if (!mounted) return;
     final result = await showModalBottomSheet<Object>(
-        context: context,
-        isScrollControlled: true,
-        builder: (ctx) => SafeArea(
-            child: SizedBox(
-                height: 440,
-                child: Column(children: [
-                  Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(children: [
-                        const Expanded(
-                            child: Text('Your projects',
-                                style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold))),
-                        TextButton.icon(
-                            onPressed: () => Navigator.pop(ctx, 'new'),
-                            icon: const Icon(Icons.add),
-                            label: const Text('New'))
-                      ])),
-                  ListTile(
-                      leading: const Icon(Icons.file_open_outlined),
-                      title: const Text('Import a project backup'),
-                      onTap: () => Navigator.pop(ctx, 'import')),
-                  Expanded(
-                      child: ListView(
-                          children: projects
-                              .map((p) => ListTile(
-                                  leading: const Icon(Icons.movie_outlined),
-                                  title: Text(p.title),
-                                  subtitle: Text(
-                                      '${p.clips.length} clips · ${p.duration.toStringAsFixed(1)} seconds'),
-                                  trailing: p.id == _project.id
-                                      ? const Icon(Icons.check, color: mint)
-                                      : null,
-                                  onTap: () => Navigator.pop(ctx, p)))
-                              .toList())),
-                ]))));
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: 440,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Your projects',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => Navigator.pop(ctx, 'new'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('New'),
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_open_outlined),
+                title: const Text('Import a project backup'),
+                onTap: () => Navigator.pop(ctx, 'import'),
+              ),
+              Expanded(
+                child: ListView(
+                  children: projects
+                      .map(
+                        (p) => ListTile(
+                          leading: const Icon(Icons.movie_outlined),
+                          title: Text(p.title),
+                          subtitle: Text(
+                            '${p.clips.length} clips · ${p.duration.toStringAsFixed(1)} seconds',
+                          ),
+                          trailing: p.id == _project.id
+                              ? const Icon(Icons.check, color: mint)
+                              : null,
+                          onTap: () => Navigator.pop(ctx, p),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
     if (!mounted || result == null) return;
     if (result == 'import') {
       await _importBackup();
@@ -309,20 +360,26 @@ class _EditorPageState extends State<EditorPage> {
   Future<void> _rename() async {
     final controller = TextEditingController(text: _project.title);
     final result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-                title: const Text('Project name'),
-                content: TextField(
-                    controller: controller, autofocus: true, maxLength: 80),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(ctx, controller.text.trim()),
-                      child: const Text('Save'))
-                ]));
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Project name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
     if (result != null && result.isNotEmpty && mounted) {
       _project.title = result;
       _change();
@@ -333,9 +390,12 @@ class _EditorPageState extends State<EditorPage> {
     try {
       await _save(silent: true);
       final path = await _store.backup(_project);
-      await SharePlus.instance.share(ShareParams(
+      await SharePlus.instance.share(
+        ShareParams(
           files: [XFile(path, mimeType: 'application/zip')],
-          subject: '${_project.title} — Mockareel project'));
+          subject: '${_project.title} — Mockareel project',
+        ),
+      );
     } catch (e) {
       _toast('Could not share backup: ${_error(e)}');
     }
@@ -368,18 +428,21 @@ class _EditorPageState extends State<EditorPage> {
       for (final clip in _project.clips) {
         if (!await File(clip.path).exists()) {
           throw Exception(
-              '“${clip.name}” is missing. Remove or replace that clip.');
+            '“${clip.name}” is missing. Remove or replace that clip.',
+          );
         }
       }
-      temp = await Directory('${_store.root!.path}/exports/overlay_${newId()}')
-          .create();
+      temp = await Directory(
+        '${_store.root!.path}/exports/overlay_${newId()}',
+      ).create();
       final overlays = <String>[];
       for (var i = 0; i < _project.clips.length; i++) {
         if (!mounted) return;
         setState(() => _captureIndex = i);
         await SchedulerBinding.instance.endOfFrame;
-        final boundary = _captureKey.currentContext!.findRenderObject()!
-            as RenderRepaintBoundary;
+        final boundary =
+            _captureKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
         final image = await boundary.toImage(pixelRatio: 2);
         final data = await image.toByteData(format: ui.ImageByteFormat.png);
         image.dispose();
@@ -398,8 +461,11 @@ class _EditorPageState extends State<EditorPage> {
       final path = await _renderer.export(_project, overlays);
       if (!mounted) return;
       setState(() => _status = 'Reel exported');
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => ExportedVideoPage(path: path, renderer: _renderer)));
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
+        ),
+      );
     } catch (e) {
       _toast(_error(e));
     } finally {
@@ -419,6 +485,7 @@ class _EditorPageState extends State<EditorPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autosave?.cancel();
     _progressSubscription?.cancel();
     if (_exporting) _renderer.cancel();
@@ -432,261 +499,353 @@ class _EditorPageState extends State<EditorPage> {
   Widget build(BuildContext context) {
     if (!_ready) {
       return Scaffold(
-          body: Center(
-              child: _status.isEmpty
-                  ? const CircularProgressIndicator()
-                  : Text(_status)));
+        body: Center(
+          child: _status.isEmpty
+              ? const CircularProgressIndicator()
+              : Text(_status),
+        ),
+      );
     }
     return PopScope(
-        canPop: !_exporting,
-        child: Stack(children: [
+      canPop: !_exporting,
+      child: Stack(
+        children: [
           // The capture surface is painted behind the opaque editor. It stays exactly
           // 360×640 logical pixels regardless of the phone screen or accessibility scale.
           Positioned(
-              left: 0,
-              top: 0,
-              width: 360,
-              height: 640,
-              child: ExcludeSemantics(
-                  child: IgnorePointer(
-                      child: MediaQuery.withNoTextScaling(
-                          child: RepaintBoundary(
-                              key: _captureKey,
-                              child: PlaceOverlay(
-                                  project: _project, index: _captureIndex)))))),
+            left: 0,
+            top: 0,
+            width: 360,
+            height: 640,
+            child: ExcludeSemantics(
+              child: IgnorePointer(
+                child: MediaQuery.withNoTextScaling(
+                  child: RepaintBoundary(
+                    key: _captureKey,
+                    child: PlaceOverlay(
+                      project: _project,
+                      index: _captureIndex,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
           Scaffold(
-              appBar: AppBar(
-                  titleSpacing: 4,
-                  leading: IconButton(
-                      tooltip: 'Saved projects',
-                      onPressed: _projects,
-                      icon: const Icon(Icons.folder_open_outlined)),
-                  title: InkWell(
-                      onTap: _rename,
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_project.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700)),
-                            const Text('MAPS PLACE STORY · 9:16',
-                                style: TextStyle(
-                                    fontSize: 9, color: mint, letterSpacing: 1))
-                          ])),
-                  actions: [
-                    IconButton(
-                        tooltip: 'Save project',
-                        onPressed: _save,
-                        icon: Icon(
-                            _dirty
-                                ? Icons.save_outlined
-                                : Icons.check_circle_outline,
-                            color: mint)),
-                    IconButton(
-                        tooltip: 'Maps API settings',
-                        onPressed: _settings,
-                        icon: const Icon(Icons.settings_outlined))
-                  ]),
-              body: IndexedStack(
-                  index: _tab,
-                  children: [_editTab(), _timelineTab(), _exportTab()]),
-              bottomNavigationBar: NavigationBar(
-                  selectedIndex: _tab,
-                  onDestinationSelected: (i) => setState(() {
-                        _tab = i;
-                        _previewRevision = newId();
-                      }),
-                  destinations: const [
-                    NavigationDestination(
-                        icon: Icon(Icons.edit_location_alt_outlined),
-                        label: 'Place'),
-                    NavigationDestination(
-                        icon: Icon(Icons.video_collection_outlined),
-                        label: 'Timeline'),
-                    NavigationDestination(
-                        icon: Icon(Icons.ios_share), label: 'Export'),
-                  ])),
+            appBar: AppBar(
+              titleSpacing: 4,
+              leading: IconButton(
+                tooltip: 'Saved projects',
+                onPressed: _projects,
+                icon: const Icon(Icons.folder_open_outlined),
+              ),
+              title: InkWell(
+                onTap: _rename,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _project.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Text(
+                      'MAPS PLACE STORY · 9:16',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: mint,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Save project',
+                  onPressed: _save,
+                  icon: Icon(
+                    _dirty ? Icons.save_outlined : Icons.check_circle_outline,
+                    color: mint,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Maps API settings',
+                  onPressed: _settings,
+                  icon: const Icon(Icons.settings_outlined),
+                ),
+              ],
+            ),
+            body: IndexedStack(
+              index: _tab,
+              children: [_editTab(), _timelineTab(), _exportTab()],
+            ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) => setState(() {
+                _tab = i;
+                _previewRevision = newId();
+              }),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.edit_location_alt_outlined),
+                  label: 'Place',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.video_collection_outlined),
+                  label: 'Timeline',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.ios_share),
+                  label: 'Export',
+                ),
+              ],
+            ),
+          ),
           if (_exporting)
             Positioned.fill(
-                child: ColoredBox(
-                    color: Colors.black87,
-                    child: Center(
-                        child: Padding(
-                            padding: const EdgeInsets.all(30),
-                            child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.movie_creation_outlined,
-                                      size: 44, color: mint),
-                                  const SizedBox(height: 20),
-                                  Text(_status, textAlign: TextAlign.center),
-                                  const SizedBox(height: 20),
-                                  LinearProgressIndicator(value: _progress),
-                                  const SizedBox(height: 12),
-                                  Text(_progress == null
-                                      ? 'Keep the app open while rendering'
-                                      : '${(_progress! * 100).round()}%'),
-                                  const SizedBox(height: 18),
-                                  TextButton(
-                                      onPressed: _progressSubscription == null
-                                          ? null
-                                          : _renderer.cancel,
-                                      child: const Text('Cancel export')),
-                                ]))))),
-        ]));
+              child: Material(
+                color: Colors.black87,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(30),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.movie_creation_outlined,
+                          size: 44,
+                          color: mint,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(_status, textAlign: TextAlign.center),
+                        const SizedBox(height: 20),
+                        LinearProgressIndicator(value: _progress),
+                        const SizedBox(height: 12),
+                        Text(
+                          _progress == null
+                              ? 'Keep the app open while rendering'
+                              : '${(_progress! * 100).round()}%',
+                        ),
+                        const SizedBox(height: 18),
+                        TextButton(
+                          onPressed: _progressSubscription == null
+                              ? null
+                              : _renderer.cancel,
+                          child: const Text('Cancel export'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _preview() => TimelinePreview(
-      key: ValueKey(_previewRevision), project: _project, selected: _selected);
-  Widget _editTab() => ListView(padding: const EdgeInsets.all(18), children: [
-        _preview(),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-            onPressed: _findPlace,
-            icon: const Icon(Icons.search),
-            label: const Text('Find a place on Google Maps')),
-        const SizedBox(height: 20),
-        const Text('PLACE DETAILS',
-            style: TextStyle(color: mint, fontSize: 11, letterSpacing: 1.5)),
-        const SizedBox(height: 12),
-        _field('Place name', _name),
-        _field('Category & description', _category),
-        _field('Rating', _rating,
-            keyboard: const TextInputType.numberWithOptions(decimal: true)),
-        _field('Address', _address),
-        const Text('All details remain editable after lookup.',
-            style: TextStyle(fontSize: 12, color: Colors.white60)),
-        const SizedBox(height: 18),
-        _addMedia(),
-      ]);
-  Widget _field(String name, TextEditingController controller,
-          {TextInputType? keyboard}) =>
-      Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextField(
-              controller: controller,
-              keyboardType: keyboard,
-              onChanged: (_) => _change(),
-              decoration: InputDecoration(labelText: name)));
+    key: ValueKey(_previewRevision),
+    project: _project,
+    selected: _selected,
+  );
+  Widget _editTab() => ListView(
+    padding: const EdgeInsets.all(18),
+    children: [
+      _preview(),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: _findPlace,
+        icon: const Icon(Icons.search),
+        label: const Text('Find a place on Google Maps'),
+      ),
+      const SizedBox(height: 20),
+      const Text(
+        'PLACE DETAILS',
+        style: TextStyle(color: mint, fontSize: 11, letterSpacing: 1.5),
+      ),
+      const SizedBox(height: 12),
+      _field('Place name', _name),
+      _field('Category & description', _category),
+      _field(
+        'Rating',
+        _rating,
+        keyboard: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      _field('Address', _address),
+      const Text(
+        'All details remain editable after lookup.',
+        style: TextStyle(fontSize: 12, color: Colors.white60),
+      ),
+      const SizedBox(height: 18),
+      _addMedia(),
+    ],
+  );
+  Widget _field(
+    String name,
+    TextEditingController controller, {
+    TextInputType? keyboard,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      onChanged: (_) => _change(),
+      decoration: InputDecoration(labelText: name),
+    ),
+  );
   Widget _addMedia() => OutlinedButton.icon(
-      onPressed: _importing ? null : _pickMedia,
-      icon: _importing
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.add_photo_alternate_outlined),
-      label: Text(_importing ? 'Importing media…' : 'Add photos & videos'));
-  Widget _timelineTab() =>
-      ListView(padding: const EdgeInsets.all(18), children: [
-        _preview(),
-        _addMedia(),
-        const SizedBox(height: 16),
-        Text(
-            '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
-            style: const TextStyle(color: mint)),
-        const SizedBox(height: 8),
-        if (_project.clips.isEmpty)
-          const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                  'Add your photos and videos to build the reel. Every clip gets its own timing and caption.',
-                  textAlign: TextAlign.center)),
-        for (var i = 0; i < _project.clips.length; i++) _clipCard(i),
-      ]);
+    onPressed: _importing ? null : _pickMedia,
+    icon: _importing
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.add_photo_alternate_outlined),
+    label: Text(_importing ? 'Importing media…' : 'Add photos & videos'),
+  );
+  Widget _timelineTab() => ListView(
+    padding: const EdgeInsets.all(18),
+    children: [
+      _preview(),
+      _addMedia(),
+      const SizedBox(height: 16),
+      Text(
+        '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+        style: const TextStyle(color: mint),
+      ),
+      const SizedBox(height: 8),
+      if (_project.clips.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(20),
+          child: Text(
+            'Add your photos and videos to build the reel. Every clip gets its own timing and caption.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      for (var i = 0; i < _project.clips.length; i++) _clipCard(i),
+    ],
+  );
   Widget _clipCard(int index) {
     final clip = _project.clips[index];
     return Card(
-        key: ValueKey(clip.id),
-        margin: const EdgeInsets.only(bottom: 12),
-        color: panel,
-        child: Padding(
-            padding: const EdgeInsets.all(14),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
+      key: ValueKey(clip.id),
+      margin: const EdgeInsets.only(bottom: 12),
+      color: panel,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
                 Icon(
-                    clip.isVideo
-                        ? Icons.videocam_outlined
-                        : Icons.image_outlined,
-                    color: mint),
+                  clip.isVideo ? Icons.videocam_outlined : Icons.image_outlined,
+                  color: mint,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                    child: Text('${index + 1}. ${clip.name}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  child: Text(
+                    '${index + 1}. ${clip.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 IconButton(
-                    tooltip: 'Preview clip ${index + 1}',
-                    onPressed: () => setState(() {
-                          _selected = index;
-                          _previewRevision = newId();
-                        }),
-                    icon: const Icon(Icons.play_arrow)),
-                IconButton(
-                    tooltip: 'Remove clip ${index + 1}',
-                    onPressed: () {
-                      _project.clips.removeAt(index);
-                      _selected =
-                          min(_selected, max(0, _project.clips.length - 1));
-                      _captureIndex = 0;
-                      _previewRevision = newId();
-                      _change();
-                    },
-                    icon: const Icon(Icons.close, size: 19)),
-              ]),
-              Row(children: [
-                Expanded(
-                    child: Text(
-                        'Duration · ${clip.duration.toStringAsFixed(1)}s',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis)),
-                IconButton(
-                    tooltip: 'Move clip up',
-                    onPressed: index == 0 ? null : () => _move(index, -1),
-                    icon: const Icon(Icons.arrow_upward, size: 18)),
-                IconButton(
-                    tooltip: 'Move clip down',
-                    onPressed: index == _project.clips.length - 1
-                        ? null
-                        : () => _move(index, 1),
-                    icon: const Icon(Icons.arrow_downward, size: 18))
-              ]),
-              Slider(
-                  value: clip.duration,
-                  min: min(.5, clip.maxDuration),
-                  max: max(.5, clip.maxDuration),
-                  onChanged: (v) {
-                    clip.duration = v;
-                    clip.normalize();
-                    _change();
+                  tooltip: 'Preview clip ${index + 1}',
+                  onPressed: () => setState(() {
+                    _selected = index;
+                    _previewRevision = newId();
                   }),
-              if (clip.isVideo &&
-                  clip.sourceDuration > clip.duration + .01) ...[
-                Text(
-                    'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
-                    style:
-                        const TextStyle(fontSize: 12, color: Colors.white70)),
-                Slider(
-                    value: clip.trimStart,
-                    max: max(.01, clip.sourceDuration - clip.duration),
-                    onChanged: (v) {
-                      clip.trimStart = v;
-                      clip.normalize();
-                      _change();
-                    }),
+                  icon: const Icon(Icons.play_arrow),
+                ),
+                IconButton(
+                  tooltip: 'Remove clip ${index + 1}',
+                  onPressed: () {
+                    _project.clips.removeAt(index);
+                    _selected = min(
+                      _selected,
+                      max(0, _project.clips.length - 1),
+                    );
+                    _captureIndex = 0;
+                    _previewRevision = newId();
+                    _change();
+                  },
+                  icon: const Icon(Icons.close, size: 19),
+                ),
               ],
-              TextFormField(
-                  key: ValueKey('caption-${clip.id}'),
-                  initialValue: clip.caption,
-                  maxLength: 120,
-                  decoration: const InputDecoration(
-                      labelText: 'Caption (optional)', counterText: ''),
-                  onChanged: (v) {
-                    clip.caption = v;
-                    _change();
-                  }),
-            ])));
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Duration · ${clip.duration.toStringAsFixed(1)}s',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Move clip up',
+                  onPressed: index == 0 ? null : () => _move(index, -1),
+                  icon: const Icon(Icons.arrow_upward, size: 18),
+                ),
+                IconButton(
+                  tooltip: 'Move clip down',
+                  onPressed: index == _project.clips.length - 1
+                      ? null
+                      : () => _move(index, 1),
+                  icon: const Icon(Icons.arrow_downward, size: 18),
+                ),
+              ],
+            ),
+            Slider(
+              value: clip.duration,
+              min: min(.5, clip.maxDuration),
+              max: max(.5, clip.maxDuration),
+              onChanged: (v) {
+                clip.duration = v;
+                clip.normalize();
+                _change();
+              },
+            ),
+            if (clip.isVideo && clip.sourceDuration > clip.duration + .01) ...[
+              Text(
+                'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+              Slider(
+                value: clip.trimStart,
+                max: max(.01, clip.sourceDuration - clip.duration),
+                onChanged: (v) {
+                  clip.trimStart = v;
+                  clip.normalize();
+                  _change();
+                },
+              ),
+            ],
+            TextFormField(
+              key: ValueKey('caption-${clip.id}'),
+              initialValue: clip.caption,
+              maxLength: 120,
+              decoration: const InputDecoration(
+                labelText: 'Caption (optional)',
+                counterText: '',
+              ),
+              onChanged: (v) {
+                clip.caption = v;
+                _change();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _move(int index, int delta) {
@@ -697,58 +856,76 @@ class _EditorPageState extends State<EditorPage> {
     _change();
   }
 
-  Widget _exportTab() => ListView(padding: const EdgeInsets.all(22), children: [
-        const SizedBox(height: 16),
-        const Icon(Icons.movie_creation_outlined, size: 55, color: mint),
-        const SizedBox(height: 18),
-        const Text('Your place. Your story.',
+  Widget _exportTab() => ListView(
+    padding: const EdgeInsets.all(22),
+    children: [
+      const SizedBox(height: 16),
+      const Icon(Icons.movie_creation_outlined, size: 55, color: mint),
+      const SizedBox(height: 18),
+      const Text(
+        'Your place. Your story.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 12),
+      Text(
+        '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 10),
+      const Text(
+        'Vertical MP4 · 720 × 1280\nSilent video · photos gently zoom\nYour captions and edited place details included',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.white60, height: 1.7),
+      ),
+      const SizedBox(height: 26),
+      FilledButton.icon(
+        onPressed: _project.clips.isEmpty || _importing ? null : _export,
+        icon: const Icon(Icons.file_download_outlined),
+        label: const Text('Render MP4'),
+      ),
+      if (_project.clips.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            'Add at least one photo or video in Timeline to export.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        Text(
-            '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
-            textAlign: TextAlign.center),
-        const SizedBox(height: 10),
-        const Text(
-            'Vertical MP4 · 720 × 1280\nSilent video · photos gently zoom\nYour captions and edited place details included',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white60, height: 1.7)),
-        const SizedBox(height: 26),
-        FilledButton.icon(
-            onPressed: _project.clips.isEmpty || _importing ? null : _export,
-            icon: const Icon(Icons.file_download_outlined),
-            label: const Text('Render MP4')),
-        if (_project.clips.isEmpty)
-          const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                  'Add at least one photo or video in Timeline to export.',
-                  textAlign: TextAlign.center)),
-        const SizedBox(height: 22),
-        const Divider(),
-        const SizedBox(height: 12),
-        const Text('Keep creating later',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        const Text(
-            'Projects autosave on this device. Backups include the media, timings, captions and place details so they can be imported on another device.',
-            style: TextStyle(color: Colors.white60, height: 1.5)),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-            onPressed: _backup,
-            icon: const Icon(Icons.inventory_2_outlined),
-            label: const Text('Share project backup')),
-        TextButton.icon(
-            onPressed: _projects,
-            icon: const Icon(Icons.folder_open_outlined),
-            label: const Text('Open or import a project')),
-      ]);
+          ),
+        ),
+      const SizedBox(height: 22),
+      const Divider(),
+      const SizedBox(height: 12),
+      const Text(
+        'Keep creating later',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        'Projects autosave on this device. Backups include the media, timings, captions and place details so they can be imported on another device.',
+        style: TextStyle(color: Colors.white60, height: 1.5),
+      ),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: _backup,
+        icon: const Icon(Icons.inventory_2_outlined),
+        label: const Text('Share project backup'),
+      ),
+      TextButton.icon(
+        onPressed: _projects,
+        icon: const Icon(Icons.folder_open_outlined),
+        label: const Text('Open or import a project'),
+      ),
+    ],
+  );
 }
 
 class PlaceSearchDialog extends StatefulWidget {
   final String apiKey, initial;
-  const PlaceSearchDialog(
-      {super.key, required this.apiKey, required this.initial});
+  const PlaceSearchDialog({
+    super.key,
+    required this.apiKey,
+    required this.initial,
+  });
   @override
   State<PlaceSearchDialog> createState() => _PlaceSearchDialogState();
 }
@@ -793,52 +970,68 @@ class _PlaceSearchDialogState extends State<PlaceSearchDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-          title: const Text('Find a place'),
-          content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(
-                    controller: _query,
-                    autofocus: true,
-                    onSubmitted: (_) => _search(),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                        hintText: 'Place name and city',
-                        suffixIcon: IconButton(
-                            onPressed: _loading ? null : _search,
-                            icon: const Icon(Icons.search)))),
-                if (_loading)
-                  const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator()),
-                if (_message != null)
-                  Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(_message!,
-                          style: const TextStyle(fontSize: 12))),
-                ..._results.map((p) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.place_outlined, color: mint),
-                    title: Text(p.name),
-                    subtitle: Text(p.address),
-                    onTap: () => Navigator.pop(context, p))),
-                const SizedBox(height: 14),
-                const Text('Google Maps',
-                    style: TextStyle(color: Colors.white60)),
-              ]))),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'))
-          ]);
+    title: const Text('Find a place'),
+    content: SizedBox(
+      width: 420,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _query,
+              autofocus: true,
+              onSubmitted: (_) => _search(),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Place name and city',
+                suffixIcon: IconButton(
+                  onPressed: _loading ? null : _search,
+                  icon: const Icon(Icons.search),
+                ),
+              ),
+            ),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            if (_message != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(_message!, style: const TextStyle(fontSize: 12)),
+              ),
+            ..._results.map(
+              (p) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.place_outlined, color: mint),
+                title: Text(p.name),
+                subtitle: Text(p.address),
+                onTap: () => Navigator.pop(context, p),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text('Google Maps', style: TextStyle(color: Colors.white60)),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+    ],
+  );
 }
 
 class ExportedVideoPage extends StatefulWidget {
   final String path;
   final NativeRenderer renderer;
-  const ExportedVideoPage(
-      {super.key, required this.path, required this.renderer});
+  const ExportedVideoPage({
+    super.key,
+    required this.path,
+    required this.renderer,
+  });
   @override
   State<ExportedVideoPage> createState() => _ExportedVideoPageState();
 }
@@ -863,8 +1056,10 @@ class _ExportedVideoPageState extends State<ExportedVideoPage> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'The video was exported but playback could not start. You can still share or save it.');
+        setState(
+          () => _error =
+              'The video was exported but playback could not start. You can still share or save it.',
+        );
       }
     }
   }
@@ -877,71 +1072,94 @@ class _ExportedVideoPageState extends State<ExportedVideoPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Your reel is ready')),
-      body: SafeArea(
-          child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(children: [
-                Expanded(
-                    child: Center(
-                        child: _error != null
-                            ? Text(_error!)
-                            : !_controller.value.isInitialized
-                                ? const CircularProgressIndicator()
-                                : GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _controller.value.isPlaying
-                                            ? _controller.pause()
-                                            : _controller.play();
-                                      });
-                                    },
-                                    child: AspectRatio(
-                                        aspectRatio:
-                                            _controller.value.aspectRatio,
-                                        child: VideoPlayer(_controller))))),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                    onPressed: () async {
+    appBar: AppBar(title: const Text('Your reel is ready')),
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: _error != null
+                    ? Text(_error!)
+                    : !_controller.value.isInitialized
+                    ? const CircularProgressIndicator()
+                    : GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _controller.value.isPlaying
+                                ? _controller.pause()
+                                : _controller.play();
+                          });
+                        },
+                        child: AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: VideoPlayer(_controller),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  await SharePlus.instance.share(
+                    ShareParams(
+                      files: [XFile(widget.path, mimeType: 'video/mp4')],
+                      subject: 'My Mockareel',
+                    ),
+                  );
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not open the share sheet. Try saving to gallery.',
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.share),
+              label: const Text('Share video'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _saving || _saved
+                  ? null
+                  : () async {
+                      setState(() => _saving = true);
                       try {
-                        await SharePlus.instance.share(ShareParams(
-                            files: [XFile(widget.path, mimeType: 'video/mp4')],
-                            subject: 'My Mockareel'));
-                      } catch (_) {
+                        await widget.renderer.saveToGallery(widget.path);
+                        if (mounted) setState(() => _saved = true);
+                      } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
                               content: Text(
-                                  'Could not open the share sheet. Try saving to gallery.')));
+                                e is PlatformException
+                                    ? e.message ?? 'Save failed'
+                                    : e.toString(),
+                              ),
+                            ),
+                          );
                         }
+                      } finally {
+                        if (mounted) setState(() => _saving = false);
                       }
                     },
-                    icon: const Icon(Icons.share),
-                    label: const Text('Share video')),
-                OutlinedButton.icon(
-                    onPressed: _saving || _saved
-                        ? null
-                        : () async {
-                            setState(() => _saving = true);
-                            try {
-                              await widget.renderer.saveToGallery(widget.path);
-                              if (mounted) setState(() => _saved = true);
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text(e is PlatformException
-                                            ? e.message ?? 'Save failed'
-                                            : e.toString())));
-                              }
-                            } finally {
-                              if (mounted) setState(() => _saving = false);
-                            }
-                          },
-                    icon: const Icon(Icons.save_alt),
-                    label: Text(_saved
-                        ? 'Saved to Movies/Mockareel'
-                        : _saving
-                            ? 'Saving…'
-                            : 'Save to gallery')),
-              ]))));
+              icon: const Icon(Icons.save_alt),
+              label: Text(
+                _saved
+                    ? 'Saved to Movies/Mockareel'
+                    : _saving
+                    ? 'Saving…'
+                    : 'Save to gallery',
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
