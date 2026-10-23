@@ -1,44 +1,45 @@
 # Mockareel
 
-Mockareel is a Flutter editor for vertical place-story reels. The first template recreates the Google Maps Place story shown in the reference clip.
+A Flutter editor for vertical Google Maps style place reels. Android is the first export target.
 
-## Current editor
+## Use the app
 
-- Search for a place by opening Google Maps with the current place name, then edit the place title, category, rating, and location in the app.
-- Add multiple photos and videos from the device library.
-- Edit scene timing and review the five-card left-scroll story.
-- Save an editable project draft on the device or share its JSON project description.
+1. Find a place with Google Places or enter the name, category, rating and address yourself. All fields stay editable.
+2. Open **Timeline** and select photos and videos. Every selected file is copied into private app storage so a gallery cleanup or picker cache expiry will not break a saved project.
+3. Reorder clips, set each duration, trim the start of videos, and add captions. Play and scrub the composed preview.
+4. Open **Export → Render MP4**. When rendering finishes, play the actual MP4, share it, or save it to `Movies/Mockareel` on Android 10+.
+5. Projects autosave. The folder button opens the project library or creates a new project. Project backups include all media and can be imported on another device.
 
-With a developer-supplied Places API key, in-app search fetches the selected place's title, category, rating and address. Without a key, the app opens Google Maps search and supports manual editing. A missing key does not prevent building or using the editor.
+Exports are silent H.264 MP4s, 720 × 1280. Photo scenes render at 30 fps with a gentle zoom; video scenes retain their source cadence. Clips use cuts between scenes. There is no audio/music editor or animated left-scroll transition yet. Native video export currently supports Android only; platform-independent models/editor code stay in Dart.
 
-Project data contains media paths rather than copies of the selected media. Rendering a finished MP4, video playback, and portable project import are still pending; the current export shares the project description as JSON text.
+## Google Places
 
-## Run and build
+The app uses **Places API (New)** Text Search. Enable that API and billing in Google Cloud. Supply a client key with `--dart-define=MAPS_API_KEY=...` or enter it in the app's settings. A key saved in the app takes precedence over a build-time key. Restrict client keys to the required APIs and configure restrictions compatible with your deployment. Keys are never included in project backups or Git source.
 
-The Android project uses Flutter 3.47.7, JDK 21, Android SDK 36, and NDK 28.2.13676358. From this directory with those tools installed:
+The cloud environment's secret proxy may expose only a placeholder usable from cloud requests. Such a placeholder cannot be compiled into a phone APK. `tool/build_android.sh` includes a real `MAPS_API_KEY` environment value when available and otherwise leaves search configurable on device. It does not print the key.
 
-```sh
-flutter pub get
-flutter run
-flutter build apk --release
-```
+## Development
 
-The release APK is written to `build/app/outputs/flutter-apk/app-release.apk`.
-
-The current release configuration uses the generated Android debug signing key for installation during development. A production release needs a separate signing configuration.
-
-## Cloud development
-
-The existing checkout is `/workspace/mockareel`. SDKs and caches live outside the checkout in `/workspace/.tooling`. Use the existing checkout rather than creating a Git worktree.
+Use Flutter 3.47.7, JDK 21 and Android SDK 36. The first export target uses AndroidX Media3 Transformer; Media3 versions are aligned with `video_player_android`. The Flutter Gradle plugin currently requires the legacy Android DSL; Kotlin compilation is enabled through AGP 9's built-in Kotlin support.
 
 ```sh
 bash tool/setup_cloud.sh
 source tool/cloud_env.sh
 flutter analyze
 flutter test
-flutter build apk --release
+bash tool/build_android.sh
 ```
 
-Setup checks the SDK archive hashes, keeps TLS verification enabled, configures the Java proxy, and redirects tool caches to writable locations. Dart's native build hooks also need a one-time `dart --disable-analytics` initialization; if the sandbox rejects its configuration write, initialize `/home/agent/.dart-tool` with filesystem escalation rather than changing `HOME`.
+The APK is `build/app/outputs/flutter-apk/app-release.apk`. Development APKs use the existing development signing key. Version 0.2.0+2 can update the previous preview without uninstalling it, provided that signing key is preserved.
 
-For development with live place lookup, build with a real Places API key supplied using `--dart-define=MAPS_API_KEY=...`. This embeds the key in the APK. A cloud proxy secret placeholder cannot serve as a phone's API key; production lookup needs an appropriate mobile SDK or server integration. Live Google lookup cannot be validated without credentials.
+With an Android device/emulator connected:
+
+```sh
+flutter test integration_test/reel_flow_test.dart -d <device-id>
+```
+
+The device test creates a photo → trimmed video with source audio → photo project, plays the preview, uses the real native MP4 renderer, checks duration, resolution and muted audio, saves to MediaStore, and restores a portable backup with media. Unit/widget tests cover timeline boundaries, trimming, narrow layouts, save/reopen, durable media ownership, backup restoration, and Places request/error handling. Live Places lookup additionally needs a valid key.
+
+## Download
+
+The `apk-preview` branch holds the installable preview APK separately from application source. Open its `mockareel-preview.apk` file while signed into GitHub with repository access and choose **Download raw file**.

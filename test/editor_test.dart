@@ -1,84 +1,107 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/main.dart';
+import 'package:mockareel/model/project.dart';
+import 'package:mockareel/services/project_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  Future<void> openEditor(WidgetTester tester,
-      {double width = 390, Map<String, Object> preferences = const {}}) async {
-    tester.view.physicalSize = Size(width, 844);
+  late MemoryProjectStore store;
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    store = MemoryProjectStore();
+  });
+  Future<void> open(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    SharedPreferences.setMockInitialValues(preferences);
-    await tester.pumpWidget(const MockareelApp());
+    await tester.pumpWidget(MockareelApp(store: store));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('editor and all tabs render on a narrow Android phone',
+  testWidgets('real editor and export empty state fit a narrow phone',
       (tester) async {
-    await openEditor(tester, width: 360);
-    expect(find.text('Google Maps Place'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(4));
-    expect(tester.takeException(), isNull);
-
-    for (final tab in ['Cards', 'Scroll', 'Export', 'Edit']) {
+    await open(tester);
+    expect(find.text('MAPS PLACE STORY · 9:16'), findsOneWidget);
+    for (final tab in ['Timeline', 'Export', 'Place']) {
       await tester.tap(find.text(tab).last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: '$tab layout');
     }
-  });
-
-  testWidgets('saved place, card timing and media restore together',
-      (tester) async {
-    await openEditor(tester, preferences: {
-      'draft': jsonEncode({
-        'version': 1,
-        'place': {
-          'name': 'Cafe Test',
-          'subtitle': 'Coffee shop',
-          'rating': '4.9',
-          'address': 'Makati, Philippines',
-        },
-        'clipDurationsSeconds': [2, 2.5, 3, 3.5, 4],
-        'media': ['/tmp/test-photo.jpg'],
-      }),
-    });
-
-    final fields =
-        tester.widgetList<TextField>(find.byType(TextField)).toList();
-    expect(fields.map((f) => f.controller!.text),
-        ['Cafe Test', 'Coffee shop', '4.9', 'Makati, Philippines']);
-    await tester.tap(find.text('Scroll').last);
-    await tester.pumpAndSettle();
-    expect(find.text('2.0 sec'), findsOneWidget);
-    expect(find.text('4.0 sec'), findsOneWidget);
     await tester.tap(find.text('Export').last);
     await tester.pumpAndSettle();
-    expect(find.textContaining('1 media clips'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final renderButton = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Render MP4'));
+    expect(renderButton.onPressed, isNull);
+    expect(find.textContaining('Add at least one photo'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
-
-  testWidgets('edited place survives saving and reopening the app',
+  testWidgets('edited place persists and restores with the project',
       (tester) async {
-    await openEditor(tester);
-    await tester.enterText(find.byType(TextField).first, 'My weekend cafe');
-    await tester.tap(find.byIcon(Icons.save_outlined));
+    await open(tester);
+    final field = find.widgetWithText(TextField, 'Place name');
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'Weekend cafe');
+    await tester.tap(find.byTooltip('Save project'));
     await tester.pumpAndSettle();
-    final prefs = await SharedPreferences.getInstance();
-    final project =
-        jsonDecode(prefs.getString('draft')!) as Map<String, dynamic>;
-    expect(project['place']['name'], 'My weekend cafe');
-    expect(project['clipDurationsSeconds'], hasLength(5));
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpWidget(const MockareelApp());
-    await tester.pumpAndSettle();
+    expect((await store.restore()).place.name, 'Weekend cafe');
+    await tester.pumpWidget(const SizedBox());
+    await open(tester);
     expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'My weekend cafe');
+        tester
+            .widget<TextField>(find.widgetWithText(TextField, 'Place name'))
+            .controller!
+            .text,
+        'Weekend cafe');
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
+  testWidgets('timeline uses real clip count and independent timing',
+      (tester) async {
+    final p = ReelProject(
+        clips: List.generate(
+            7,
+            (i) => ReelClip(
+                id: '$i',
+                path: '/missing/$i.jpg',
+                name: 'Photo $i',
+                isVideo: false,
+                duration: i + 1)));
+    await store.save(p);
+    await open(tester);
+    await tester.tap(find.text('Timeline').last);
+    await tester.pumpAndSettle();
+    expect(find.text('7 clips · 28.0 seconds'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('Remove clip 1'));
+    await tester.tap(find.byTooltip('Remove clip 1'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, 800));
+    await tester.pumpAndSettle();
+    expect(find.text('6 clips · 27.0 seconds'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Save project'));
+    await tester.pumpAndSettle();
+    expect((await store.restore()).clips.first.name, 'Photo 1');
+    await tester.pumpWidget(const SizedBox());
+  });
+}
+
+class MemoryProjectStore extends ProjectStore {
+  final _projects = <String, ReelProject>{};
+  String? _current;
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<void> save(ReelProject p) async {
+    _projects[p.id] = ReelProject.fromJson(p.toJson());
+    _current = p.id;
+  }
+
+  @override
+  Future<ReelProject> restore() async => _current == null
+      ? ReelProject()
+      : ReelProject.fromJson(_projects[_current]!.toJson());
+  @override
+  Future<List<ReelProject>> projects() async => _projects.values.toList();
 }

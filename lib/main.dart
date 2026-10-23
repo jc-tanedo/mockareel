@@ -1,783 +1,947 @@
-import 'dart:convert';
-
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
+import 'model/project.dart';
+import 'services/native_renderer.dart';
+import 'services/places.dart';
+import 'services/project_store.dart';
+import 'widgets/reel_preview.dart';
 
-void main() => runApp(const MockareelApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MockareelApp());
+}
 
-const ink = Color(0xFF0A1018);
-const panel = Color(0xFF111B27);
-const mint = Color(0xFF55E3C0);
+const ink = Color(0xff0a1018),
+    panel = Color(0xff111b27),
+    mint = Color(0xff55e3c0);
 
 class MockareelApp extends StatelessWidget {
-  const MockareelApp({super.key});
-
+  final ProjectStore? store;
+  const MockareelApp({super.key, this.store});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Mockareel',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
+      title: 'Mockareel',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
           brightness: Brightness.dark,
           scaffoldBackgroundColor: ink,
+          useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
               seedColor: mint, brightness: Brightness.dark),
-          useMaterial3: true,
           inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: const Color(0xFF182432),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          ),
-        ),
-        home: const EditorPage(),
-      );
+              filled: true,
+              fillColor: panel,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none))),
+      home: EditorPage(store: store));
 }
 
 class EditorPage extends StatefulWidget {
-  const EditorPage({super.key});
+  final ProjectStore? store;
+  const EditorPage({super.key, this.store});
   @override
   State<EditorPage> createState() => _EditorPageState();
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final _picker = ImagePicker();
-  final _name = TextEditingController(text: 'Kura Sushi Nishishinjuku');
-  final _subtitle =
-      TextEditingController(text: 'Conveyor belt sushi · Japanese restaurant');
-  final _rating = TextEditingController(text: '4.6');
-  final _address = TextEditingController(text: 'Shinjuku, Tokyo, Japan');
-  final List<XFile> _media = [];
-  final List<double> _durations = [3.5, 3.5, 4, 3.5, 4];
-  int _tab = 0;
-  int _selected = 0;
-  bool _saved = false;
-  static const _mapsApiKey = String.fromEnvironment('MAPS_API_KEY');
-
+  late final ProjectStore _store = widget.store ?? ProjectStore();
+  final _renderer = NativeRenderer();
+  final _captureKey = GlobalKey();
+  final _name = TextEditingController(),
+      _category = TextEditingController(),
+      _rating = TextEditingController(),
+      _address = TextEditingController();
+  ReelProject _project = ReelProject();
+  int _tab = 0, _selected = 0, _captureIndex = 0, _editRevision = 0;
+  bool _ready = false, _importing = false, _exporting = false, _dirty = false;
+  double? _progress;
+  String _key = '', _status = '', _previewRevision = 'initial';
+  Timer? _autosave;
+  StreamSubscription<double>? _progressSubscription;
+  static const _buildKey = String.fromEnvironment('MAPS_API_KEY');
   @override
   void initState() {
     super.initState();
-    _loadDraft();
+    _initialize();
   }
 
-  Future<void> _loadDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString('draft');
-    if (value == null || !mounted) return;
-    final data = jsonDecode(value) as Map<String, dynamic>;
-    setState(() {
-      final place = data['place'] as Map<String, dynamic>? ?? data;
-      _name.text = place['name'] as String? ?? _name.text;
-      _subtitle.text = place['subtitle'] as String? ?? _subtitle.text;
-      _rating.text = place['rating'] as String? ?? _rating.text;
-      _address.text = place['address'] as String? ?? _address.text;
-      _durations.setAll(
-          0,
-          ((data['clipDurationsSeconds'] ?? data['durations'])
-                      as List<dynamic>? ??
-                  [])
-              .map((e) => (e as num).toDouble())
-              .take(5));
-      _media.addAll((data['media'] as List<dynamic>? ?? [])
-          .whereType<String>()
-          .map(XFile.new));
-    });
+  Future<void> _initialize() async {
+    try {
+      await _store.initialize();
+      final project = await _store.restore();
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      _key = prefs.getString('mapsApiKey') ?? _buildKey;
+      _setProject(project);
+      setState(() => _ready = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _status = 'Could not open project storage: $e');
+      }
+    }
   }
 
-  Map<String, Object> _project() => {
-        'template': 'Google Maps Place Story',
-        'version': 1,
-        'place': {
-          'name': _name.text,
-          'subtitle': _subtitle.text,
-          'rating': _rating.text,
-          'address': _address.text
-        },
-        'clipDurationsSeconds': _durations,
-        'media': _media.map((f) => f.path).toList(),
-        'format': '9:16',
-        'createdAt': DateTime.now().toIso8601String(),
-      };
-
-  Future<void> _save() async {
-    final p = _project();
-    await (await SharedPreferences.getInstance())
-        .setString('draft', jsonEncode(p));
-    if (mounted) setState(() => _saved = true);
-    _toast('Project saved on this device');
+  void _setProject(ReelProject project) {
+    _project = project;
+    _selected = 0;
+    _captureIndex = 0;
+    _name.text = project.place.name;
+    _category.text = project.place.category;
+    _rating.text = project.place.rating;
+    _address.text = project.place.address;
+    _dirty = false;
+    _previewRevision = newId();
   }
+
+  void _change() {
+    _project.place.name = _name.text;
+    _project.place.category = _category.text;
+    _project.place.rating = _rating.text;
+    _project.place.address = _address.text;
+    _editRevision++;
+    setState(() => _dirty = true);
+    _autosave?.cancel();
+    _autosave =
+        Timer(const Duration(milliseconds: 700), () => _save(silent: true));
+  }
+
+  Future<void> _save({bool silent = false}) async {
+    _autosave?.cancel();
+    try {
+      final revision = _editRevision;
+      await _store.save(_project);
+      if (!mounted) return;
+      if (revision == _editRevision) setState(() => _dirty = false);
+      if (!silent) _toast('Project and media saved on this device');
+    } catch (_) {
+      if (mounted) {
+        _toast('Could not save project. Check available device storage.');
+      }
+    }
+  }
+
+  void _toast(String text) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
+  }
+
+  String _error(Object e) => e is PlatformException
+      ? e.message ?? e.code
+      : e.toString().replaceFirst('Exception: ', '');
 
   Future<void> _pickMedia() async {
-    final files = await _picker.pickMultipleMedia();
-    if (files.isNotEmpty && mounted) {
-      setState(() {
-        _media.addAll(files);
-        _selected = _media.length - 1;
-      });
+    if (_importing) return;
+    setState(() => _importing = true);
+    var failures = 0;
+    try {
+      final files = await ImagePicker().pickMultipleMedia();
+      for (final file in files) {
+        String? retained;
+        try {
+          final video = file.mimeType?.startsWith('video/') == true ||
+              RegExp(r'\.(mp4|mov|m4v|webm|mkv|3gp)$', caseSensitive: false)
+                  .hasMatch(file.name);
+          final metadata =
+              video ? await _renderer.inspect(file.path) : <String, dynamic>{};
+          final length = (metadata['duration'] as num?)?.toDouble() ?? 0;
+          if (video && length <= 0) {
+            throw const FormatException('Video duration is unavailable');
+          }
+          retained = await _store.retainMedia(file.path, file.name);
+          final clip = ReelClip(
+              id: newId(),
+              path: retained,
+              name: file.name,
+              isVideo: video,
+              sourceDuration: length,
+              duration: video ? min(3.5, length) : 3.5);
+          if (!mounted) return;
+          _project.clips.add(clip);
+          _selected = _project.clips.length - 1;
+        } catch (_) {
+          failures++;
+          if (retained != null) await File(retained).delete();
+        }
+      }
+      if (mounted) {
+        _previewRevision = newId();
+        _change();
+      }
+      if (failures > 0) {
+        _toast(
+            '$failures files could not be opened. Try JPG/PNG images or MP4 video.');
+      }
+    } catch (e) {
+      _toast(_error(e));
+    } finally {
+      if (mounted) setState(() => _importing = false);
     }
+  }
+
+  Future<void> _settings() async {
+    final controller = TextEditingController(text: _key);
+    final value = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: const Text('Google Places key'),
+                content: SingleChildScrollView(
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text(
+                          'Enable Places API (New) and billing in your Google Cloud project. The key is stored on this device and used only for place search.'),
+                      const SizedBox(height: 14),
+                      TextField(
+                          controller: controller,
+                          obscureText: true,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          decoration:
+                              const InputDecoration(labelText: 'API key')),
+                      const SizedBox(height: 10),
+                      const Text(
+                          'Manual place editing and video export work without a key.',
+                          style:
+                              TextStyle(color: Colors.white60, fontSize: 12)),
+                    ])),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(ctx, controller.text.trim()),
+                      child: const Text('Save key'))
+                ]));
+    if (value != null) {
+      await (await SharedPreferences.getInstance())
+          .setString('mapsApiKey', value);
+      if (mounted) setState(() => _key = value);
+    }
+    // The route's closing animation still references the controller; let its field own teardown.
   }
 
   Future<void> _findPlace() async {
-    if (_mapsApiKey.isEmpty) {
-      final q = Uri.encodeComponent(
-          _name.text.isEmpty ? 'restaurants near me' : _name.text);
-      await launchUrl(
-          Uri.parse('https://www.google.com/maps/search/?api=1&query=$q'),
-          mode: LaunchMode.externalApplication);
-      if (mounted) {
-        _toast('Add a Places API key to enable in-app search and autofill.');
-      }
-      return;
+    if (_key.isEmpty) {
+      await _settings();
+      if (_key.isEmpty || !mounted) return;
     }
-    final query = TextEditingController(text: _name.text);
-    List<Map<String, dynamic>> results = [];
-    bool loading = false;
-    String? error;
-    await showDialog<void>(
+    final place = await showDialog<PlaceDetails>(
         context: context,
-        builder: (dialogContext) => StatefulBuilder(
-            builder: (context, refresh) => AlertDialog(
-                  backgroundColor: panel,
-                  title: const Text('Find a place'),
-                  content: SizedBox(
-                      width: 420,
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        TextField(
-                            controller: query,
-                            autofocus: true,
-                            decoration: InputDecoration(
-                                hintText: 'Search places',
-                                suffixIcon: IconButton(
-                                    onPressed: loading
-                                        ? null
-                                        : () async {
-                                            refresh(() {
-                                              loading = true;
-                                              error = null;
-                                            });
-                                            try {
-                                              final response = await http.post(
-                                                  Uri.https(
-                                                      'places.googleapis.com',
-                                                      '/v1/places:autocomplete'),
-                                                  headers: {
-                                                    'Content-Type':
-                                                        'application/json',
-                                                    'X-Goog-Api-Key':
-                                                        _mapsApiKey
-                                                  },
-                                                  body: jsonEncode(
-                                                      {'input': query.text}));
-                                              if (response.statusCode != 200) {
-                                                throw Exception(
-                                                    'Places search returned ${response.statusCode}. Check API key and Places API access.');
-                                              }
-                                              results = ((jsonDecode(
-                                                                  response.body)[
-                                                              'suggestions']
-                                                          as List<dynamic>? ??
-                                                      [])
-                                                  .where((e) => (e as Map<
-                                                          String, dynamic>)
-                                                      .containsKey(
-                                                          'placePrediction'))
-                                                  .map((e) => e['placePrediction']
-                                                      as Map<String, dynamic>)
-                                                  .toList());
-                                            } catch (e) {
-                                              error = e.toString().replaceFirst(
-                                                  'Exception: ', '');
-                                            }
-                                            refresh(() {
-                                              loading = false;
-                                            });
-                                          },
-                                    icon:
-                                        const Icon(Icons.search, color: mint))),
-                            onSubmitted: (_) =>
-                                FocusScope.of(context).unfocus()),
-                        if (loading)
-                          const Padding(
-                              padding: EdgeInsets.all(18),
-                              child: CircularProgressIndicator(color: mint)),
-                        if (error != null)
-                          Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Text(error!,
-                                  style: const TextStyle(
-                                      color: Colors.orangeAccent,
-                                      fontSize: 12))),
-                        if (!loading && results.isNotEmpty)
-                          ...results.map((item) {
-                            final structured = item['structuredFormat']
-                                    as Map<String, dynamic>? ??
-                                {};
-                            final main = (structured['mainText']
-                                        as Map<String, dynamic>?)?['text']
-                                    as String? ??
-                                '';
-                            final secondary = (structured['secondaryText']
-                                        as Map<String, dynamic>?)?['text']
-                                    as String? ??
-                                '';
-                            return ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: const Icon(Icons.location_on_outlined,
-                                    color: mint),
-                                title: Text(main,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                subtitle: Text(secondary,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                onTap: () async {
-                                  final placeId = item['placeId'] as String?;
-                                  if (placeId == null) return;
-                                  Navigator.pop(dialogContext);
-                                  await _loadPlace(placeId);
-                                });
-                          }),
-                        if (!loading && results.isEmpty && error == null)
-                          const Padding(
-                              padding: EdgeInsets.only(top: 14),
-                              child: Text(
-                                  'Search for a place to see matching results.',
-                                  style: TextStyle(
-                                      color: Colors.white54, fontSize: 12))),
-                      ])),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(dialogContext),
-                        child: const Text('Cancel'))
-                  ],
-                )));
-    query.dispose();
+        builder: (_) => PlaceSearchDialog(apiKey: _key, initial: _name.text));
+    if (place == null || !mounted) return;
+    setState(() {
+      _project.place = place;
+      _name.text = place.name;
+      _category.text = place.category;
+      _rating.text = place.rating;
+      _address.text = place.address;
+      if (_project.title == 'Untitled reel') _project.title = place.name;
+    });
+    _change();
   }
 
-  Future<void> _loadPlace(String placeId) async {
+  Future<void> _projects() async {
+    await _save(silent: true);
+    final projects = await _store.projects();
+    if (!mounted) return;
+    final result = await showModalBottomSheet<Object>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => SafeArea(
+            child: SizedBox(
+                height: 440,
+                child: Column(children: [
+                  Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(children: [
+                        const Expanded(
+                            child: Text('Your projects',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold))),
+                        TextButton.icon(
+                            onPressed: () => Navigator.pop(ctx, 'new'),
+                            icon: const Icon(Icons.add),
+                            label: const Text('New'))
+                      ])),
+                  ListTile(
+                      leading: const Icon(Icons.file_open_outlined),
+                      title: const Text('Import a project backup'),
+                      onTap: () => Navigator.pop(ctx, 'import')),
+                  Expanded(
+                      child: ListView(
+                          children: projects
+                              .map((p) => ListTile(
+                                  leading: const Icon(Icons.movie_outlined),
+                                  title: Text(p.title),
+                                  subtitle: Text(
+                                      '${p.clips.length} clips · ${p.duration.toStringAsFixed(1)} seconds'),
+                                  trailing: p.id == _project.id
+                                      ? const Icon(Icons.check, color: mint)
+                                      : null,
+                                  onTap: () => Navigator.pop(ctx, p)))
+                              .toList())),
+                ]))));
+    if (!mounted || result == null) return;
+    if (result == 'import') {
+      await _importBackup();
+      return;
+    }
+    setState(() => _setProject(result is ReelProject ? result : ReelProject()));
+    await _save(silent: true);
+  }
+
+  Future<void> _rename() async {
+    final controller = TextEditingController(text: _project.title);
+    final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: const Text('Project name'),
+                content: TextField(
+                    controller: controller, autofocus: true, maxLength: 80),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(ctx, controller.text.trim()),
+                      child: const Text('Save'))
+                ]));
+    if (result != null && result.isNotEmpty && mounted) {
+      _project.title = result;
+      _change();
+    }
+  }
+
+  Future<void> _backup() async {
     try {
-      final response = await http.get(
-          Uri.https('places.googleapis.com', '/v1/places/$placeId',
-              {'languageCode': 'en'}),
-          headers: {
-            'X-Goog-Api-Key': _mapsApiKey,
-            'X-Goog-FieldMask':
-                'displayName,formattedAddress,shortFormattedAddress,rating,primaryTypeDisplayName'
-          });
-      if (response.statusCode != 200) {
-        throw Exception('Place details returned ${response.statusCode}.');
-      }
-      final place = jsonDecode(response.body) as Map<String, dynamic>;
-      if (!mounted) return;
-      setState(() {
-        _name.text = (place['displayName'] as Map<String, dynamic>?)?['text']
-                as String? ??
-            _name.text;
-        _subtitle.text = (place['primaryTypeDisplayName']
-                as Map<String, dynamic>?)?['text'] as String? ??
-            _subtitle.text;
-        _rating.text =
-            (place['rating'] as num?)?.toStringAsFixed(1) ?? _rating.text;
-        _address.text = place['shortFormattedAddress'] as String? ??
-            place['formattedAddress'] as String? ??
-            _address.text;
-      });
-      _toast('Place details added. Edit any field below.');
+      await _save(silent: true);
+      final path = await _store.backup(_project);
+      await SharePlus.instance.share(ShareParams(
+          files: [XFile(path, mimeType: 'application/zip')],
+          subject: '${_project.title} — Mockareel project'));
     } catch (e) {
-      if (mounted) _toast(e.toString().replaceFirst('Exception: ', ''));
+      _toast('Could not share backup: ${_error(e)}');
+    }
+  }
+
+  Future<void> _importBackup() async {
+    try {
+      final file = await FilePicker.pickFile(type: FileType.any);
+      final path = file?.path;
+      if (path == null) return;
+      final project = await _store.importBackup(path);
+      if (mounted) setState(() => _setProject(project));
+      _toast('Project imported with its media');
+    } catch (e) {
+      _toast('Import failed: ${_error(e)}');
     }
   }
 
   Future<void> _export() async {
-    await Share.share(const JsonEncoder.withIndent('  ').convert(_project()),
-        subject: 'My Mockareel project');
+    if (_project.clips.isEmpty || _exporting) return;
+    setState(() {
+      _exporting = true;
+      _progress = null;
+      _status = 'Preparing your reel…';
+      _previewRevision = newId();
+    });
+    Directory? temp;
+    try {
+      await _save(silent: true);
+      for (final clip in _project.clips) {
+        if (!await File(clip.path).exists()) {
+          throw Exception(
+              '“${clip.name}” is missing. Remove or replace that clip.');
+        }
+      }
+      temp = await Directory('${_store.root!.path}/exports/overlay_${newId()}')
+          .create();
+      final overlays = <String>[];
+      for (var i = 0; i < _project.clips.length; i++) {
+        if (!mounted) return;
+        setState(() => _captureIndex = i);
+        await SchedulerBinding.instance.endOfFrame;
+        final boundary = _captureKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 2);
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        final file = File('${temp.path}/$i.png');
+        await file.writeAsBytes(data!.buffer.asUint8List());
+        overlays.add(file.path);
+      }
+      _progressSubscription = _renderer.progress.listen((value) {
+        if (mounted) {
+          setState(() {
+            _progress = value;
+            _status = 'Rendering MP4 on this device…';
+          });
+        }
+      });
+      final path = await _renderer.export(_project, overlays);
+      if (!mounted) return;
+      setState(() => _status = 'Reel exported');
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => ExportedVideoPage(path: path, renderer: _renderer)));
+    } catch (e) {
+      _toast(_error(e));
+    } finally {
+      await _progressSubscription?.cancel();
+      _progressSubscription = null;
+      if (temp != null && await temp.exists()) {
+        await temp.delete(recursive: true);
+      }
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+          _progress = null;
+        });
+      }
+    }
   }
-
-  void _toast(String message) => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-          child: Column(children: [
-        _topBar(),
-        Expanded(
-            child: IndexedStack(index: _tab, children: [
-          _editTab(),
-          _cardsTab(),
-          _scrollTab(),
-          _exportTab()
-        ])),
-        _bottomNav(),
-      ])),
-    );
-  }
-
-  Widget _topBar() => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
-        child: Column(children: [
-          Row(children: [
-            Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                    color: mint.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.location_on_rounded,
-                    color: mint, size: 21)),
-            const SizedBox(width: 10),
-            const Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text('Google Maps Place',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  Text('STORY STUDIO  ·  9:16 VERTICAL',
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 9,
-                          letterSpacing: 1.2))
-                ])),
-            IconButton(
-                onPressed: _save,
-                icon: Icon(
-                    _saved ? Icons.cloud_done_rounded : Icons.save_outlined,
-                    color: mint)),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-                child: OutlinedButton.icon(
-                    onPressed: _findPlace,
-                    icon: const Icon(Icons.search, size: 16),
-                    label: const Text('Find a place'),
-                    style: _outlineButton())),
-            const SizedBox(width: 8),
-            Expanded(
-                child: FilledButton.icon(
-                    onPressed: _export,
-                    icon: const Icon(Icons.file_upload_outlined, size: 16),
-                    label: const Text('Export project'),
-                    style: FilledButton.styleFrom(
-                        backgroundColor: mint, foregroundColor: ink))),
-          ]),
-        ]),
-      );
-
-  ButtonStyle _outlineButton() => OutlinedButton.styleFrom(
-      foregroundColor: mint,
-      side: BorderSide(color: mint.withValues(alpha: .4)),
-      visualDensity: VisualDensity.compact);
-
-  Widget _editTab() =>
-      ListView(padding: const EdgeInsets.fromLTRB(18, 10, 18, 24), children: [
-        _preview(),
-        const SizedBox(height: 18),
-        _sectionTitle('PLACE DETAILS', 'Edit any field'),
-        const SizedBox(height: 12),
-        _field('Place name', _name, Icons.place_outlined),
-        const SizedBox(height: 9),
-        _field('Category & description', _subtitle, Icons.short_text_rounded),
-        const SizedBox(height: 9),
-        Row(children: [
-          Expanded(
-              child: _field('Rating', _rating, Icons.star_outline_rounded,
-                  keyboard: TextInputType.number)),
-          const SizedBox(width: 9),
-          Expanded(child: _field('Location', _address, Icons.map_outlined))
-        ]),
-        const SizedBox(height: 18),
-        _sectionTitle('YOUR MEDIA', '${_media.length} clips'),
-        const SizedBox(height: 10),
-        _uploadCard(),
-        if (_media.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          ...List.generate(_media.length, (i) => _mediaTile(i)),
-        ],
-      ]);
-
-  Widget _preview() => Container(
-        height: 245,
-        decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF214A51),
-                  Color(0xFF152A36),
-                  Color(0xFF35253B)
-                ]),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white12)),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(children: [
-          Positioned(
-              top: -25,
-              right: -5,
-              child: Icon(Icons.ramen_dining,
-                  size: 210, color: Colors.white.withValues(alpha: .06))),
-          Positioned(
-              left: 20,
-              top: 24,
-              child: _chip(Icons.location_on, 'PLACE PREVIEW')),
-          Positioned(
-              top: 22, right: 18, child: _chip(Icons.aspect_ratio, '9:16')),
-          Positioned(
-              left: 18,
-              right: 18,
-              bottom: 16,
-              child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                      color: const Color(0xFF101820).withValues(alpha: .92),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.white12)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Expanded(
-                              child: Text(
-                                  _name.text.isEmpty
-                                      ? 'Your place name'
-                                      : _name.text,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold))),
-                          const Icon(Icons.star_rounded,
-                              color: Color(0xFFFFC857), size: 17),
-                          Text(' ${_rating.text}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700))
-                        ]),
-                        const SizedBox(height: 4),
-                        Text(
-                            _subtitle.text.isEmpty
-                                ? 'Category and description'
-                                : _subtitle.text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 11)),
-                        const SizedBox(height: 10),
-                        Row(children: [
-                          for (final pair in const [
-                            (Icons.directions, 'Directions'),
-                            (Icons.restaurant, 'Menu'),
-                            (Icons.call, 'Call'),
-                            (Icons.bookmark_border, 'Save')
-                          ])
-                            Expanded(
-                                child: Container(
-                                    margin: const EdgeInsets.only(right: 5),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 7),
-                                    decoration: BoxDecoration(
-                                        color: mint.withValues(alpha: .12),
-                                        borderRadius: BorderRadius.circular(8)),
-                                    child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(pair.$1, size: 12, color: mint),
-                                          const SizedBox(width: 3),
-                                          Flexible(
-                                              child: Text(pair.$2,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                      fontSize: 9,
-                                                      color: mint)))
-                                        ])))
-                        ]),
-                        const SizedBox(height: 8),
-                        Text(_address.text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: Colors.white54, fontSize: 10)),
-                      ]))),
-        ]),
-      );
-
-  Widget _chip(IconData icon, String text) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-          color: ink.withValues(alpha: .72),
-          borderRadius: BorderRadius.circular(20)),
-      child: Row(children: [
-        Icon(icon, size: 12, color: mint),
-        const SizedBox(width: 5),
-        Text(text, style: const TextStyle(fontSize: 9, letterSpacing: .8))
-      ]));
-  Widget _sectionTitle(String title, String trailing) => Row(children: [
-        Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.white60,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w700))),
-        const SizedBox(width: 8),
-        Text(trailing, style: const TextStyle(fontSize: 10, color: mint))
-      ]);
-  Widget _field(String label, TextEditingController controller, IconData icon,
-          {TextInputType? keyboard}) =>
-      TextField(
-          controller: controller,
-          keyboardType: keyboard,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-              labelText: label,
-              prefixIcon: Icon(icon, size: 18, color: mint),
-              labelStyle: const TextStyle(fontSize: 12)));
-
-  Widget _uploadCard() => InkWell(
-      onTap: _pickMedia,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-              color: panel,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: mint.withValues(alpha: .25))),
-          child: Row(children: [
-            Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                    color: mint.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.add_photo_alternate_outlined,
-                    color: mint)),
-            const SizedBox(width: 12),
-            const Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text('Add videos & photos',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
-                  SizedBox(height: 3),
-                  Text('Choose multiple clips from your library',
-                      style: TextStyle(color: Colors.white54, fontSize: 11))
-                ])),
-            const Icon(Icons.add_circle_outline, color: mint)
-          ])));
-
-  Widget _mediaTile(int i) => Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration:
-          BoxDecoration(color: panel, borderRadius: BorderRadius.circular(15)),
-      child: Row(children: [
-        Container(
-            width: 35,
-            height: 38,
-            decoration: BoxDecoration(
-                color: const Color(0xFF253642),
-                borderRadius: BorderRadius.circular(9)),
-            child: Icon(
-                _media[i].mimeType?.startsWith('video') == true
-                    ? Icons.play_arrow_rounded
-                    : Icons.image_outlined,
-                color: mint,
-                size: 19)),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(_media[i].name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600))),
-        IconButton(
-            onPressed: () => setState(() => _media.removeAt(i)),
-            icon: const Icon(Icons.close, size: 17, color: Colors.white54)),
-        const Text('SEC', style: TextStyle(fontSize: 9, color: Colors.white54)),
-        SizedBox(
-            width: 88,
-            child: Slider(
-                value: _durations[i % 5],
-                min: 1,
-                max: 8,
-                divisions: 14,
-                activeColor: mint,
-                onChanged: (v) => setState(() => _durations[i % 5] = v)))
-      ]));
-
-  Widget _cardsTab() => ListView(padding: const EdgeInsets.all(18), children: [
-        _sectionTitle('STORY CARDS', '5 cards · 9:16'),
-        const SizedBox(height: 12),
-        for (int i = 0; i < 5; i++)
-          Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                  color: panel,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: i == _selected
-                          ? mint.withValues(alpha: .4)
-                          : Colors.white10)),
-              child: Row(children: [
-                CircleAvatar(
-                    radius: 15,
-                    backgroundColor: mint.withValues(alpha: .12),
-                    child: Text('${i + 1}',
-                        style: const TextStyle(color: mint, fontSize: 12))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Text(
-                        [
-                          'Sushi plates',
-                          'Nigiri close-up',
-                          'Salmon & ikura',
-                          'Conveyor belt',
-                          'Shinjuku table'
-                        ][i],
-                        style: const TextStyle(fontWeight: FontWeight.w600))),
-                Text('${_durations[i].toStringAsFixed(1)}s',
-                    style: const TextStyle(color: mint, fontSize: 12))
-              ])),
-        const SizedBox(height: 10),
-        _uploadCard(),
-      ]);
-
-  Widget _scrollTab() => ListView(padding: const EdgeInsets.all(18), children: [
-        _sectionTitle('LEFT-SCROLL STORY',
-            '5 cards · ${_durations.fold<double>(0, (a, b) => a + b).toStringAsFixed(1)}s'),
-        const SizedBox(height: 18),
-        Container(
-            padding: const EdgeInsets.all(17),
-            decoration: BoxDecoration(
-                color: panel, borderRadius: BorderRadius.circular(20)),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Card timing',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 5),
-              const Text('Adjust how long each scene stays on screen.',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
-              const SizedBox(height: 18),
-              for (int i = 0; i < 5; i++)
-                Column(children: [
-                  Row(children: [
-                    Text('CARD ${i + 1}',
-                        style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                            letterSpacing: 1)),
-                    const Spacer(),
-                    Text('${_durations[i].toStringAsFixed(1)} sec',
-                        style: const TextStyle(
-                            color: mint, fontWeight: FontWeight.w700))
-                  ]),
-                  Slider(
-                      value: _durations[i],
-                      min: 1,
-                      max: 8,
-                      divisions: 14,
-                      activeColor: mint,
-                      onChanged: (v) => setState(() => _durations[i] = v))
-                ])
-            ])),
-      ]);
-
-  Widget _exportTab() => ListView(padding: const EdgeInsets.all(18), children: [
-        _sectionTitle('EXPORT YOUR REEL', '9:16 VERTICAL'),
-        const SizedBox(height: 16),
-        Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-                color: panel, borderRadius: BorderRadius.circular(20)),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.movie_creation_outlined, color: mint, size: 30),
-              const SizedBox(height: 12),
-              const Text('Your story is ready to shape',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text(
-                  '${_media.length} media clips · ${_durations.fold<double>(0, (a, b) => a + b).toStringAsFixed(1)} seconds · ${_name.text}',
-                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
-              const SizedBox(height: 18),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                      onPressed: _export,
-                      icon: const Icon(Icons.ios_share),
-                      label: const Text('Export project file'),
-                      style: FilledButton.styleFrom(
-                          backgroundColor: mint,
-                          foregroundColor: ink,
-                          padding: const EdgeInsets.all(14)))),
-              const SizedBox(height: 10),
-              SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.bookmark_add_outlined),
-                      label: const Text('Save project on device'),
-                      style: _outlineButton().copyWith(
-                          padding: const WidgetStatePropertyAll(
-                              EdgeInsets.all(13)))))
-            ])),
-        const SizedBox(height: 12),
-        const Text(
-            'Project export keeps your place details and timing so you can pick up editing later. Media files stay in your device library.',
-            style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5)),
-      ]);
-
-  Widget _bottomNav() => Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 5),
-        decoration: const BoxDecoration(
-            color: Color(0xFF0E1620),
-            border: Border(top: BorderSide(color: Colors.white10))),
-        child: Row(children: [
-          for (final entry in [
-            (Icons.tune_rounded, 'Edit', 0),
-            (Icons.dashboard_customize_outlined, 'Cards', 1),
-            (Icons.view_carousel_outlined, 'Scroll', 2),
-            (Icons.ios_share_outlined, 'Export', 3)
-          ])
-            Expanded(
-                child: InkWell(
-              onTap: () => setState(() => _tab = entry.$3),
-              child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(entry.$1,
-                        size: 19,
-                        color: _tab == entry.$3 ? mint : Colors.white54),
-                    const SizedBox(height: 4),
-                    Text(entry.$2,
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: _tab == entry.$3 ? mint : Colors.white54)),
-                  ])),
-            )),
-        ]),
-      );
 
   @override
   void dispose() {
-    _name.dispose();
-    _subtitle.dispose();
-    _rating.dispose();
-    _address.dispose();
+    _autosave?.cancel();
+    _progressSubscription?.cancel();
+    if (_exporting) _renderer.cancel();
+    for (final c in [_name, _category, _rating, _address]) {
+      c.dispose();
+    }
     super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) {
+      return Scaffold(
+          body: Center(
+              child: _status.isEmpty
+                  ? const CircularProgressIndicator()
+                  : Text(_status)));
+    }
+    return PopScope(
+        canPop: !_exporting,
+        child: Stack(children: [
+          // The capture surface is painted behind the opaque editor. It stays exactly
+          // 360×640 logical pixels regardless of the phone screen or accessibility scale.
+          Positioned(
+              left: 0,
+              top: 0,
+              width: 360,
+              height: 640,
+              child: ExcludeSemantics(
+                  child: IgnorePointer(
+                      child: MediaQuery.withNoTextScaling(
+                          child: RepaintBoundary(
+                              key: _captureKey,
+                              child: PlaceOverlay(
+                                  project: _project, index: _captureIndex)))))),
+          Scaffold(
+              appBar: AppBar(
+                  titleSpacing: 4,
+                  leading: IconButton(
+                      tooltip: 'Saved projects',
+                      onPressed: _projects,
+                      icon: const Icon(Icons.folder_open_outlined)),
+                  title: InkWell(
+                      onTap: _rename,
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_project.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w700)),
+                            const Text('MAPS PLACE STORY · 9:16',
+                                style: TextStyle(
+                                    fontSize: 9, color: mint, letterSpacing: 1))
+                          ])),
+                  actions: [
+                    IconButton(
+                        tooltip: 'Save project',
+                        onPressed: _save,
+                        icon: Icon(
+                            _dirty
+                                ? Icons.save_outlined
+                                : Icons.check_circle_outline,
+                            color: mint)),
+                    IconButton(
+                        tooltip: 'Maps API settings',
+                        onPressed: _settings,
+                        icon: const Icon(Icons.settings_outlined))
+                  ]),
+              body: IndexedStack(
+                  index: _tab,
+                  children: [_editTab(), _timelineTab(), _exportTab()]),
+              bottomNavigationBar: NavigationBar(
+                  selectedIndex: _tab,
+                  onDestinationSelected: (i) => setState(() {
+                        _tab = i;
+                        _previewRevision = newId();
+                      }),
+                  destinations: const [
+                    NavigationDestination(
+                        icon: Icon(Icons.edit_location_alt_outlined),
+                        label: 'Place'),
+                    NavigationDestination(
+                        icon: Icon(Icons.video_collection_outlined),
+                        label: 'Timeline'),
+                    NavigationDestination(
+                        icon: Icon(Icons.ios_share), label: 'Export'),
+                  ])),
+          if (_exporting)
+            Positioned.fill(
+                child: ColoredBox(
+                    color: Colors.black87,
+                    child: Center(
+                        child: Padding(
+                            padding: const EdgeInsets.all(30),
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.movie_creation_outlined,
+                                      size: 44, color: mint),
+                                  const SizedBox(height: 20),
+                                  Text(_status, textAlign: TextAlign.center),
+                                  const SizedBox(height: 20),
+                                  LinearProgressIndicator(value: _progress),
+                                  const SizedBox(height: 12),
+                                  Text(_progress == null
+                                      ? 'Keep the app open while rendering'
+                                      : '${(_progress! * 100).round()}%'),
+                                  const SizedBox(height: 18),
+                                  TextButton(
+                                      onPressed: _progressSubscription == null
+                                          ? null
+                                          : _renderer.cancel,
+                                      child: const Text('Cancel export')),
+                                ]))))),
+        ]));
+  }
+
+  Widget _preview() => TimelinePreview(
+      key: ValueKey(_previewRevision), project: _project, selected: _selected);
+  Widget _editTab() => ListView(padding: const EdgeInsets.all(18), children: [
+        _preview(),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+            onPressed: _findPlace,
+            icon: const Icon(Icons.search),
+            label: const Text('Find a place on Google Maps')),
+        const SizedBox(height: 20),
+        const Text('PLACE DETAILS',
+            style: TextStyle(color: mint, fontSize: 11, letterSpacing: 1.5)),
+        const SizedBox(height: 12),
+        _field('Place name', _name),
+        _field('Category & description', _category),
+        _field('Rating', _rating,
+            keyboard: const TextInputType.numberWithOptions(decimal: true)),
+        _field('Address', _address),
+        const Text('All details remain editable after lookup.',
+            style: TextStyle(fontSize: 12, color: Colors.white60)),
+        const SizedBox(height: 18),
+        _addMedia(),
+      ]);
+  Widget _field(String name, TextEditingController controller,
+          {TextInputType? keyboard}) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+              controller: controller,
+              keyboardType: keyboard,
+              onChanged: (_) => _change(),
+              decoration: InputDecoration(labelText: name)));
+  Widget _addMedia() => OutlinedButton.icon(
+      onPressed: _importing ? null : _pickMedia,
+      icon: _importing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.add_photo_alternate_outlined),
+      label: Text(_importing ? 'Importing media…' : 'Add photos & videos'));
+  Widget _timelineTab() =>
+      ListView(padding: const EdgeInsets.all(18), children: [
+        _preview(),
+        _addMedia(),
+        const SizedBox(height: 16),
+        Text(
+            '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+            style: const TextStyle(color: mint)),
+        const SizedBox(height: 8),
+        if (_project.clips.isEmpty)
+          const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text(
+                  'Add your photos and videos to build the reel. Every clip gets its own timing and caption.',
+                  textAlign: TextAlign.center)),
+        for (var i = 0; i < _project.clips.length; i++) _clipCard(i),
+      ]);
+  Widget _clipCard(int index) {
+    final clip = _project.clips[index];
+    return Card(
+        key: ValueKey(clip.id),
+        margin: const EdgeInsets.only(bottom: 12),
+        color: panel,
+        child: Padding(
+            padding: const EdgeInsets.all(14),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(
+                    clip.isVideo
+                        ? Icons.videocam_outlined
+                        : Icons.image_outlined,
+                    color: mint),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Text('${index + 1}. ${clip.name}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis)),
+                IconButton(
+                    tooltip: 'Preview clip ${index + 1}',
+                    onPressed: () => setState(() {
+                          _selected = index;
+                          _previewRevision = newId();
+                        }),
+                    icon: const Icon(Icons.play_arrow)),
+                IconButton(
+                    tooltip: 'Remove clip ${index + 1}',
+                    onPressed: () {
+                      _project.clips.removeAt(index);
+                      _selected =
+                          min(_selected, max(0, _project.clips.length - 1));
+                      _captureIndex = 0;
+                      _previewRevision = newId();
+                      _change();
+                    },
+                    icon: const Icon(Icons.close, size: 19)),
+              ]),
+              Row(children: [
+                Expanded(
+                    child: Text(
+                        'Duration · ${clip.duration.toStringAsFixed(1)}s',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis)),
+                IconButton(
+                    tooltip: 'Move clip up',
+                    onPressed: index == 0 ? null : () => _move(index, -1),
+                    icon: const Icon(Icons.arrow_upward, size: 18)),
+                IconButton(
+                    tooltip: 'Move clip down',
+                    onPressed: index == _project.clips.length - 1
+                        ? null
+                        : () => _move(index, 1),
+                    icon: const Icon(Icons.arrow_downward, size: 18))
+              ]),
+              Slider(
+                  value: clip.duration,
+                  min: min(.5, clip.maxDuration),
+                  max: max(.5, clip.maxDuration),
+                  onChanged: (v) {
+                    clip.duration = v;
+                    clip.normalize();
+                    _change();
+                  }),
+              if (clip.isVideo &&
+                  clip.sourceDuration > clip.duration + .01) ...[
+                Text(
+                    'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white70)),
+                Slider(
+                    value: clip.trimStart,
+                    max: max(.01, clip.sourceDuration - clip.duration),
+                    onChanged: (v) {
+                      clip.trimStart = v;
+                      clip.normalize();
+                      _change();
+                    }),
+              ],
+              TextFormField(
+                  key: ValueKey('caption-${clip.id}'),
+                  initialValue: clip.caption,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                      labelText: 'Caption (optional)', counterText: ''),
+                  onChanged: (v) {
+                    clip.caption = v;
+                    _change();
+                  }),
+            ])));
+  }
+
+  void _move(int index, int delta) {
+    final clip = _project.clips.removeAt(index);
+    _project.clips.insert(index + delta, clip);
+    _selected = index + delta;
+    _previewRevision = newId();
+    _change();
+  }
+
+  Widget _exportTab() => ListView(padding: const EdgeInsets.all(22), children: [
+        const SizedBox(height: 16),
+        const Icon(Icons.movie_creation_outlined, size: 55, color: mint),
+        const SizedBox(height: 18),
+        const Text('Your place. Your story.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        Text(
+            '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+            textAlign: TextAlign.center),
+        const SizedBox(height: 10),
+        const Text(
+            'Vertical MP4 · 720 × 1280\nSilent video · photos gently zoom\nYour captions and edited place details included',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, height: 1.7)),
+        const SizedBox(height: 26),
+        FilledButton.icon(
+            onPressed: _project.clips.isEmpty || _importing ? null : _export,
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('Render MP4')),
+        if (_project.clips.isEmpty)
+          const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                  'Add at least one photo or video in Timeline to export.',
+                  textAlign: TextAlign.center)),
+        const SizedBox(height: 22),
+        const Divider(),
+        const SizedBox(height: 12),
+        const Text('Keep creating later',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        const Text(
+            'Projects autosave on this device. Backups include the media, timings, captions and place details so they can be imported on another device.',
+            style: TextStyle(color: Colors.white60, height: 1.5)),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+            onPressed: _backup,
+            icon: const Icon(Icons.inventory_2_outlined),
+            label: const Text('Share project backup')),
+        TextButton.icon(
+            onPressed: _projects,
+            icon: const Icon(Icons.folder_open_outlined),
+            label: const Text('Open or import a project')),
+      ]);
+}
+
+class PlaceSearchDialog extends StatefulWidget {
+  final String apiKey, initial;
+  const PlaceSearchDialog(
+      {super.key, required this.apiKey, required this.initial});
+  @override
+  State<PlaceSearchDialog> createState() => _PlaceSearchDialogState();
+}
+
+class _PlaceSearchDialogState extends State<PlaceSearchDialog> {
+  late final _query = TextEditingController(text: widget.initial);
+  late final _places = PlacesService(widget.apiKey);
+  List<PlaceDetails> _results = [];
+  bool _loading = false;
+  String? _message;
+  Future<void> _search() async {
+    if (_query.text.trim().isEmpty || _loading) return;
+    setState(() {
+      _loading = true;
+      _message = null;
+    });
+    try {
+      final places = await _places.search(_query.text);
+      if (mounted) {
+        setState(() {
+          _results = places;
+          if (places.isEmpty) {
+            _message = 'No places found. Try a name and city.';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _message = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _query.dispose();
+    _places.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+          title: const Text('Find a place'),
+          content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(
+                    controller: _query,
+                    autofocus: true,
+                    onSubmitted: (_) => _search(),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                        hintText: 'Place name and city',
+                        suffixIcon: IconButton(
+                            onPressed: _loading ? null : _search,
+                            icon: const Icon(Icons.search)))),
+                if (_loading)
+                  const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator()),
+                if (_message != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Text(_message!,
+                          style: const TextStyle(fontSize: 12))),
+                ..._results.map((p) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.place_outlined, color: mint),
+                    title: Text(p.name),
+                    subtitle: Text(p.address),
+                    onTap: () => Navigator.pop(context, p))),
+                const SizedBox(height: 14),
+                const Text('Google Maps',
+                    style: TextStyle(color: Colors.white60)),
+              ]))),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'))
+          ]);
+}
+
+class ExportedVideoPage extends StatefulWidget {
+  final String path;
+  final NativeRenderer renderer;
+  const ExportedVideoPage(
+      {super.key, required this.path, required this.renderer});
+  @override
+  State<ExportedVideoPage> createState() => _ExportedVideoPageState();
+}
+
+class _ExportedVideoPageState extends State<ExportedVideoPage> {
+  late final _controller = VideoPlayerController.file(File(widget.path));
+  String? _error;
+  bool _saved = false, _saving = false;
+  @override
+  void initState() {
+    super.initState();
+    _open();
+  }
+
+  Future<void> _open() async {
+    try {
+      await _controller.initialize();
+      await _controller.setLooping(true);
+      if (mounted) {
+        setState(() {});
+        await _controller.play();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error =
+            'The video was exported but playback could not start. You can still share or save it.');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('Your reel is ready')),
+      body: SafeArea(
+          child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(children: [
+                Expanded(
+                    child: Center(
+                        child: _error != null
+                            ? Text(_error!)
+                            : !_controller.value.isInitialized
+                                ? const CircularProgressIndicator()
+                                : GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _controller.value.isPlaying
+                                            ? _controller.pause()
+                                            : _controller.play();
+                                      });
+                                    },
+                                    child: AspectRatio(
+                                        aspectRatio:
+                                            _controller.value.aspectRatio,
+                                        child: VideoPlayer(_controller))))),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                    onPressed: () async {
+                      try {
+                        await SharePlus.instance.share(ShareParams(
+                            files: [XFile(widget.path, mimeType: 'video/mp4')],
+                            subject: 'My Mockareel'));
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text(
+                                  'Could not open the share sheet. Try saving to gallery.')));
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share video')),
+                OutlinedButton.icon(
+                    onPressed: _saving || _saved
+                        ? null
+                        : () async {
+                            setState(() => _saving = true);
+                            try {
+                              await widget.renderer.saveToGallery(widget.path);
+                              if (mounted) setState(() => _saved = true);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(e is PlatformException
+                                            ? e.message ?? 'Save failed'
+                                            : e.toString())));
+                              }
+                            } finally {
+                              if (mounted) setState(() => _saving = false);
+                            }
+                          },
+                    icon: const Icon(Icons.save_alt),
+                    label: Text(_saved
+                        ? 'Saved to Movies/Mockareel'
+                        : _saving
+                            ? 'Saving…'
+                            : 'Save to gallery')),
+              ]))));
 }
