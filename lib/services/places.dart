@@ -15,7 +15,7 @@ class PlacesService {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': key,
             'X-Goog-FieldMask':
-                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName',
+                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName,places.userRatingCount,places.priceLevel,places.currentOpeningHours',
           },
           body: jsonEncode({
             'textQuery': query.trim(),
@@ -40,6 +40,21 @@ class PlacesService {
         address: p['formattedAddress'] as String? ?? '',
         rating: (p['rating'] as num?)?.toStringAsFixed(1) ?? '',
         placeId: p['id'] as String?,
+        reviewCount: p['userRatingCount']?.toString() ?? '',
+        price:
+            const {
+              'PRICE_LEVEL_FREE': 'Free',
+              'PRICE_LEVEL_INEXPENSIVE': 'Inexpensive',
+              'PRICE_LEVEL_MODERATE': 'Moderate',
+              'PRICE_LEVEL_EXPENSIVE': 'Expensive',
+              'PRICE_LEVEL_VERY_EXPENSIVE': 'Very expensive',
+            }[p['priceLevel']] ??
+            '',
+        hours: (p['currentOpeningHours'] as Map?)?['openNow'] == null
+            ? ''
+            : (p['currentOpeningHours'] as Map)['openNow'] == true
+            ? 'Open now'
+            : 'Closed now',
       );
     }).toList();
   }

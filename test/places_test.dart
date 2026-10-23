@@ -27,6 +27,9 @@ void main() {
                   'primaryTypeDisplayName': {'text': 'Coffee shop'},
                   'formattedAddress': 'Makati, Philippines',
                   'rating': 4.7,
+                  'userRatingCount': 123,
+                  'priceLevel': 'PRICE_LEVEL_MODERATE',
+                  'currentOpeningHours': {'openNow': true},
                 },
               ],
             }),
@@ -40,6 +43,9 @@ void main() {
       expect(p.category, 'Coffee shop');
       expect(p.address, 'Makati, Philippines');
       expect(p.placeId, 'place-id');
+      expect(p.reviewCount, '123');
+      expect(p.price, 'Moderate');
+      expect(p.hours, 'Open now');
       service.dispose();
     },
   );

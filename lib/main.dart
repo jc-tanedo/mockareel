@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'model/template_layout.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -68,12 +69,31 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   final _name = TextEditingController(),
       _category = TextEditingController(),
       _rating = TextEditingController(),
-      _address = TextEditingController();
+      _address = TextEditingController(),
+      _localName = TextEditingController(),
+      _reviews = TextEditingController(),
+      _price = TextEditingController(),
+      _hours = TextEditingController(),
+      _badge = TextEditingController();
   ReelProject _project = ReelProject();
   int _tab = 0, _selected = 0, _captureIndex = 0, _editRevision = 0;
   bool _ready = false, _importing = false, _exporting = false, _dirty = false;
   double? _progress;
   String _key = '', _status = '', _previewRevision = 'initial';
+  String? _captureHeroPath;
+  bool _captureSnapshot = false;
+  Map<String, String> _capturePosters = {};
+  List<TextEditingController> get _controllers => [
+    _name,
+    _category,
+    _rating,
+    _address,
+    _localName,
+    _reviews,
+    _price,
+    _hours,
+    _badge,
+  ];
   Timer? _autosave;
   StreamSubscription<double>? _progressSubscription;
   static const _buildKey = String.fromEnvironment('MAPS_API_KEY');
@@ -111,10 +131,18 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _project = project;
     _selected = 0;
     _captureIndex = 0;
+    _captureHeroPath = null;
+    _captureSnapshot = false;
+    _capturePosters = {};
     _name.text = project.place.name;
     _category.text = project.place.category;
     _rating.text = project.place.rating;
     _address.text = project.place.address;
+    _localName.text = project.place.localName;
+    _reviews.text = project.place.reviewCount;
+    _price.text = project.place.price;
+    _hours.text = project.place.hours;
+    _badge.text = project.storyBadge;
     _dirty = false;
     _previewRevision = newId();
   }
@@ -124,6 +152,11 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _project.place.category = _category.text;
     _project.place.rating = _rating.text;
     _project.place.address = _address.text;
+    _project.place.localName = _localName.text;
+    _project.place.reviewCount = _reviews.text;
+    _project.place.price = _price.text;
+    _project.place.hours = _hours.text;
+    _project.storyBadge = _badge.text;
     _editRevision++;
     setState(() => _dirty = true);
     _autosave?.cancel();
@@ -281,6 +314,10 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       _category.text = place.category;
       _rating.text = place.rating;
       _address.text = place.address;
+      _localName.text = place.localName;
+      _reviews.text = place.reviewCount;
+      _price.text = place.price;
+      _hours.text = place.hours;
       if (_project.title == 'Untitled reel') _project.title = place.name;
     });
     _change();
@@ -414,6 +451,122 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _precache(String path) async {
+    if (!mounted) return;
+    Object? failure;
+    await precacheImage(
+      FileImage(File(path)),
+      context,
+      onError: (e, _) {
+        failure = e;
+      },
+    );
+    if (failure != null) {
+      throw Exception(
+        'A media image could not be opened. Replace it and try again.',
+      );
+    }
+  }
+
+  Future<void> _prepareCapture({bool snapshot = false}) async {
+    final hero = _project.heroClip;
+    String? heroPath;
+    if (hero != null) {
+      heroPath = hero.isVideo
+          ? await _renderer.thumbnail(hero.path, hero.trimStart)
+          : hero.path;
+      await _precache(heroPath);
+    }
+    final paths = <String, String>{};
+    if (snapshot) {
+      for (final c in _project.clips) {
+        paths[c.id] = c.isVideo
+            ? await _renderer.thumbnail(c.path, c.trimStart)
+            : c.path;
+        await _precache(paths[c.id]!);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _captureHeroPath = heroPath;
+      _captureSnapshot = snapshot;
+      _capturePosters = paths;
+    });
+  }
+
+  Future<Uint8List> _capturePng() async {
+    await SchedulerBinding.instance.endOfFrame;
+    final boundary =
+        _captureKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(
+      pixelRatio: TemplateLayout.exportScale,
+    );
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      return bytes!.buffer.asUint8List();
+    } finally {
+      image.dispose();
+    }
+  }
+
+  Future<void> _exportPng(bool snapshot) async {
+    if (_exporting) return;
+    setState(() {
+      _exporting = true;
+      _status = 'Preparing image…';
+      _progress = null;
+      _previewRevision = newId();
+    });
+    try {
+      await _save(silent: true);
+      await _prepareCapture(snapshot: snapshot);
+      if (!mounted) return;
+      setState(() => _captureIndex = _selected);
+      final bytes = await _capturePng();
+      final file = File(
+        '${_store.root!.path}/exports/${snapshot ? 'snapshot' : 'template'}-${newId()}.png',
+      );
+      await file.writeAsBytes(bytes);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+          subject:
+              '${_project.title} — ${snapshot ? 'snapshot' : 'transparent template'}',
+        ),
+      );
+    } catch (e) {
+      _toast(_error(e));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+          _captureSnapshot = false;
+          _capturePosters = {};
+        });
+      }
+    }
+  }
+
+  Widget _framingControl(
+    String label,
+    double value,
+    double min,
+    double max,
+    String display,
+    ValueChanged<double> onChanged,
+  ) => Column(
+    children: [
+      Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
+          Text(display, style: const TextStyle(color: mint, fontSize: 12)),
+        ],
+      ),
+      Slider(value: value, min: min, max: max, onChanged: onChanged),
+    ],
+  );
+
   Future<void> _export() async {
     if (_project.clips.isEmpty || _exporting) return;
     setState(() {
@@ -435,19 +588,14 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       temp = await Directory(
         '${_store.root!.path}/exports/overlay_${newId()}',
       ).create();
+      await _prepareCapture();
       final overlays = <String>[];
       for (var i = 0; i < _project.clips.length; i++) {
         if (!mounted) return;
         setState(() => _captureIndex = i);
-        await SchedulerBinding.instance.endOfFrame;
-        final boundary =
-            _captureKey.currentContext!.findRenderObject()!
-                as RenderRepaintBoundary;
-        final image = await boundary.toImage(pixelRatio: 2);
-        final data = await image.toByteData(format: ui.ImageByteFormat.png);
-        image.dispose();
+        final data = await _capturePng();
         final file = File('${temp.path}/$i.png');
-        await file.writeAsBytes(data!.buffer.asUint8List());
+        await file.writeAsBytes(data);
         overlays.add(file.path);
       }
       _progressSubscription = _renderer.progress.listen((value) {
@@ -489,7 +637,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _autosave?.cancel();
     _progressSubscription?.cancel();
     if (_exporting) _renderer.cancel();
-    for (final c in [_name, _category, _rating, _address]) {
+    for (final c in _controllers) {
       c.dispose();
     }
     super.dispose();
@@ -522,9 +670,18 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                 child: MediaQuery.withNoTextScaling(
                   child: RepaintBoundary(
                     key: _captureKey,
-                    child: PlaceOverlay(
+                    child: ReelCanvas(
                       project: _project,
-                      index: _captureIndex,
+                      position:
+                          _project.startOf(_captureIndex) +
+                          TemplateLayout.transitionDuration(
+                            _project,
+                            _captureIndex,
+                          ),
+                      overlayOnly: !_captureSnapshot,
+                      posterOnly: true,
+                      heroPath: _captureHeroPath,
+                      posters: _capturePosters,
                     ),
                   ),
                 ),
@@ -580,10 +737,11 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            body: IndexedStack(
-              index: _tab,
-              children: [_editTab(), _timelineTab(), _exportTab()],
-            ),
+            body: switch (_tab) {
+              0 => _editTab(),
+              1 => _timelineTab(),
+              _ => _exportTab(),
+            },
             bottomNavigationBar: NavigationBar(
               selectedIndex: _tab,
               onDestinationSelected: (i) => setState(() {
@@ -678,6 +836,58 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         keyboard: const TextInputType.numberWithOptions(decimal: true),
       ),
       _field('Address', _address),
+      ExpansionTile(
+        title: const Text('Template details'),
+        tilePadding: EdgeInsets.zero,
+        children: [
+          _field('Local / alternate place name', _localName),
+          _field('Review count', _reviews, keyboard: TextInputType.number),
+          _field('Price / price range', _price),
+          _field('Hours / open status', _hours),
+          _field('Story badge (optional)', _badge),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Story controls overlay'),
+            subtitle: const Text(
+              'Add the reference’s decorative story controls',
+            ),
+            value: _project.storyChrome,
+            onChanged: (v) {
+              _project.storyChrome = v;
+              _change();
+            },
+          ),
+          if (_project.clips.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('hero-${_project.id}-${_project.heroClip?.id}'),
+                initialValue: _project.heroClip?.id,
+                decoration: const InputDecoration(
+                  labelText: 'Peeking header photo',
+                ),
+                isExpanded: true,
+                items: _project.clips
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text(
+                          c.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (id) {
+                  _project.heroClipId = id;
+                  _previewRevision = newId();
+                  _change();
+                },
+              ),
+            ),
+        ],
+      ),
       const Text(
         'All details remain editable after lookup.',
         style: TextStyle(fontSize: 12, color: Colors.white60),
@@ -715,6 +925,41 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     children: [
       _preview(),
       _addMedia(),
+      ExpansionTile(
+        title: const Text('Left-scroll snap'),
+        tilePadding: EdgeInsets.zero,
+        children: [
+          _framingControl(
+            'Slide speed',
+            _project.slideSeconds,
+            .15,
+            .8,
+            '${_project.slideSeconds.toStringAsFixed(2)}s',
+            (v) {
+              _project.slideSeconds = v;
+              _change();
+            },
+          ),
+          const Text(
+            'Each card slides in, snaps fully into view, then holds. Slide time is included in the clip duration.',
+            style: TextStyle(fontSize: 12, color: Colors.white60),
+          ),
+          TextButton(
+            onPressed: _project.clips.isEmpty
+                ? null
+                : () {
+                    for (final c in _project.clips) {
+                      c.duration = 1.56;
+                      c.normalize();
+                    }
+                    _project.slideSeconds = .35;
+                    _previewRevision = newId();
+                    _change();
+                  },
+            child: const Text('Use reference pace · 1.56s per card'),
+          ),
+        ],
+      ),
       const SizedBox(height: 16),
       Text(
         '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
@@ -829,6 +1074,57 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                 },
               ),
             ],
+            ExpansionTile(
+              key: ValueKey('framing-${clip.id}'),
+              title: const Text('Card framing'),
+              tilePadding: EdgeInsets.zero,
+              children: [
+                _framingControl(
+                  'Card width',
+                  clip.cardWidth,
+                  .45,
+                  1,
+                  '${(clip.cardWidth * 328).round()} px',
+                  (v) {
+                    clip.cardWidth = v;
+                    _change();
+                  },
+                ),
+                _framingControl(
+                  'Card height',
+                  clip.cardHeight,
+                  .55,
+                  1,
+                  '${(clip.cardHeight * 250).round()} px',
+                  (v) {
+                    clip.cardHeight = v;
+                    _change();
+                  },
+                ),
+                _framingControl(
+                  'Zoom',
+                  clip.zoom,
+                  1,
+                  3,
+                  '${clip.zoom.toStringAsFixed(2)}×',
+                  (v) {
+                    clip.zoom = v;
+                    _change();
+                  },
+                ),
+                _framingControl(
+                  'Horizontal crop',
+                  clip.panX,
+                  -1,
+                  1,
+                  '${(clip.panX * 100).round()}%',
+                  (v) {
+                    clip.panX = v;
+                    _change();
+                  },
+                ),
+              ],
+            ),
             TextFormField(
               key: ValueKey('caption-${clip.id}'),
               initialValue: clip.caption,
@@ -874,7 +1170,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       ),
       const SizedBox(height: 10),
       const Text(
-        'Vertical MP4 · 720 × 1280\nSilent video · photos gently zoom\nYour captions and edited place details included',
+        'Vertical MP4 · 1080 × 1920\nSilent video · cards scroll left and snap\nYour framing, captions and place details included',
         textAlign: TextAlign.center,
         style: TextStyle(color: Colors.white60, height: 1.7),
       ),
@@ -892,6 +1188,17 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
             textAlign: TextAlign.center,
           ),
         ),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: () => _exportPng(false),
+        icon: const Icon(Icons.layers_outlined),
+        label: const Text('Transparent template PNG'),
+      ),
+      OutlinedButton.icon(
+        onPressed: _project.clips.isEmpty ? null : () => _exportPng(true),
+        icon: const Icon(Icons.image_outlined),
+        label: const Text('Full snapshot PNG'),
+      ),
       const SizedBox(height: 22),
       const Divider(),
       const SizedBox(height: 12),

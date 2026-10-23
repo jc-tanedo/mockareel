@@ -58,6 +58,10 @@ void main() {
       await source.delete();
       final p = ReelProject(
         title: 'Cafe reel',
+        heroClipId: 'clip',
+        storyBadge: 'weekend find',
+        storyChrome: true,
+        slideSeconds: .3,
         place: PlaceDetails(name: 'My cafe', address: 'Makati'),
         clips: [
           ReelClip(
@@ -67,6 +71,10 @@ void main() {
             isVideo: false,
             duration: 4,
             caption: 'A great discovery',
+            cardWidth: .6,
+            cardHeight: .8,
+            zoom: 1.4,
+            panX: -.4,
           ),
         ],
       );
@@ -82,6 +90,14 @@ void main() {
       await Directory('${root.path}/first/media').delete(recursive: true);
       expect(imported.id, isNot(p.id));
       expect(imported.place.name, 'My cafe');
+      expect(imported.heroClipId, imported.clips.single.id);
+      expect(imported.storyBadge, 'weekend find');
+      expect(imported.storyChrome, true);
+      expect(imported.slideSeconds, .3);
+      expect(imported.clips.single.cardWidth, .6);
+      expect(imported.clips.single.cardHeight, .8);
+      expect(imported.clips.single.zoom, 1.4);
+      expect(imported.clips.single.panX, -.4);
       expect(imported.clips.single.caption, 'A great discovery');
       expect(imported.clips.single.duration, 4);
       expect(await File(imported.clips.single.path).readAsBytes(), [

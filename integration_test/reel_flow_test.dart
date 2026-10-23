@@ -118,8 +118,8 @@ void main() {
       find.byType(ExportedVideoPage),
     );
     final output = await renderer.inspect(page.path);
-    expect(output['width'], 720);
-    expect(output['height'], 1280);
+    expect(output['width'], 1080);
+    expect(output['height'], 1920);
     expect(output['duration'] as num, closeTo(project.duration, .15));
     expect(output['hasAudio'], false);
     expect(output['size'] as num, greaterThan(10000));

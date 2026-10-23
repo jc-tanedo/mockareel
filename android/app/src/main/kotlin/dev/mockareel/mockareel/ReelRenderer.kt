@@ -3,6 +3,10 @@ package dev.mockareel.mockareel
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Matrix
+import android.graphics.Bitmap
+import androidx.media3.effect.Crop
+import java.security.MessageDigest
+import kotlin.math.*
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -12,11 +16,9 @@ import android.provider.MediaStore
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
-import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -39,6 +41,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
     private var transformer: Transformer? = null
     private var pending: MethodChannel.Result? = null
     private var output: File? = null
+    private var posterCache: PosterCache? = null
     private val progress = object : Runnable {
         override fun run() {
             val active = transformer ?: return
@@ -54,6 +57,12 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
     override fun onCancel(arguments: Any?) { events = null }
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "thumbnail" -> worker.execute {
+                try {
+                    val path = thumbnail(requireNotNull(call.argument<String>("path")), call.argument<Number>("seconds")?.toDouble() ?: 0.0)
+                    handler.post { result.success(path) }
+                } catch (e: Exception) { handler.post { result.error("MEDIA", "Could not create a video thumbnail: ${e.message}", null) } }
+            }
             "inspect" -> worker.execute {
                 try {
                     val info = inspect(requireNotNull(call.argument<String>("path")))
@@ -73,6 +82,29 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             }
             else -> result.notImplemented()
         }
+    }
+
+    private fun thumbnail(path: String, seconds: Double): String {
+        val source = File(path)
+        require(source.isFile && seconds.isFinite()) { "Video file is missing or its position is invalid" }
+        val stamp = "$path:${source.lastModified()}:${(max(0.0, seconds) * 1000).roundToLong()}"
+        val id = MessageDigest.getInstance("SHA-256").digest(stamp.toByteArray()).joinToString("") { "%02x".format(it) }
+        val directory = File(context.cacheDir, "posters").apply { mkdirs() }
+        val target = File(directory, "$id.jpg")
+        if (target.isFile) return target.path
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(path)
+            val bitmap = requireNotNull(retriever.getFrameAtTime((max(0.0, seconds) * 1_000_000).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)) { "No frame was decoded" }
+            try {
+                val factor = min(1f, 1080f / max(bitmap.width, bitmap.height))
+                val scaled = if (factor < 1) Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * factor).roundToInt()), max(1, (bitmap.height * factor).roundToInt()), true) else bitmap
+                try { target.outputStream().use { check(scaled.compress(Bitmap.CompressFormat.JPEG, 92, it)) } }
+                finally { if (scaled !== bitmap) scaled.recycle() }
+            } finally { bitmap.recycle() }
+            return target.path
+        } catch (e: Exception) { target.delete(); throw e }
+        finally { retriever.release() }
     }
 
     private fun inspect(path: String): Map<String, Any> {
@@ -100,7 +132,18 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         require(clips.isNotEmpty() && clips.size == overlays.size) { "Add media before exporting" }
         // Validate all inputs before creating the output, so failures never look like completed videos.
         clips.forEach { require(File(it["path"] as String).isFile) { "A source media file is missing" } }
+        val starts = requireNotNull(call.argument<List<String>>("posters"))
+        val ends = requireNotNull(call.argument<List<String>>("endPosters"))
+        require(starts.size == clips.size && ends.size == clips.size) { "Missing scene thumbnails" }
+        val layout = SheetLayout.from(requireNotNull(call.argument<Map<String, Number>>("layout")))
+        val slideSeconds = call.argument<Number>("slideSeconds")?.toDouble() ?: .42
+        val cards = clips.mapIndexed { i, c -> CardSpec(
+            layout.gallery.width() * ((c["cardWidth"] as? Number)?.toFloat() ?: .78f).coerceIn(.45f, 1f),
+            layout.gallery.height() * ((c["cardHeight"] as? Number)?.toFloat() ?: 1f).coerceIn(.55f, 1f),
+            ((c["zoom"] as? Number)?.toFloat() ?: 1f).coerceIn(1f, 3f),
+            ((c["panX"] as? Number)?.toFloat() ?: 0f).coerceIn(-1f, 1f), starts[i], ends[i]) }
         pending = result
+        val cache = PosterCache(); posterCache = cache
         val items = clips.mapIndexed { index, clip ->
             val durationMs = ((clip["duration"] as Number).toDouble() * 1000).toLong()
             require(durationMs in 1..30000) { "Invalid clip duration" }
@@ -113,18 +156,31 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             } else { media.setImageDurationMs(durationMs) }
             val overlayFile = File(overlays[index])
             require(overlayFile.isFile) { "Could not read the place overlay" }
+            val card = cards[index]
+            val (sourceWidth, sourceHeight) = cache.dimensions(starts[index])
+            val aspect = sourceWidth.toFloat() / sourceHeight
+            val cardAspect = card.width / card.height
+            val fractionX = min(1f, cardAspect / aspect) / card.zoom
+            val fractionY = min(1f, aspect / cardAspect) / card.zoom
+            val centerX = card.panX * (1 - fractionX)
+            val transition = if (index == 0) 0.0 else min(slideSeconds, durationMs / 1000.0 * .45)
+            val clock = ClipClock()
+            val cardWidth = max(2, (card.width / 2).roundToInt() * 2)
+            val cardHeight = max(2, (card.height / 2).roundToInt() * 2)
             val effects = mutableListOf<androidx.media3.common.Effect>(
-                Presentation.createForWidthAndHeight(720, 604, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)
+                Crop(centerX - fractionX, centerX + fractionX, -fractionY, fractionY),
+                Presentation.createForWidthAndHeight(cardWidth, cardHeight, Presentation.LAYOUT_SCALE_TO_FIT),
+                Presentation.createForWidthAndHeight(layout.width, layout.height, Presentation.LAYOUT_SCALE_TO_FIT),
+                MatrixTransformation { timeUs ->
+                    clock.begin(timeUs)
+                    val entry = if (index == 0) 0f else ScrollMotion.entryOffset(cards[index - 1].width, layout.gap, clock.elapsed(timeUs), transition)
+                    val scale = card.width / layout.width
+                    val x = 2 * (layout.gallery.left + entry + card.width / 2) / layout.width - 1
+                    val y = 1 - 2 * layout.gallery.centerY() / layout.height
+                    Matrix().apply { postScale(scale, scale); postTranslate(x, y) }
+                },
+                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock)))
             )
-            if (!isVideo) effects.add(MatrixTransformation { timeUs ->
-                val scale = 1f + .04f * (timeUs.toFloat() / (durationMs * 1000f)).coerceIn(0f, 1f)
-                Matrix().apply { postScale(scale, scale) }
-            })
-            // Fit into the 360×302 media window of the shared 360×640 template,
-            // then move its center from y=640 to y=486 in the 720×1280 output.
-            effects.add(Presentation.createForWidthAndHeight(720, 1280, Presentation.LAYOUT_SCALE_TO_FIT))
-            effects.add(MatrixTransformation { Matrix().apply { postTranslate(0f, .240625f) } })
-            effects.add(OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(context, Uri.fromFile(overlayFile), StaticOverlaySettings.Builder().build()))))
             EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()
         }
@@ -159,6 +215,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         handler.removeCallbacks(progress)
         transformer = null
         pending = null
+        posterCache?.close(); posterCache = null
         if (deleteOutput) output?.delete()
         output = null
     }

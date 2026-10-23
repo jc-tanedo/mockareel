@@ -148,7 +148,11 @@ class ProjectStore {
       final written = <File>[];
       try {
         for (final clip in clips) {
-          clip['id'] = newId();
+          final replacementId = newId();
+          if (json['heroClipId'] == clip['id']) {
+            json['heroClipId'] = replacementId;
+          }
+          clip['id'] = replacementId;
           final entry = archive.findFile(clip['path'] as String);
           if (entry == null || !entry.isFile) {
             throw const FormatException(

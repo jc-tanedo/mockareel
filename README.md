@@ -1,51 +1,66 @@
 # Mockareel
 
-A Flutter editor for vertical Google Maps style place reels. Android is the first export target.
+A Flutter editor for vertical place reels. Android is the first video-export target.
 
-## Use the app
+## First template: Maps place story
 
-1. Find a place with Google Places or enter the name, category, rating and address yourself. All fields stay editable.
-2. Open **Timeline** and select photos and videos. Every selected file is copied into private app storage so a gallery cleanup or picker cache expiry will not break a saved project.
-3. Reorder clips, set each duration, trim the start of videos, and add captions. Play and scrub the composed preview.
-4. Open **Export → Render MP4**. When rendering finishes, play the actual MP4, share it, or save it to `Movies/Mockareel` on Android 10+.
-5. Projects autosave. The folder button opens the project library or creates a new project. Project backups include all media and can be imported on another device.
+The template follows the supplied screen recording: a peeking header photo, a fixed white place sheet with editable details and teal action chips, and a horizontal gallery of rounded cards that scrolls left, snaps a card fully into view, then holds. Tabs, an order button and hours stay fixed beneath the gallery. Story controls and a text badge can be added as decorative overlays.
 
-Exports are silent H.264 MP4s, 720 × 1280. Photo scenes render at 30 fps with a gentle zoom; video scenes retain their source cadence. Clips use cuts between scenes. There is no audio/music editor or animated left-scroll transition yet. Native video export currently supports Android only; platform-independent models/editor code stay in Dart.
+1. Find a place with Google Places or edit its details manually. **Template details** includes the alternate name, review count, price, hours, story badge and header-photo selection.
+2. Open **Timeline** and select photos and videos. Selected originals are copied into app storage so picker-cache expiry does not break projects.
+3. Set durations, trim video starts, reorder cards, and add captions. **Card framing** controls width, height, zoom and horizontal crop. **Left-scroll snap** adjusts the entry speed; the reference-pace preset gives five cards a 7.8-second timeline.
+4. Play and scrub the preview. The header/footer stay fixed as cards move inside the gallery. The active video plays; other video cards show their start/end frames while waiting or exiting.
+5. Export a silent 1080 × 1920 H.264 MP4, then play/share it or save it to `Movies/Mockareel` on Android 10+. Photos render at 30 fps; video cards retain their source cadence. Slide time is included in each card's duration.
+6. Export a **Transparent template PNG** for compositing, or a **Full snapshot PNG** with the selected card. Both are 1080 × 1920. The cutout has real transparency in the gallery; optional captions remain part of the overlay.
+
+Projects autosave, including when leaving the app. The folder button opens the project library or creates a new project. Portable `.mockareel` backups include originals, timings, framing, captions, header selection and template details; they can be imported on another device. Older projects open with default framing.
 
 ## Google Places
 
-The app uses **Places API (New)** Text Search. Enable that API and billing in Google Cloud. Supply a client key with `--dart-define=MAPS_API_KEY=...` or enter it in the app's settings. A key saved in the app takes precedence over a build-time key. Restrict client keys to the required APIs and configure restrictions compatible with your deployment. Keys are never included in project backups or Git source.
+The app uses **Places API (New)** Text Search. Enable it and billing in Google Cloud. Set a key with `--dart-define=MAPS_API_KEY=...` or enter it in the app's Settings. An on-device key takes precedence. Keys are not included in project backups or Git source.
 
-The cloud environment's secret proxy may expose only a placeholder usable from cloud requests. Such a placeholder cannot be compiled into a phone APK. `tool/build_android.sh` includes a real `MAPS_API_KEY` environment value when available and otherwise leaves search configurable on device. It does not print the key.
+`tool/build_android.sh` includes a real `MAPS_API_KEY` environment value when available; cloud secret-proxy placeholders cannot authenticate from a phone and are skipped. The script never prints the key. Manual editing and rendering need no Maps key.
 
-## Development
+## Development and verification
 
-Use Flutter 3.47.7, JDK 21 and Android SDK 36. The first export target uses AndroidX Media3 Transformer; Media3 versions are aligned with `video_player_android`. The Flutter Gradle plugin currently requires the legacy Android DSL; Kotlin compilation is enabled through AGP 9's built-in Kotlin support.
+Use Flutter 3.47.7, JDK 21 and Android SDK 36. Media3 versions are aligned with `video_player_android`. AGP 9 built-in Kotlin is enabled; the Flutter Gradle plugin still requires the legacy Android DSL.
 
 ```sh
 bash tool/setup_cloud.sh
 source tool/cloud_env.sh
 flutter analyze
 flutter test
+./android/gradlew -p android :app:testDebugUnitTest --tests dev.mockareel.mockareel.ScrollMotionTest
 bash tool/build_android.sh
 ```
 
-The APK is `build/app/outputs/flutter-apk/app-release.apk`. Development APKs use the existing development signing key. Version 0.2.0+2 can update the previous preview without uninstalling it, provided that signing key is preserved.
+Run Flutter tests and APK builds sequentially: both regenerate plugin registration, so concurrent runs can leave a test-only plugin in the release registrant.
 
-With an Android device/emulator connected:
+The APK is `build/app/outputs/flutter-apk/app-release.apk`. Version 0.3.0+3 uses the existing development signing key and can update the previous preview without uninstalling it.
+
+Fourteen Flutter tests cover narrow layouts, real PNG export/share flows, cutout alpha, fixed header/footer pixels, moving and snapped card positions, crop direction, duration/trim bounds, media ownership, backup restoration and Places requests. Two host-side Kotlin tests cover native entry motion and timestamp normalization for clipped/concatenated inputs.
+
+**Native execution remains unverified on a device.** The cloud emulator's Android system services crashed during APK installation, before the device test could start. Passing host tests and building an APK do not establish that a device's codecs, picker, player or MediaStore work. The real-device test is included:
 
 ```sh
 flutter test integration_test/reel_flow_test.dart -d <device-id>
 ```
 
-The device test creates a photo → trimmed video with source audio → photo project, plays the preview, uses the real native MP4 renderer, checks duration, resolution and muted audio, saves to MediaStore, and restores a portable backup with media. Unit/widget tests cover timeline boundaries, trimming, narrow layouts, save/reopen, durable media ownership, backup restoration, and Places request/error handling. Live Places lookup additionally needs a valid key.
+Video export currently targets Android. Editor/models/storage stay in Dart for future platforms. Audio/music editing and simultaneous playback of neighboring video cards are not implemented.
+
+## Visual reference review
+
+The original reference is a recording of an editor, not the exported 9:16 reel. Recording chrome and the floating assistant button are excluded from the template. Layout measurements and timing are recorded in [docs/reference.md](docs/reference.md). The supplied recording is retained outside the Git checkout at `/workspace/mockareel-reference.mp4` when available.
+
+Generate a visual review using crops from that recording:
+
+```sh
+MOCKAREEL_REFERENCE_VIDEO=/path/to/reference.mp4 \
+  flutter test tool/render_reference_preview_test.dart
+```
+
+This generates PNG frames under `/tmp/mockareel-reference-preview`. They demonstrate the Flutter template renderer; they are not a recording of native Android MP4 export.
 
 ## Download
 
-The `apk-preview` branch holds the installable preview APK separately from application source. Open its `mockareel-preview.apk` file while signed into GitHub with repository access and choose **Download raw file**.
-
-## Current verification
-
-`flutter analyze`, all eight unit/widget tests, and the Android release build pass. APK signing and alignment are checked before publishing. The real-device integration test is included, but it has **not passed in this cloud environment**: the unaccelerated Android emulator's system services crash while installing the app, before the test can start. MP4 encoding, native video playback, media picking and gallery saving therefore still need verification on a physical Android device. Do not describe those native paths as device-tested based only on a successful build.
-
-The original reference attachment is no longer available in the running workspace. This version uses the Maps-style place layout already established in the editor; exact matching of the supplied video and its scrolling transition remains separate work.
+The `apk-preview` branch holds installable APKs separately from source. Open the versioned APK while signed into GitHub with repository access and choose **Download raw file**. Source changes are on `work`.
