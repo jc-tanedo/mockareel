@@ -5,12 +5,19 @@ import '../model/project.dart';
 import '../model/template_layout.dart';
 import 'media_frame.dart';
 import 'place_overlay.dart';
+import 'music_playback.dart';
 export 'place_overlay.dart';
 
 class TimelinePreview extends StatefulWidget {
   final ReelProject project;
   final int selected;
-  const TimelinePreview({super.key, required this.project, this.selected = 0});
+  final double maxHeight;
+  const TimelinePreview({
+    super.key,
+    required this.project,
+    this.selected = 0,
+    this.maxHeight = 420,
+  });
   @override
   State<TimelinePreview> createState() => _TimelinePreviewState();
 }
@@ -86,9 +93,16 @@ class _TimelinePreviewState extends State<TimelinePreview>
     final p = widget.project;
     return Column(
       children: [
+        if (p.music != null)
+          MusicPlayback(
+            key: ValueKey(p.music!.path),
+            track: p.music!,
+            position: _position,
+            playing: _playing,
+          ),
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 420),
+            constraints: BoxConstraints(maxHeight: widget.maxHeight),
             child: AspectRatio(
               aspectRatio: 9 / 16,
               child: ClipRRect(
@@ -137,7 +151,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
 class ReelCanvas extends StatelessWidget {
   final ReelProject project;
   final double position;
-  final bool playing, overlayOnly, posterOnly;
+  final bool playing, overlayOnly, posterOnly, showTags;
   final String? heroPath;
   final Map<String, String> posters;
   const ReelCanvas({
@@ -147,6 +161,7 @@ class ReelCanvas extends StatelessWidget {
     this.playing = false,
     this.overlayOnly = false,
     this.posterOnly = false,
+    this.showTags = true,
     this.heroPath,
     this.posters = const {},
   });
@@ -230,6 +245,7 @@ class ReelCanvas extends StatelessWidget {
                 project: project,
                 index: max(0, index),
                 heroPath: heroPath,
+                showTags: showTags,
               ),
             ),
           ],

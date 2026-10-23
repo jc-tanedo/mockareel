@@ -6,23 +6,74 @@ String newId() =>
 class PlaceDetails {
   String name, category, rating, address, localName, reviewCount, price, hours;
   String? placeId;
+  String phone, website;
+  List<String> types;
+  List<PlaceAction>? actionOverrides;
+  bool? menuOverride;
+  String? footerOverride;
+  bool get hasMenu =>
+      menuOverride ??
+      types.any(
+        (t) =>
+            const {
+              'restaurant',
+              'cafe',
+              'coffee_shop',
+              'bakery',
+              'bar',
+              'meal_takeaway',
+              'meal_delivery',
+              'fast_food_restaurant',
+              'food_court',
+            }.contains(t) ||
+            t.endsWith('_restaurant'),
+      );
+  List<PlaceAction> get suggestedActions => [
+    PlaceAction(kind: 'directions', label: 'Directions'),
+    if (hasMenu) PlaceAction(kind: 'menu', label: 'Menu'),
+    if (phone.isNotEmpty) PlaceAction(kind: 'call', label: 'Call'),
+    if (website.isNotEmpty) PlaceAction(kind: 'website', label: 'Website'),
+    PlaceAction(kind: 'save', label: 'Save'),
+  ].take(4).toList();
+  List<PlaceAction> get actions => actionOverrides ?? suggestedActions;
+  String get footer =>
+      footerOverride ??
+      (hasMenu
+          ? 'View menu'
+          : website.isNotEmpty
+          ? 'Visit website'
+          : 'Get directions');
   PlaceDetails({
     this.name = '',
     this.category = '',
     this.rating = '',
     this.address = '',
     this.placeId,
+    this.phone = '',
+    this.website = '',
+    List<String>? types,
+    this.actionOverrides,
+    this.menuOverride,
+    this.footerOverride,
     this.localName = '',
     this.reviewCount = '',
     this.price = '',
     this.hours = '',
-  });
+  }) : types = types ?? [];
   factory PlaceDetails.fromJson(Map<String, dynamic> json) => PlaceDetails(
     name: json['name'] as String? ?? '',
     category: (json['category'] ?? json['subtitle']) as String? ?? '',
     rating: json['rating']?.toString() ?? '',
     address: json['address'] as String? ?? '',
     placeId: json['placeId'] as String?,
+    phone: json['phone'] as String? ?? '',
+    website: json['website'] as String? ?? '',
+    types: (json['types'] as List? ?? []).cast<String>(),
+    actionOverrides: (json['actions'] as List?)
+        ?.map((e) => PlaceAction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList(),
+    menuOverride: json['menuOverride'] as bool?,
+    footerOverride: json['footerOverride'] as String?,
     localName: json['localName'] as String? ?? '',
     reviewCount: json['reviewCount'] as String? ?? '',
     price: json['price'] as String? ?? '',
@@ -34,10 +85,112 @@ class PlaceDetails {
     'rating': rating,
     'address': address,
     'placeId': placeId,
+    'phone': phone,
+    'website': website,
+    'types': types,
+    'actions': actionOverrides?.map((e) => e.toJson()).toList(),
+    'menuOverride': menuOverride,
+    'footerOverride': footerOverride,
     'localName': localName,
     'reviewCount': reviewCount,
     'price': price,
     'hours': hours,
+  };
+}
+
+class PlaceAction {
+  String kind, label;
+  PlaceAction({required this.kind, required this.label});
+  factory PlaceAction.fromJson(Map<String, dynamic> j) => PlaceAction(
+    kind: j['kind'] as String? ?? 'custom',
+    label: j['label'] as String? ?? 'Action',
+  );
+  Map<String, dynamic> toJson() => {'kind': kind, 'label': label};
+}
+
+class StoryTag {
+  final String id;
+  String text, style;
+  double x, y, size, rotation;
+  int color;
+  StoryTag({
+    String? id,
+    this.text = 'Your text',
+    this.style = 'badge',
+    this.x = .5,
+    this.y = .29,
+    this.size = 18,
+    this.rotation = 0,
+    this.color = 0xffffffff,
+  }) : id = id ?? newId() {
+    normalize();
+  }
+  void normalize() {
+    x = x.isFinite ? x.clamp(0, 1).toDouble() : .5;
+    y = y.isFinite ? y.clamp(0, 1).toDouble() : .29;
+    size = size.isFinite ? size.clamp(10, 48).toDouble() : 18;
+    rotation = rotation.isFinite ? rotation.clamp(-3.14, 3.14).toDouble() : 0;
+  }
+
+  factory StoryTag.fromJson(Map<String, dynamic> j) => StoryTag(
+    id: j['id'] as String?,
+    text: j['text'] as String? ?? '',
+    style: j['style'] as String? ?? 'badge',
+    x: (j['x'] as num?)?.toDouble() ?? .5,
+    y: (j['y'] as num?)?.toDouble() ?? .29,
+    size: (j['size'] as num?)?.toDouble() ?? 18,
+    rotation: (j['rotation'] as num?)?.toDouble() ?? 0,
+    color: (j['color'] as num?)?.toInt() ?? 0xffffffff,
+  );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'text': text,
+    'style': style,
+    'x': x,
+    'y': y,
+    'size': size,
+    'rotation': rotation,
+    'color': color,
+  };
+}
+
+class MusicTrack {
+  String path, name;
+  double sourceDuration, trimStart, volume;
+  bool loop;
+  MusicTrack({
+    required this.path,
+    required this.name,
+    required this.sourceDuration,
+    this.trimStart = 0,
+    this.volume = .7,
+    this.loop = true,
+  }) {
+    normalize();
+  }
+  void normalize() {
+    sourceDuration = sourceDuration.isFinite ? max(0, sourceDuration) : 0;
+    trimStart = trimStart.isFinite
+        ? trimStart.clamp(0, max(0, sourceDuration - .1)).toDouble()
+        : 0;
+    volume = volume.isFinite ? volume.clamp(0, 1).toDouble() : .7;
+  }
+
+  factory MusicTrack.fromJson(Map<String, dynamic> j) => MusicTrack(
+    path: j['path'] as String,
+    name: j['name'] as String? ?? 'Music',
+    sourceDuration: (j['sourceDuration'] as num?)?.toDouble() ?? 0,
+    trimStart: (j['trimStart'] as num?)?.toDouble() ?? 0,
+    volume: (j['volume'] as num?)?.toDouble() ?? .7,
+    loop: j['loop'] != false,
+  );
+  Map<String, dynamic> toJson() => {
+    'path': path,
+    'name': name,
+    'sourceDuration': sourceDuration,
+    'trimStart': trimStart,
+    'volume': volume,
+    'loop': loop,
   };
 }
 
@@ -117,6 +270,8 @@ class ReelProject {
   double slideSeconds;
   PlaceDetails place;
   final List<ReelClip> clips;
+  final List<StoryTag> tags;
+  MusicTrack? music;
   DateTime updatedAt;
   ReelProject({
     String? id,
@@ -127,6 +282,8 @@ class ReelProject {
     double slideSeconds = .42,
     PlaceDetails? place,
     List<ReelClip>? clips,
+    List<StoryTag>? tags,
+    this.music,
     DateTime? updatedAt,
   }) : slideSeconds = slideSeconds.isFinite
            ? slideSeconds.clamp(.15, .8).toDouble()
@@ -134,6 +291,12 @@ class ReelProject {
        id = id ?? newId(),
        place = place ?? PlaceDetails(),
        clips = clips ?? [],
+       tags =
+           tags ??
+           [
+             if (storyBadge.isNotEmpty)
+               StoryTag(text: storyBadge, size: 11, x: .7, y: .3),
+           ],
        updatedAt = updatedAt ?? DateTime.now();
   ReelClip? get heroClip {
     for (final clip in clips) {
@@ -158,6 +321,22 @@ class ReelProject {
     id: json['id'] as String?,
     title: json['title'] as String? ?? 'My place reel',
     storyBadge: json['storyBadge'] as String? ?? '',
+    tags:
+        (json['tags'] as List?)
+            ?.map((e) => StoryTag.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList() ??
+        [
+          if ((json['storyBadge'] as String? ?? '').isNotEmpty)
+            StoryTag(
+              text: json['storyBadge'] as String,
+              size: 11,
+              x: .7,
+              y: .3,
+            ),
+        ],
+    music: json['music'] == null
+        ? null
+        : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
     storyChrome: json['storyChrome'] == true,
     heroClipId: json['heroClipId'] as String?,
     slideSeconds: (json['slideSeconds'] as num?)?.toDouble() ?? .42,
@@ -174,6 +353,8 @@ class ReelProject {
     'id': id,
     'title': title,
     'storyBadge': storyBadge,
+    'tags': tags.map((t) => t.toJson()).toList(),
+    'music': music?.toJson(),
     'storyChrome': storyChrome,
     'heroClipId': heroClipId,
     'slideSeconds': slideSeconds,

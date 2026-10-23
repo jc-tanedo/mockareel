@@ -45,6 +45,17 @@ void main() {
     expect(source['duration'], greaterThanOrEqualTo(3));
     final project = ReelProject(
       title: 'Export integration',
+      music: MusicTrack(
+        path: video.path,
+        name: 'Fixture soundtrack',
+        sourceDuration: (source['duration'] as num).toDouble(),
+        trimStart: 2.2,
+        volume: .4,
+      ),
+      tags: [
+        StoryTag(text: 'A new find', x: .35, y: .3),
+        StoryTag(text: 'Save this spot', y: .78, style: 'plain'),
+      ],
       place: PlaceDetails(
         name: 'Mockareel Test Cafe',
         category: 'Coffee shop',
@@ -121,7 +132,7 @@ void main() {
     expect(output['width'], 1080);
     expect(output['height'], 1920);
     expect(output['duration'] as num, closeTo(project.duration, .15));
-    expect(output['hasAudio'], false);
+    expect(output['hasAudio'], true);
     expect(output['size'] as num, greaterThan(10000));
     // Retain the result for host-side ffprobe and frame inspection.
     debugPrint('EXPORTED_TEST_PATH=${page.path}');
@@ -135,6 +146,10 @@ void main() {
       'Final scene',
     ]);
     expect(restored.clips[1].trimStart, 1);
+    expect(restored.music!.volume, .4);
+    expect(restored.music!.trimStart, 2.2);
+    expect(await File(restored.music!.path).exists(), true);
+    expect(restored.tags.length, 2);
     for (final c in restored.clips) {
       expect(await File(c.path).exists(), true);
     }

@@ -37,6 +37,7 @@ class NativeRenderer {
       'endPosters': ends,
       'layout': TemplateLayout.native,
       'slideSeconds': project.slideSeconds,
+      'music': project.music?.toJson(),
     });
     if (path == null) throw StateError('The renderer did not return a video.');
     return path;

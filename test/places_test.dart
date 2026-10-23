@@ -23,6 +23,9 @@ void main() {
               'places': [
                 {
                   'id': 'place-id',
+                  'types': ['cafe', 'food'],
+                  'nationalPhoneNumber': '12345',
+                  'websiteUri': 'https://cafe.example',
                   'displayName': {'text': 'Cafe Test'},
                   'primaryTypeDisplayName': {'text': 'Coffee shop'},
                   'formattedAddress': 'Makati, Philippines',
@@ -46,6 +49,13 @@ void main() {
       expect(p.reviewCount, '123');
       expect(p.price, 'Moderate');
       expect(p.hours, 'Open now');
+      expect(p.hasMenu, true);
+      expect(p.actions.map((a) => a.kind), [
+        'directions',
+        'menu',
+        'call',
+        'website',
+      ]);
       service.dispose();
     },
   );

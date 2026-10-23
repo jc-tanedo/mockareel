@@ -25,7 +25,7 @@ void main() {
   ) async {
     await open(tester);
     expect(find.text('MAPS PLACE STORY · 9:16'), findsOneWidget);
-    for (final tab in ['Timeline', 'Export', 'Place']) {
+    for (final tab in ['Timeline', 'Text', 'Audio', 'Export', 'Place']) {
       await tester.tap(find.text(tab).last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: '$tab layout');
@@ -81,10 +81,23 @@ void main() {
     await tester.tap(find.text('Timeline').last);
     await tester.pumpAndSettle();
     expect(find.text('7 clips · 28.0 seconds'), findsOneWidget);
-    await tester.ensureVisible(find.byTooltip('Remove clip 1'));
+    await tester.scrollUntilVisible(
+      find.byTooltip('Remove clip 1'),
+      150,
+      scrollable: find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .first,
+    );
     await tester.tap(find.byTooltip('Remove clip 1'));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, 800));
+    await tester.drag(
+      find.byWidgetPredicate(
+        (w) => w is ListView && w.scrollDirection == Axis.vertical,
+      ),
+      const Offset(0, 800),
+    );
     await tester.pumpAndSettle();
     expect(find.text('6 clips · 27.0 seconds'), findsOneWidget);
     expect(tester.takeException(), isNull);

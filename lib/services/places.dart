@@ -15,7 +15,7 @@ class PlacesService {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': key,
             'X-Goog-FieldMask':
-                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName,places.userRatingCount,places.priceLevel,places.currentOpeningHours',
+                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types,places.nationalPhoneNumber,places.websiteUri',
           },
           body: jsonEncode({
             'textQuery': query.trim(),
@@ -40,6 +40,9 @@ class PlacesService {
         address: p['formattedAddress'] as String? ?? '',
         rating: (p['rating'] as num?)?.toStringAsFixed(1) ?? '',
         placeId: p['id'] as String?,
+        types: (p['types'] as List? ?? []).cast<String>(),
+        phone: p['nationalPhoneNumber'] as String? ?? '',
+        website: p['websiteUri'] as String? ?? '',
         reviewCount: p['userRatingCount']?.toString() ?? '',
         price:
             const {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
 import 'media_frame.dart';
+import 'story_tags.dart';
 
 /// Only the gallery rectangle is transparent. This surface is shared by the
 /// live preview, transparent PNG, and each frame of the native compositor.
@@ -10,11 +11,13 @@ class PlaceOverlay extends StatelessWidget {
   final ReelProject project;
   final int index;
   final String? heroPath;
+  final bool showTags;
   const PlaceOverlay({
     super.key,
     required this.project,
     this.index = 0,
     this.heroPath,
+    this.showTags = true,
   });
   static const _teal = Color(0xff075d6b),
       _pale = Color(0xffddf0f3),
@@ -216,27 +219,6 @@ class PlaceOverlay extends StatelessWidget {
                       color: const Color(0xff39825d),
                     ),
                   ),
-                  if (project.storyBadge.isNotEmpty)
-                    Positioned(
-                      right: 20,
-                      top: 182,
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 190),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: line(
-                          project.storyBadge,
-                          size: 11,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
                   Positioned(
                     left: 16,
                     right: 16,
@@ -245,17 +227,12 @@ class PlaceOverlay extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final action in [
-                          (Icons.directions, 'Directions'),
-                          (Icons.shopping_bag_outlined, 'Order'),
-                          (Icons.call_outlined, 'Call'),
-                          (Icons.bookmark_border, 'Save'),
-                        ])
+                        for (final action in p.actions)
                           Expanded(
                             child: Container(
                               margin: const EdgeInsets.only(right: 4),
                               decoration: BoxDecoration(
-                                color: action.$2 == 'Directions'
+                                color: action.kind == 'directions'
                                     ? _teal
                                     : _pale,
                                 borderRadius: BorderRadius.circular(16),
@@ -264,18 +241,18 @@ class PlaceOverlay extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    action.$1,
+                                    placeActionIcon(action.kind),
                                     size: 11,
-                                    color: action.$2 == 'Directions'
+                                    color: action.kind == 'directions'
                                         ? Colors.white
                                         : _teal,
                                   ),
                                   const SizedBox(width: 3),
                                   Flexible(
                                     child: line(
-                                      action.$2,
+                                      action.label,
                                       size: 8,
-                                      color: action.$2 == 'Directions'
+                                      color: action.kind == 'directions'
                                           ? Colors.white
                                           : _teal,
                                     ),
@@ -316,7 +293,7 @@ class PlaceOverlay extends StatelessWidget {
                       children: [
                         for (final tab in [
                           'Overview',
-                          'Menu',
+                          if (p.hasMenu) 'Menu',
                           'Reviews',
                           'Photos',
                           'Updates',
@@ -355,13 +332,9 @@ class PlaceOverlay extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.shopping_bag_outlined,
-                            color: _teal,
-                            size: 12,
-                          ),
+                          const Icon(Icons.open_in_new, color: _teal, size: 12),
                           const SizedBox(width: 6),
-                          line('Order online', size: 11, color: _teal),
+                          line(p.footer, size: 11, color: _teal),
                         ],
                       ),
                     ),
@@ -383,6 +356,8 @@ class PlaceOverlay extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (showTags)
+                    Positioned.fill(child: StoryTagLayer(tags: project.tags)),
                   if (project.storyChrome) ...[
                     const Positioned(
                       left: 16,

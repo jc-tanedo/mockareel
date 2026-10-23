@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.media3.common.audio.GainProcessor
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
@@ -184,11 +185,33 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()
         }
-        val composition = Composition.Builder(EditedMediaItemSequence.Builder(items).build())
+        val sequences = mutableListOf(EditedMediaItemSequence.Builder(items).build())
+        val music = call.argument<Map<String, Any>>("music")
+        if (music != null) {
+            val path = music["path"] as String
+            require(File(path).isFile) { "The music file is missing. Replace or remove it in Audio." }
+            val info = inspect(path)
+            require(info["hasAudio"] == true) { "The selected file has no audio track" }
+            val sourceMs = ((info["duration"] as Double) * 1000).toLong()
+            val startMs = (((music["trimStart"] as? Number)?.toDouble() ?: 0.0) * 1000).toLong().coerceIn(0, max(0, sourceMs - 100))
+            val reelMs = clips.sumOf { ((it["duration"] as Number).toDouble() * 1000).toLong() }
+            val volume = ((music["volume"] as? Number)?.toFloat() ?: .7f).coerceIn(0f, 1f)
+            val gain = GainProcessor(object : GainProcessor.GainProvider {
+                override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int) = volume
+                override fun isUnityUntil(samplePosition: Long, sampleRate: Int): Long = if (volume == 1f) androidx.media3.common.C.TIME_END_OF_SOURCE else androidx.media3.common.C.TIME_UNSET
+            })
+            val audio = MediaItem.Builder().setUri(Uri.fromFile(File(path)))
+                .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs)
+                    .setEndPositionMs(min(sourceMs, startMs + reelMs)).build()).build()
+            val audioItem = EditedMediaItem.Builder(audio).setRemoveVideo(true)
+                .setEffects(Effects(listOf(gain), emptyList())).build()
+            sequences.add(EditedMediaItemSequence.Builder(audioItem).setIsLooping(music["loop"] != false).build())
+        }
+        val composition = Composition.Builder(sequences)
             .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL).build()
         val directory = File(context.filesDir, "exports").apply { mkdirs() }
         output = File(directory, "Mockareel-${System.currentTimeMillis()}.mp4")
-        transformer = Transformer.Builder(context).setVideoMimeType(MimeTypes.VIDEO_H264)
+        transformer = Transformer.Builder(context).setVideoMimeType(MimeTypes.VIDEO_H264).setAudioMimeType(MimeTypes.AUDIO_AAC)
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     val path = output?.absolutePath

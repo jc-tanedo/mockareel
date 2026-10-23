@@ -17,15 +17,19 @@ import 'services/native_renderer.dart';
 import 'services/places.dart';
 import 'services/project_store.dart';
 import 'widgets/reel_preview.dart';
+import 'widgets/media_frame.dart';
+import 'widgets/place_actions_editor.dart';
+import 'widgets/text_editor.dart';
+import 'widgets/audio_editor.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MockareelApp());
 }
 
-const ink = Color(0xff0a1018),
-    panel = Color(0xff111b27),
-    mint = Color(0xff55e3c0);
+const ink = Color(0xff171719),
+    panel = Color(0xff232326),
+    mint = Color(0xffb1a6ff);
 
 class MockareelApp extends StatelessWidget {
   final ProjectStore? store;
@@ -36,6 +40,23 @@ class MockareelApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       brightness: Brightness.dark,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xff202023),
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: Color(0xff202023),
+        indicatorColor: Color(0xff39334f),
+        height: 68,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xff38383d),
+        thickness: 1,
+      ),
+      sliderTheme: const SliderThemeData(
+        trackHeight: 2,
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+      ),
       scaffoldBackgroundColor: ink,
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -46,7 +67,7 @@ class MockareelApp extends StatelessWidget {
         filled: true,
         fillColor: panel,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
@@ -73,8 +94,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       _localName = TextEditingController(),
       _reviews = TextEditingController(),
       _price = TextEditingController(),
-      _hours = TextEditingController(),
-      _badge = TextEditingController();
+      _hours = TextEditingController();
   ReelProject _project = ReelProject();
   int _tab = 0, _selected = 0, _captureIndex = 0, _editRevision = 0;
   bool _ready = false, _importing = false, _exporting = false, _dirty = false;
@@ -92,7 +112,6 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _reviews,
     _price,
     _hours,
-    _badge,
   ];
   Timer? _autosave;
   StreamSubscription<double>? _progressSubscription;
@@ -142,7 +161,6 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _reviews.text = project.place.reviewCount;
     _price.text = project.place.price;
     _hours.text = project.place.hours;
-    _badge.text = project.storyBadge;
     _dirty = false;
     _previewRevision = newId();
   }
@@ -156,7 +174,6 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _project.place.reviewCount = _reviews.text;
     _project.place.price = _price.text;
     _project.place.hours = _hours.text;
-    _project.storyBadge = _badge.text;
     _editRevision++;
     setState(() => _dirty = true);
     _autosave?.cancel();
@@ -190,6 +207,37 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   String _error(Object e) => e is PlatformException
       ? e.message ?? e.code
       : e.toString().replaceFirst('Exception: ', '');
+
+  Future<void> _pickMusic() async {
+    if (_importing) return;
+    setState(() => _importing = true);
+    String? retained;
+    try {
+      final file = await FilePicker.pickFile(type: FileType.audio);
+      if (file == null || file.path == null) return;
+      final info = await _renderer.inspect(file.path!);
+      final duration = (info['duration'] as num?)?.toDouble() ?? 0;
+      if (duration <= 0 || info['hasAudio'] != true) {
+        throw const FormatException(
+          'Choose a file with a playable audio track.',
+        );
+      }
+      retained = await _store.retainMedia(file.path!, file.name);
+      if (!mounted) return;
+      _project.music = MusicTrack(
+        path: retained,
+        name: file.name,
+        sourceDuration: duration,
+      );
+      _previewRevision = newId();
+      _change();
+    } catch (e) {
+      if (retained != null) await File(retained).delete();
+      _toast(_error(e));
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
 
   Future<void> _pickMedia() async {
     if (_importing) return;
@@ -740,6 +788,19 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
             body: switch (_tab) {
               0 => _editTab(),
               1 => _timelineTab(),
+              2 => TextEditor(
+                key: ValueKey(_project.id),
+                project: _project,
+                selectedClip: _selected,
+                onChanged: _change,
+              ),
+              3 => AudioEditor(
+                project: _project,
+                preview: _preview(),
+                importing: _importing,
+                onPick: _pickMusic,
+                onChanged: _change,
+              ),
               _ => _exportTab(),
             },
             bottomNavigationBar: NavigationBar(
@@ -756,6 +817,14 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                 NavigationDestination(
                   icon: Icon(Icons.video_collection_outlined),
                   label: 'Timeline',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.text_fields),
+                  label: 'Text',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.music_note_outlined),
+                  label: 'Audio',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.ios_share),
@@ -807,10 +876,11 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _preview() => TimelinePreview(
+  Widget _preview({double maxHeight = 420}) => TimelinePreview(
     key: ValueKey(_previewRevision),
     project: _project,
     selected: _selected,
+    maxHeight: maxHeight,
   );
   Widget _editTab() => ListView(
     padding: const EdgeInsets.all(18),
@@ -836,6 +906,11 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         keyboard: const TextInputType.numberWithOptions(decimal: true),
       ),
       _field('Address', _address),
+      PlaceActionsEditor(
+        key: ValueKey('actions-${_project.id}-${_project.place.placeId}'),
+        place: _project.place,
+        onChanged: _change,
+      ),
       ExpansionTile(
         title: const Text('Template details'),
         tilePadding: EdgeInsets.zero,
@@ -844,7 +919,6 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
           _field('Review count', _reviews, keyboard: TextInputType.number),
           _field('Price / price range', _price),
           _field('Hours / open status', _hours),
-          _field('Story badge (optional)', _badge),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Story controls overlay'),
@@ -923,7 +997,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   Widget _timelineTab() => ListView(
     padding: const EdgeInsets.all(18),
     children: [
-      _preview(),
+      _preview(maxHeight: 320),
       _addMedia(),
       ExpansionTile(
         title: const Text('Left-scroll snap'),
@@ -974,9 +1048,86 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
             textAlign: TextAlign.center,
           ),
         ),
-      for (var i = 0; i < _project.clips.length; i++) _clipCard(i),
+      if (_project.clips.isNotEmpty) ...[
+        _clipStrip(),
+        const SizedBox(height: 18),
+        const Text(
+          'CLIP INSPECTOR',
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 2,
+            color: Colors.white54,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _clipCard(_selected.clamp(0, _project.clips.length - 1)),
+      ],
     ],
   );
+  Widget _clipStrip() => SizedBox(
+    height: 96,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: _project.clips.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 5),
+      itemBuilder: (_, i) {
+        final c = _project.clips[i];
+        return InkWell(
+          onTap: () => setState(() {
+            _selected = i;
+            _previewRevision = newId();
+          }),
+          child: Container(
+            width: (c.duration * 12).clamp(78, 150),
+            decoration: BoxDecoration(
+              color: panel,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: i == _selected ? mint : Colors.white12,
+                width: 2,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipPoster(clip: c),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black87],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 6,
+                    top: 5,
+                    child: Text(
+                      '${i + 1}',
+                      style: const TextStyle(fontSize: 10, color: Colors.white),
+                    ),
+                  ),
+                  Positioned(
+                    left: 6,
+                    right: 4,
+                    bottom: 6,
+                    child: Text(
+                      '${c.duration.toStringAsFixed(1)}s',
+                      style: const TextStyle(fontSize: 11, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+
   Widget _clipCard(int index) {
     final clip = _project.clips[index];
     return Card(
@@ -1170,7 +1321,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       ),
       const SizedBox(height: 10),
       const Text(
-        'Vertical MP4 · 1080 × 1920\nSilent video · cards scroll left and snap\nYour framing, captions and place details included',
+        'Vertical MP4 · 1080 × 1920\nCards scroll left and snap\nYour music, text, framing and place details included',
         textAlign: TextAlign.center,
         style: TextStyle(color: Colors.white60, height: 1.7),
       ),

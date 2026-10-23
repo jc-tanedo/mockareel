@@ -35,7 +35,10 @@ class _MediaFrameState extends State<MediaFrame> {
     await previous?.dispose();
     _error = null;
     if (!widget.clip.isVideo) return;
-    final controller = VideoPlayerController.file(File(widget.clip.path));
+    final controller = VideoPlayerController.file(
+      File(widget.clip.path),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     try {
       await controller.initialize();
       if (!mounted || generation != _generation) {

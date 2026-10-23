@@ -122,6 +122,12 @@ class ProjectStore {
         clips[i]['path'] = relative;
         await encoder.addFile(File(c.path), relative);
       }
+      if (project.music != null) {
+        final music = project.music!;
+        final relative = 'media/music.${music.path.split('.').last}';
+        (data['music'] as Map)['path'] = relative;
+        await encoder.addFile(File(music.path), relative);
+      }
       final bytes = utf8.encode(jsonEncode(data));
       encoder.addArchiveFile(ArchiveFile('project.json', bytes.length, bytes));
     } finally {
@@ -147,12 +153,17 @@ class ProjectStore {
       final clips = json['clips'] as List;
       final written = <File>[];
       try {
-        for (final clip in clips) {
-          final replacementId = newId();
-          if (json['heroClipId'] == clip['id']) {
-            json['heroClipId'] = replacementId;
+        for (final clip in [
+          ...clips,
+          if (json['music'] != null) json['music'],
+        ]) {
+          if (clip.containsKey('id')) {
+            final replacementId = newId();
+            if (json['heroClipId'] == clip['id']) {
+              json['heroClipId'] = replacementId;
+            }
+            clip['id'] = replacementId;
           }
-          clip['id'] = replacementId;
           final entry = archive.findFile(clip['path'] as String);
           if (entry == null || !entry.isFile) {
             throw const FormatException(
