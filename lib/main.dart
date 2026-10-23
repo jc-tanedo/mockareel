@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,6 +53,7 @@ class _EditorPageState extends State<EditorPage> {
   int _tab = 0;
   int _selected = 0;
   bool _saved = false;
+  static const _mapsApiKey = String.fromEnvironment('MAPS_API_KEY');
 
   @override
   void initState() { super.initState(); _loadDraft(); }
@@ -67,6 +69,7 @@ class _EditorPageState extends State<EditorPage> {
       _rating.text = data['rating'] as String? ?? _rating.text;
       _address.text = data['address'] as String? ?? _address.text;
       _durations.setAll(0, (data['durations'] as List<dynamic>? ?? []).map((e) => (e as num).toDouble()).take(5));
+      _media.addAll((data['media'] as List<dynamic>? ?? []).whereType<String>().map(XFile.new));
     });
   }
 
@@ -91,13 +94,67 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Future<void> _findPlace() async {
-    final q = Uri.encodeComponent(_name.text.isEmpty ? 'restaurants near me' : _name.text);
-    await launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$q'), mode: LaunchMode.externalApplication);
-    if (mounted) _toast('Choose a place in Maps, then update its details below.');
+    if (_mapsApiKey.isEmpty) {
+      final q = Uri.encodeComponent(_name.text.isEmpty ? 'restaurants near me' : _name.text);
+      await launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$q'), mode: LaunchMode.externalApplication);
+      if (mounted) _toast('Add a Places API key to enable in-app search and autofill.');
+      return;
+    }
+    final query = TextEditingController(text: _name.text);
+    List<Map<String, dynamic>> results = [];
+    bool loading = false;
+    String? error;
+    await showDialog<void>(context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, refresh) => AlertDialog(
+      backgroundColor: panel,
+      title: const Text('Find a place'),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: query, autofocus: true, decoration: InputDecoration(hintText: 'Search places', suffixIcon: IconButton(onPressed: loading ? null : () async {
+          refresh(() { loading = true; error = null; });
+          try {
+            final response = await http.post(Uri.https('places.googleapis.com', '/v1/places:autocomplete'), headers: {'Content-Type': 'application/json', 'X-Goog-Api-Key': _mapsApiKey}, body: jsonEncode({'input': query.text}));
+            if (response.statusCode != 200) throw Exception('Places search returned ${response.statusCode}. Check API key and Places API access.');
+            results = ((jsonDecode(response.body)['suggestions'] as List<dynamic>? ?? []).where((e) => (e as Map<String, dynamic>).containsKey('placePrediction')).map((e) => e['placePrediction'] as Map<String, dynamic>).toList());
+          } catch (e) { error = e.toString().replaceFirst('Exception: ', ''); }
+          refresh(() { loading = false; });
+        }, icon: const Icon(Icons.search, color: mint))), onSubmitted: (_) => FocusScope.of(context).unfocus()),
+        if (loading) const Padding(padding: EdgeInsets.all(18), child: CircularProgressIndicator(color: mint)),
+        if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12))),
+        if (!loading && results.isNotEmpty) ...results.map((item) {
+          final structured = item['structuredFormat'] as Map<String, dynamic>? ?? {};
+          final main = (structured['mainText'] as Map<String, dynamic>?)?['text'] as String? ?? '';
+          final secondary = (structured['secondaryText'] as Map<String, dynamic>?)?['text'] as String? ?? '';
+          return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.location_on_outlined, color: mint), title: Text(main, maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text(secondary, maxLines: 1, overflow: TextOverflow.ellipsis), onTap: () async {
+            final placeId = item['placeId'] as String?;
+            if (placeId == null) return;
+            Navigator.pop(dialogContext);
+            await _loadPlace(placeId);
+          });
+        }),
+        if (!loading && results.isEmpty && error == null) const Padding(padding: EdgeInsets.only(top: 14), child: Text('Search for a place to see matching results.', style: TextStyle(color: Colors.white54, fontSize: 12))),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+    )));
+    query.dispose();
+  }
+
+  Future<void> _loadPlace(String placeId) async {
+    try {
+      final response = await http.get(Uri.https('places.googleapis.com', '/v1/places/$placeId', {'languageCode': 'en'}), headers: {'X-Goog-Api-Key': _mapsApiKey, 'X-Goog-FieldMask': 'displayName,formattedAddress,shortFormattedAddress,rating,primaryTypeDisplayName'});
+      if (response.statusCode != 200) throw Exception('Place details returned ${response.statusCode}.');
+      final place = jsonDecode(response.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _name.text = (place['displayName'] as Map<String, dynamic>?)?['text'] as String? ?? _name.text;
+        _subtitle.text = (place['primaryTypeDisplayName'] as Map<String, dynamic>?)?['text'] as String? ?? _subtitle.text;
+        _rating.text = (place['rating'] as num?)?.toStringAsFixed(1) ?? _rating.text;
+        _address.text = place['shortFormattedAddress'] as String? ?? place['formattedAddress'] as String? ?? _address.text;
+      });
+      _toast('Place details added. Edit any field below.');
+    } catch (e) { if (mounted) _toast(e.toString().replaceFirst('Exception: ', '')); }
   }
 
   Future<void> _export() async {
-    await Share.shareXFiles([], text: const JsonEncoder.withIndent('  ').convert(_project()), subject: 'My Mockareel project');
+    await Share.share(const JsonEncoder.withIndent('  ').convert(_project()), subject: 'My Mockareel project');
   }
 
   void _toast(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
