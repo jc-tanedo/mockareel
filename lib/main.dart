@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'model/project.dart';
+import 'pages/library_page.dart';
 import 'services/native_renderer.dart';
 import 'services/places.dart';
 import 'services/static_map.dart';
@@ -38,7 +39,8 @@ const ink = Color(0xff171719),
 
 class MockareelApp extends StatelessWidget {
   final ProjectStore? store;
-  const MockareelApp({super.key, this.store});
+  final ReelProject? editorProject;
+  const MockareelApp({super.key, this.store, this.editorProject});
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Mockareel',
@@ -77,13 +79,16 @@ class MockareelApp extends StatelessWidget {
         ),
       ),
     ),
-    home: EditorPage(store: store),
+    home: editorProject == null
+        ? LibraryPage(store: store)
+        : EditorPage(store: store, initialProject: editorProject),
   );
 }
 
 class EditorPage extends StatefulWidget {
   final ProjectStore? store;
-  const EditorPage({super.key, this.store});
+  final ReelProject? initialProject;
+  const EditorPage({super.key, this.store, this.initialProject});
   @override
   State<EditorPage> createState() => _EditorPageState();
 }
@@ -140,7 +145,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   Future<void> _initialize() async {
     try {
       await _store.initialize();
-      final project = await _store.restore();
+      final project = widget.initialProject ?? await _store.restore();
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       _key = prefs.getString('mapsApiKey') ?? _buildKey;
@@ -444,73 +449,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
 
   Future<void> _projects() async {
     await _save(silent: true);
-    final projects = await _store.projects();
-    if (!mounted) return;
-    final result = await showModalBottomSheet<Object>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: SizedBox(
-          height: 440,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Your projects',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => Navigator.pop(ctx, 'new'),
-                      icon: const Icon(Icons.add),
-                      label: const Text('New'),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.file_open_outlined),
-                title: const Text('Import a project backup'),
-                onTap: () => Navigator.pop(ctx, 'import'),
-              ),
-              Expanded(
-                child: ListView(
-                  children: projects
-                      .map(
-                        (p) => ListTile(
-                          leading: const Icon(Icons.movie_outlined),
-                          title: Text(p.title),
-                          subtitle: Text(
-                            '${p.clips.length} clips · ${p.duration.toStringAsFixed(1)} seconds',
-                          ),
-                          trailing: p.id == _project.id
-                              ? const Icon(Icons.check, color: mint)
-                              : null,
-                          onTap: () => Navigator.pop(ctx, p),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || result == null) return;
-    if (result == 'import') {
-      await _importBackup();
-      return;
-    }
-    setState(() => _setProject(result is ReelProject ? result : ReelProject()));
-    await _save(silent: true);
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _rename() async {
@@ -554,19 +493,6 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       );
     } catch (e) {
       _toast('Could not share backup: ${_error(e)}');
-    }
-  }
-
-  Future<void> _importBackup() async {
-    try {
-      final file = await FilePicker.pickFile(type: FileType.any);
-      final path = file?.path;
-      if (path == null) return;
-      final project = await _store.importBackup(path);
-      if (mounted) setState(() => _setProject(project));
-      _toast('Project imported with its media');
-    } catch (e) {
-      _toast('Import failed: ${_error(e)}');
     }
   }
 
@@ -806,6 +732,9 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     }
     return PopScope(
       canPop: !_exporting,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop && _dirty) unawaited(_save(silent: true));
+      },
       child: Stack(
         children: [
           // The capture surface is painted behind the opaque editor. It stays exactly
@@ -844,9 +773,16 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
             appBar: AppBar(
               titleSpacing: 4,
               leading: IconButton(
-                tooltip: 'Saved projects',
-                onPressed: _projects,
-                icon: const Icon(Icons.folder_open_outlined),
+                tooltip: 'Back to projects',
+                onPressed: _exporting
+                    ? null
+                    : () async {
+                        await _save(silent: true);
+                        if (mounted && context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                icon: const Icon(Icons.arrow_back),
               ),
               title: InkWell(
                 onTap: _rename,

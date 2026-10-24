@@ -126,6 +126,59 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         } finally { retriever.release() }
     }
 
+    private fun buildFeedItems(
+        clips: List<Map<String, Any>>, overlays: List<String>, posters: List<String>, cache: PosterCache,
+        frames: List<List<String>>, transitions: List<Number>,
+    ): List<EditedMediaItem> {
+        require(frames.size == clips.size && transitions.size == clips.size) { "Missing feed scene plan" }
+        frames.flatten().forEach { require(File(it).isFile) { "A feed UI frame is missing" } }
+        return clips.flatMapIndexed { index, clip ->
+            val total = (clip["duration"] as Number).toDouble()
+            require(total.isFinite() && total > 0 && total <= 30) { "Invalid scene duration" }
+            require(File(overlays[index]).isFile) { "A feed overlay is missing" }
+            val video = clip["isVideo"] == true
+            val loop = clip["loopSource"] == true && video
+            val trim = (clip["trimStart"] as? Number)?.toDouble() ?: 0.0
+            val available = if (loop) min((clip["loopDuration"] as Number).toDouble(), (clip["sourceDuration"] as Number).toDouble() - trim) else total
+            require(available > 0) { "Invalid source duration" }
+            val (sw, sh) = cache.dimensions(posters[index])
+            val aspect = sw.toFloat() / sh
+            val cardAspect = 1080f / 1920f
+            val zoom = ((clip["zoom"] as? Number)?.toFloat() ?: 1f).coerceIn(1f, 3f)
+            val pan = ((clip["panX"] as? Number)?.toFloat() ?: 0f).coerceIn(-1f, 1f)
+            val fx = min(1f, cardAspect / aspect) / zoom
+            val fy = min(1f, aspect / cardAspect) / zoom
+            val cx = pan * (1 - fx)
+            val items = mutableListOf<EditedMediaItem>()
+            var offset = 0.0
+            while (offset < total - .0001) {
+                val segment = min(available, total - offset)
+                val sceneOffset = offset
+                val media = MediaItem.Builder().setUri(Uri.fromFile(File(clip["path"] as String)))
+                if (video) media.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs((trim * 1000).roundToLong())
+                    .setEndPositionMs(((trim + segment) * 1000).roundToLong()).build())
+                else media.setImageDurationMs((segment * 1000).roundToLong())
+                val clock = ClipClock()
+                val transition = transitions[index].toDouble()
+                val effects = listOf<androidx.media3.common.Effect>(
+                    Crop(cx - fx, cx + fx, -fy, fy),
+                    Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT),
+                    MatrixTransformation { timeUs ->
+                        clock.begin(timeUs)
+                        val entry = FeedMotion.entry(sceneOffset + clock.elapsed(timeUs), transition)
+                        Matrix().apply { postTranslate(0f, -2 * entry / 640f) }
+                    },
+                    OverlayEffect(listOf(FeedFrameOverlay(overlays[index], frames[index], clock, sceneOffset, if (transition > 0) transition else total)))
+                )
+                items.add(EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
+                    .setEffects(Effects(emptyList(), effects)).build())
+                offset += segment
+            }
+            items
+        }
+    }
+
     private fun start(call: MethodCall, result: MethodChannel.Result) {
         check(transformer == null && pending == null) { "An export is already running" }
         val clips = requireNotNull(call.argument<List<Map<String, Any>>>("clips"))
@@ -152,7 +205,11 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             ((c["panX"] as? Number)?.toFloat() ?: 0f).coerceIn(-1f, 1f), starts[i], ends[i]) }
         pending = result
         val cache = PosterCache(); posterCache = cache
-        val items = clips.mapIndexed { index, clip ->
+        val items = if (call.argument<String>("template") == "tiktok-feed") {
+            buildFeedItems(clips, overlays, starts, cache,
+                call.argument<List<List<String>>>("sceneFrames") ?: emptyList(),
+                call.argument<List<Number>>("transitions") ?: emptyList())
+        } else clips.mapIndexed { index, clip ->
             val sceneStart = globalStart
             globalStart += (clip["duration"] as Number).toDouble()
             val durationMs = ((clip["duration"] as Number).toDouble() * 1000).toLong()

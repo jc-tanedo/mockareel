@@ -90,7 +90,7 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: key,
-        child: MockareelApp(store: store),
+        child: MockareelApp(store: store, editorProject: await store.restore()),
       ),
     );
     await tester.pumpAndSettle();

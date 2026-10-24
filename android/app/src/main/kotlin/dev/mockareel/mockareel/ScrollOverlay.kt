@@ -166,3 +166,38 @@ internal class ScrollOverlay(
         ui?.recycle(); ui = null
     }
 }
+
+internal object FeedMotion {
+    fun sample(time: Double): Double = max(0, (time * 30).roundToInt()) / 30.0
+    fun entry(elapsed: Double, duration: Double): Float {
+        if (duration <= 0 || elapsed >= duration) return 0f
+        val lastSample = max(0, ceil(duration * 30).toInt() - 1) / 30.0
+        val time = min(sample(elapsed), lastSample)
+        return (640 * (1 - (time / duration).coerceIn(0.0, 1.0)).pow(3)).toFloat()
+    }
+    fun frame(elapsed: Double, count: Int): Int = if (count <= 0) -1 else (elapsed * 30).roundToInt().coerceIn(0, count - 1)
+}
+
+/** Only UI and the outgoing post are rasterized. The active video stays a native
+ * texture, preserving motion and avoiding a full-reel frame image sequence. */
+@UnstableApi
+internal class FeedFrameOverlay(
+    private val path: String, private val frames: List<String>,
+    private val clock: ClipClock, private val offset: Double, private val animatedDuration: Double,
+) : BitmapOverlay() {
+    private var loadedPath: String? = null
+    private var bitmap: Bitmap? = null
+    override fun getBitmap(presentationTimeUs: Long): Bitmap {
+        clock.begin(presentationTimeUs)
+        val elapsed = offset + clock.elapsed(presentationTimeUs)
+        val index = FeedMotion.frame(elapsed, frames.size)
+        val current = if (index >= 0 && elapsed < animatedDuration) frames[index] else path
+        if (loadedPath != current) {
+            bitmap?.recycle()
+            bitmap = requireNotNull(BitmapFactory.decodeFile(current)) { "Cannot decode a feed UI frame" }
+            loadedPath = current
+        }
+        return requireNotNull(bitmap)
+    }
+    override fun release() { super.release(); bitmap?.recycle(); bitmap = null }
+}

@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/feed.dart';
+import 'package:mockareel/pages/feed_editor_page.dart';
 import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/project_store.dart';
 import 'package:path_provider/path_provider.dart';
@@ -114,7 +116,9 @@ void main() {
       renderer.export(missing, [red]),
       throwsA(isA<PlatformException>()),
     );
-    await tester.pumpWidget(MockareelApp(store: store));
+    await tester.pumpWidget(
+      MockareelApp(store: store, editorProject: await store.restore()),
+    );
     Future<void> waitFor(Finder finder, {int seconds = 120}) async {
       final deadline = DateTime.now().add(Duration(seconds: seconds));
       while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
@@ -162,6 +166,53 @@ void main() {
     for (final c in restored.clips) {
       expect(await File(c.path).exists(), true);
     }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    final feed = ReelProject(
+      template: 'tiktok-feed',
+      title: 'Feed export integration',
+      slideSeconds: .2,
+      feed: FeedSettings(
+        search: 'test feed',
+        typingSeconds: .5,
+        loadingSeconds: .2,
+        closeToHome: true,
+        homeSeconds: .5,
+        homeMedia: ReelClip(
+          id: 'wallpaper',
+          path: video.path,
+          name: 'Looping wallpaper',
+          isVideo: true,
+          sourceDuration: (source['duration'] as num).toDouble(),
+          duration: .5,
+        ),
+      ),
+      clips: project.clips.map((c) => ReelClip.fromJson(c.toJson())).toList(),
+      music: project.music,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: FeedEditorPage(store: store, project: feed),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Export').last);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Render MP4'));
+    await waitFor(find.text('Your reel is ready'), seconds: 240);
+    final feedPage = tester.widget<ExportedVideoPage>(
+      find.byType(ExportedVideoPage),
+    );
+    final feedOutput = await renderer.inspect(feedPage.path);
+    expect(feedOutput['width'], 1080);
+    expect(feedOutput['height'], 1920);
+    expect(
+      feedOutput['duration'] as num,
+      closeTo(FeedTimeline.duration(feed), .2),
+    );
+    expect(feedOutput['hasAudio'], true);
+    debugPrint('EXPORTED_FEED_TEST_PATH=${feedPage.path}');
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(minutes: 8)));

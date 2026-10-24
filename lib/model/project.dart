@@ -1,3 +1,4 @@
+import 'feed.dart';
 import 'dart:math';
 
 String newId() =>
@@ -207,6 +208,7 @@ class ReelClip {
   final double sourceDuration;
   double duration, trimStart, cardWidth, cardHeight, zoom, panX;
   String caption;
+  FeedPost post;
   ReelClip({
     required this.id,
     required this.path,
@@ -216,11 +218,12 @@ class ReelClip {
     this.duration = 3.5,
     this.trimStart = 0,
     this.caption = '',
+    FeedPost? post,
     this.cardWidth = .78,
     this.cardHeight = 1,
     this.zoom = 1,
     this.panX = 0,
-  }) {
+  }) : post = post ?? FeedPost() {
     normalize();
   }
   double get maxDuration =>
@@ -248,6 +251,9 @@ class ReelClip {
     duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
     trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
     caption: json['caption'] as String? ?? '',
+    post: FeedPost.fromJson(
+      Map<String, dynamic>.from(json['post'] as Map? ?? {}),
+    ),
     cardWidth: (json['cardWidth'] as num?)?.toDouble() ?? .78,
     cardHeight: (json['cardHeight'] as num?)?.toDouble() ?? 1,
     zoom: (json['zoom'] as num?)?.toDouble() ?? 1,
@@ -262,6 +268,7 @@ class ReelClip {
     'duration': duration,
     'trimStart': trimStart,
     'caption': caption,
+    'post': post.toJson(),
     'cardWidth': cardWidth,
     'cardHeight': cardHeight,
     'zoom': zoom,
@@ -299,6 +306,9 @@ class FeaturedReview {
 class ReelProject {
   final String id;
   String title, storyBadge;
+  final String template;
+  FeedSettings feed;
+  bool get isFeed => template == 'tiktok-feed';
   String? heroClipId;
   bool storyChrome, darkOutput;
   double slideSeconds, sheetIntroSeconds;
@@ -315,6 +325,8 @@ class ReelProject {
   ReelProject({
     String? id,
     this.title = 'Untitled reel',
+    this.template = 'maps-place',
+    FeedSettings? feed,
     this.storyBadge = '',
     this.storyChrome = false,
     this.darkOutput = false,
@@ -331,7 +343,8 @@ class ReelProject {
     List<StoryTag>? tags,
     this.music,
     DateTime? updatedAt,
-  }) : sheetIntroSeconds = sheetIntroSeconds.isFinite
+  }) : feed = feed ?? FeedSettings(),
+       sheetIntroSeconds = sheetIntroSeconds.isFinite
            ? sheetIntroSeconds.clamp(0, 2).toDouble()
            : .9,
        review = review ?? FeaturedReview(),
@@ -370,6 +383,10 @@ class ReelProject {
   factory ReelProject.fromJson(Map<String, dynamic> json) => ReelProject(
     id: json['id'] as String?,
     title: json['title'] as String? ?? 'My place reel',
+    template: json['template'] == 'tiktok-feed' ? 'tiktok-feed' : 'maps-place',
+    feed: FeedSettings.fromJson(
+      Map<String, dynamic>.from(json['feed'] as Map? ?? {}),
+    ),
     storyBadge: json['storyBadge'] as String? ?? '',
     tags:
         (json['tags'] as List?)
@@ -424,7 +441,8 @@ class ReelProject {
     'sheetIntroSeconds': sheetIntroSeconds,
     'review': review.toJson(),
     'slideSeconds': slideSeconds,
-    'template': 'maps-place',
+    'template': template,
+    'feed': feed.toJson(),
     'place': place.toJson(),
     'clips': clips.map((e) => e.toJson()).toList(),
     'updatedAt': updatedAt.toIso8601String(),

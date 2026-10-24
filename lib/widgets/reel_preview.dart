@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
+import '../model/feed.dart';
+import 'feed_canvas.dart';
 import '../model/template_layout.dart';
 import 'media_frame.dart';
 import 'place_overlay.dart';
@@ -13,10 +15,12 @@ class TimelinePreview extends StatefulWidget {
   final ReelProject project;
   final int selected;
   final double maxHeight;
+  final bool startAtBeginning;
   const TimelinePreview({
     super.key,
     required this.project,
     this.selected = 0,
+    this.startAtBeginning = false,
     this.maxHeight = 420,
   });
   @override
@@ -29,6 +33,18 @@ class _TimelinePreviewState extends State<TimelinePreview>
   final _clock = Stopwatch();
   double _base = 0, _position = 0;
   bool get _playing => _timer != null;
+  double get _duration => widget.project.isFeed
+      ? FeedTimeline.duration(widget.project)
+      : widget.project.duration;
+  double get _selectedStart => widget.startAtBeginning
+      ? 0
+      : widget.project.isFeed
+      ? FeedTimeline.postStart(widget.project, widget.selected) +
+            (widget.project.clips.isEmpty
+                ? 0
+                : FeedTimeline.transition(widget.project, widget.selected))
+      : widget.project.startOf(widget.selected) +
+            TemplateLayout.transitionDuration(widget.project, widget.selected);
   void _pause() {
     _timer?.cancel();
     _timer = null;
@@ -38,7 +54,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
 
   void _play() {
     if (widget.project.clips.isEmpty) return;
-    if (_position >= widget.project.duration - .03) _position = 0;
+    if (_position >= _duration - .03) _position = 0;
     _base = _position;
     _clock.reset();
     _clock.start();
@@ -46,11 +62,11 @@ class _TimelinePreviewState extends State<TimelinePreview>
       if (!mounted) return;
       setState(
         () => _position = min(
-          widget.project.duration,
+          _duration,
           _base + _clock.elapsedMilliseconds / 1000,
         ),
       );
-      if (_position >= widget.project.duration) _pause();
+      if (_position >= _duration) _pause();
     });
     setState(() {});
   }
@@ -59,9 +75,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _position =
-        widget.project.startOf(widget.selected) +
-        TemplateLayout.transitionDuration(widget.project, widget.selected);
+    _position = _selectedStart;
   }
 
   @override
@@ -70,11 +84,9 @@ class _TimelinePreviewState extends State<TimelinePreview>
     if (oldWidget.selected != widget.selected ||
         oldWidget.project.id != widget.project.id) {
       _pause();
-      _position =
-          widget.project.startOf(widget.selected) +
-          TemplateLayout.transitionDuration(widget.project, widget.selected);
+      _position = _selectedStart;
     }
-    _position = _position.clamp(0, widget.project.duration);
+    _position = _position.clamp(0, _duration);
   }
 
   @override
@@ -142,8 +154,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
             ),
             Expanded(
               child: Slider(
-                value: min(_position, p.duration),
-                max: max(.01, p.duration),
+                value: min(_position, _duration),
+                max: max(.01, _duration),
                 onChangeStart: (_) => _pause(),
                 onChanged: p.clips.isEmpty
                     ? null
@@ -151,7 +163,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
               ),
             ),
             Text(
-              '${_position.toStringAsFixed(1)} / ${p.duration.toStringAsFixed(1)}s',
+              '${_position.toStringAsFixed(1)} / ${_duration.toStringAsFixed(1)}s',
               style: const TextStyle(fontSize: 11),
             ),
           ],
@@ -181,6 +193,16 @@ class ReelCanvas extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    if (project.isFeed) {
+      return FeedCanvas(
+        project: project,
+        position: position,
+        playing: playing,
+        overlayOnly: overlayOnly,
+        posterOnly: posterOnly,
+        posters: posters,
+      );
+    }
     final index = project.clipAt(position);
     final sheetOffset = animateIntro
         ? TemplateLayout.sheetOffset(project, position)

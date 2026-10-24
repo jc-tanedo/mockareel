@@ -372,7 +372,9 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MockareelApp(store: store));
+      await tester.pumpWidget(
+        MockareelApp(store: store, editorProject: await store.restore()),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Export').last);
       await tester.pumpAndSettle();

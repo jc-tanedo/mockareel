@@ -56,6 +56,43 @@ class NativeRenderer {
     return path;
   }
 
+  Future<String> exportFeed({
+    required List<Map<String, dynamic>> clips,
+    required List<String> overlays,
+    required List<List<String>> frames,
+    required List<double> transitions,
+    MusicTrack? music,
+  }) async {
+    final generation = ++_generation;
+    final posters = <String>[];
+    for (final c in clips) {
+      posters.add(
+        c['isVideo'] == true
+            ? await thumbnail(
+                c['path'] as String,
+                (c['trimStart'] as num).toDouble(),
+              )
+            : c['path'] as String,
+      );
+      if (generation != _generation) {
+        throw PlatformException(code: 'CANCELLED', message: 'Export cancelled');
+      }
+    }
+    final path = await channel.invokeMethod<String>('export', {
+      'template': 'tiktok-feed',
+      'clips': clips,
+      'overlays': overlays,
+      'posters': posters,
+      'endPosters': posters,
+      'layout': TemplateLayout.native,
+      'sceneFrames': frames,
+      'transitions': transitions,
+      'music': music?.toJson(),
+    });
+    if (path == null) throw StateError('The renderer did not return a video.');
+    return path;
+  }
+
   Future<void> cancel() {
     _generation++;
     return channel.invokeMethod('cancel');

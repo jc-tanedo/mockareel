@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
+import '../model/feed.dart';
 
 class AudioEditor extends StatelessWidget {
   final ReelProject project;
@@ -50,7 +51,7 @@ class AudioEditor extends StatelessWidget {
               leading: const Icon(Icons.music_note, color: Color(0xff9c93ff)),
               title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(
-                '${m.sourceDuration.toStringAsFixed(1)}s source · ${project.duration.toStringAsFixed(1)}s reel',
+                '${m.sourceDuration.toStringAsFixed(1)}s source · ${(project.isFeed ? FeedTimeline.duration(project) : project.duration).toStringAsFixed(1)}s reel',
               ),
               trailing: IconButton(
                 tooltip: 'Remove music',

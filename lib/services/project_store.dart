@@ -134,6 +134,19 @@ class ProjectStore {
         data['mapHeaderPath'] = relative;
         await encoder.addFile(File(project.mapHeaderPath!), relative);
       }
+      for (var i = 0; i < project.clips.length; i++) {
+        final avatar = project.clips[i].post.avatarPath;
+        if (avatar == null) continue;
+        final relative = 'media/avatar-$i.${avatar.split('.').last}';
+        (clips[i]['post'] as Map)['avatarPath'] = relative;
+        await encoder.addFile(File(avatar), relative);
+      }
+      if (project.feed.homeMedia != null) {
+        final home = project.feed.homeMedia!;
+        final relative = 'media/home.${home.path.split('.').last}';
+        ((data['feed'] as Map)['homeMedia'] as Map)['path'] = relative;
+        await encoder.addFile(File(home.path), relative);
+      }
       final bytes = utf8.encode(jsonEncode(data));
       encoder.addArchiveFile(ArchiveFile('project.json', bytes.length, bytes));
     } finally {
@@ -195,6 +208,41 @@ class ProjectStore {
           if (clip['isMapHeader'] == true) {
             json['mapHeaderPath'] = destination.path;
           }
+        }
+        Future<String> restoreExtra(String source) async {
+          final entry = archive.findFile(source);
+          if (entry == null || !entry.isFile) {
+            throw const FormatException(
+              'An image is missing from this backup.',
+            );
+          }
+          final ext = source
+              .split('.')
+              .last
+              .replaceAll(RegExp('[^a-zA-Z0-9]'), '');
+          final file = File('${root!.path}/media/${newId()}.$ext');
+          written.add(file);
+          final output = OutputFileStream(file.path);
+          try {
+            entry.writeContent(output);
+          } finally {
+            output.close();
+          }
+          return file.path;
+        }
+
+        for (final clip in clips) {
+          final post = clip['post'] as Map?;
+          if (post?['avatarPath'] != null) {
+            post!['avatarPath'] = await restoreExtra(
+              post['avatarPath'] as String,
+            );
+          }
+        }
+        final home = (json['feed'] as Map?)?['homeMedia'] as Map?;
+        if (home != null) {
+          home['id'] = newId();
+          home['path'] = await restoreExtra(home['path'] as String);
         }
         final p = ReelProject.fromJson(json);
         await save(p);

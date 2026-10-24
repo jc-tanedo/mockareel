@@ -33,4 +33,15 @@ class ScrollMotionTest {
         assertEquals(.1, clock.elapsed(9_100_000), .000001)
         assertEquals(0.0, clock.elapsed(8_000_000), .000001)
     }
+    @Test fun feedSwipeAndUiShareRoundedFramesAndSettleAtZero() {
+        assertEquals(640f, FeedMotion.entry(0.0, .4), .001f)
+        assertEquals(80f, FeedMotion.entry(.2, .4), .001f)
+        assertEquals(0f, FeedMotion.entry(.4, .4), .001f)
+        assertEquals(0f, FeedMotion.entry(0.0, 0.0), .001f)
+        assertEquals(FeedMotion.entry(.4, .42), FeedMotion.entry(.416667, .42), .001f)
+        assertEquals(1, FeedMotion.frame(.033333, 12))
+        assertEquals(11, FeedMotion.frame(.399999, 12))
+        assertEquals(-1, FeedMotion.frame(0.0, 0))
+        assertEquals(FeedMotion.entry(1.0 / 30, .4), FeedMotion.entry(.033333, .4), .001f)
+    }
 }
