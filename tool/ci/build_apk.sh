@@ -14,5 +14,8 @@ if key and not re.fullmatch(r'AIza[0-9A-Za-z_-]{35}', key):
 with open(sys.argv[1], 'w') as output:
     json.dump({'MAPS_API_KEY': key}, output)
 PY
-flutter build apk "--$mockareel_mode" --no-pub --dart-define-from-file="$mockareel_defines"
+# Flutter must regenerate the plugin registrant for this build mode. Tests/pub
+# get include integration_test; release builds exclude that dev-only plugin.
+# --no-pub also skips that regeneration and leaves uncompilable Java behind.
+flutter build apk "--$mockareel_mode" --pub --dart-define-from-file="$mockareel_defines"
 python3 tool/ci/package_apk.py "$mockareel_mode"

@@ -37,9 +37,13 @@ An embedded Maps key can be extracted from an APK; apply suitable API/applicatio
 
 For a retry after fixing signing secrets or a transient failure, rerun the failed job; alternatively run **Publish Android release** manually with the existing tag. The tag must point to the checkout that declares that version. Versions containing a prerelease suffix (for example `1.0.0-beta.1+11`, tag `v1.0.0-beta.1`) publish as prereleases. Existing releases and their assets are never replaced; use a new version/tag for changed binaries.
 
+Code or workflow fixes require a new version and tag: rerunning an old tag still checks out its original code. For example, the release-build fix after `v0.12.1` is included in `v0.12.2`.
+
 Only the publish job has `contents: write`; it downloads the build artifact without checking out or executing repository code. Release secrets are restricted to the signing-configuration check and signing step; tests and publishing do not receive them. Both APKs are checked for signature validity, ZIP integrity, 16 KB ZIP alignment, expected package ID and version before upload. `.sha256` files can be verified with `sha256sum -c *.sha256` from the download directory.
 
 These workflows publish GitHub Release assets and Actions artifacts. They do not upload to Google Play or modify the legacy `apk-preview` branch.
+
+The APK build explicitly enables Flutter's pub step so Flutter regenerates plugin registration for the selected build mode. Dependency setup and tests include the dev-only `integration_test` plugin; release registration excludes it. Do not add `--no-pub` to the APK build: it also skips this regeneration and can leave a Java reference to a test plugin that is absent from the release build. The setup step enforces `pubspec.lock`, and the build uses the existing locked dependency versions.
 
 ## Local equivalents
 
