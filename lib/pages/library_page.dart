@@ -473,7 +473,7 @@ class TemplatePickerPage extends StatelessWidget {
                                   ),
                                 ),
                                 const Text(
-                                  '4.9 ★★★★★',
+                                  '4.9 / 5',
                                   style: TextStyle(
                                     fontSize: 8,
                                     color: Colors.black54,

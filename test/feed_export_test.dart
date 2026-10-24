@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/feed.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/pages/feed_editor_page.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/project_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -138,7 +139,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Export').last);
       await tester.pumpAndSettle();
+      expect(find.byType(TimelinePreview), findsOneWidget);
       await tester.tap(find.text('Render MP4'));
+      await tester.pump();
+      expect(
+        find.byType(TimelinePreview),
+        findsNothing,
+        reason: 'Release preview video/audio players while encoding',
+      );
       for (var i = 0; i < 1600 && request == null; i++) {
         await tester.pump(const Duration(milliseconds: 16));
         await tester.runAsync(

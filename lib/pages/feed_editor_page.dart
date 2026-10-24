@@ -991,30 +991,34 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                     ),
                   ),
                 Expanded(
-                  child: EditorWorkspace(
-                    keyboardVisible: keyboard,
-                    previewFraction: .5,
-                    hint:
-                        'LIVE PREVIEW · ${_tab == 1 ? 'POST ${_selected + 1}' : 'FULL SEQUENCE'}',
-                    previewBuilder: (height) => TimelinePreview(
-                      key: ValueKey('${p.id}-${_tab == 1 ? _selected : -1}'),
-                      project: p,
-                      selected: _tab == 1 ? _selected : 0,
-                      startAtBeginning: _tab != 1,
-                      maxHeight: height,
-                    ),
-                    inspector: switch (_tab) {
-                      0 => _sequence(),
-                      1 => _posts(),
-                      2 => AudioEditor(
-                        project: p,
-                        importing: _busy,
-                        onPick: _pickMusic,
-                        onChanged: _change,
-                      ),
-                      _ => _exportPanel(),
-                    },
-                  ),
+                  child: _exporting
+                      ? const SizedBox.expand()
+                      : EditorWorkspace(
+                          keyboardVisible: keyboard,
+                          previewFraction: .5,
+                          hint:
+                              'LIVE PREVIEW · ${_tab == 1 ? 'POST ${_selected + 1}' : 'FULL SEQUENCE'}',
+                          previewBuilder: (height) => TimelinePreview(
+                            key: ValueKey(
+                              '${p.id}-${_tab == 1 ? _selected : -1}',
+                            ),
+                            project: p,
+                            selected: _tab == 1 ? _selected : 0,
+                            startAtBeginning: _tab != 1,
+                            maxHeight: height,
+                          ),
+                          inspector: switch (_tab) {
+                            0 => _sequence(),
+                            1 => _posts(),
+                            2 => AudioEditor(
+                              project: p,
+                              importing: _busy,
+                              onPick: _pickMusic,
+                              onChanged: _change,
+                            ),
+                            _ => _exportPanel(),
+                          },
+                        ),
                 ),
               ],
             ),
@@ -1313,7 +1317,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         music: p.music,
       );
       if (!mounted) return;
-      setState(() => _exporting = false);
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
