@@ -8,6 +8,7 @@ import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/template_layout.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/main.dart';
+import 'package:mockareel/services/native_renderer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'support/memory_project_store.dart';
 
@@ -231,6 +232,51 @@ void main() {
     },
   );
 
+  testWidgets(
+    'dark output changes surfaces and reviews while retaining media and cutout alpha',
+    (tester) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final p = sample()
+        ..review = FeaturedReview(author: 'Jose R.', text: 'Great place');
+      final light = await frame(tester, p, .7, artifact: 'output-light');
+      p.darkOutput = true;
+      final dark = await frame(tester, p, .7, artifact: 'output-dark');
+      expect(pixel(light, 10, 300), Colors.white);
+      expect(pixel(dark, 10, 300), const Color(0xff202124));
+      expect(pixel(dark, 184, 300), const Color(0xff202124));
+      expect(pixel(dark, 330, 620), const Color(0xff303134));
+      expect(pixel(dark, 50, 498), const Color(0xff8ab4f8));
+      expect(pixel(dark, 30, 300), pixel(light, 30, 300));
+      expect(pixel(dark, 30, 30), pixel(light, 30, 30));
+      final transparent = await frame(tester, p, .7, transparent: true);
+      expect(pixel(transparent, 30, 300).a, 0);
+      expect(pixel(transparent, 10, 300), const Color(0xff202124));
+      // The MP4 compositor receives the same opaque gap/progress colors as Flutter.
+      Map<dynamic, dynamic>? parameters;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        NativeRenderer.channel,
+        (call) async {
+          if (call.method == 'export') {
+            parameters = call.arguments as Map;
+            return '/tmp/output.mp4';
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          NativeRenderer.channel,
+          null,
+        ),
+      );
+      await NativeRenderer().export(p, ['0.png', '1.png', '2.png']);
+      expect(parameters!['backgroundColor'], 0xff202124);
+      expect(parameters!['progressColor'], 0xff8ab4f8);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('transparent PNG keeps real alpha only in the photo window', (
     tester,
   ) async {
@@ -299,14 +345,14 @@ void main() {
     },
   );
   testWidgets(
-    'real export buttons share full-size transparent and snapshot PNGs',
+    'real export buttons share dark full-size transparent and snapshot PNGs',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       final store = MemoryProjectStore()..root = root;
       await tester.runAsync(
         () => Directory('${root.path}/exports').create(recursive: true),
       );
-      final p = sample();
+      final p = sample()..darkOutput = true;
       await store.save(p);
       const share = MethodChannel('dev.fluttercommunity.plus/share');
       final paths = <String>[];
@@ -354,12 +400,18 @@ void main() {
             frame.image.width,
             frame.image.height,
             bytes!.getUint8((375 * 3 * 1080 + 50 * 3) * 4 + 3),
+            bytes.getUint8((300 * 3 * 1080 + 10 * 3) * 4),
           ];
           frame.image.dispose();
           codec.dispose();
           return result;
         });
-        expect(result, [1080, 1920, label.startsWith('Transparent') ? 0 : 255]);
+        expect(result, [
+          1080,
+          1920,
+          label.startsWith('Transparent') ? 0 : 255,
+          0x20,
+        ]);
         expect(tester.takeException(), isNull);
       }
       await tester.pumpWidget(const SizedBox());

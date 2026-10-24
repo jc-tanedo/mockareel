@@ -142,6 +142,8 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         val introSeconds = call.argument<Number>("sheetIntroSeconds")?.toDouble() ?: 0.0
         require(introSeconds.isFinite() && introSeconds in 0.0..2.0) { "Invalid reveal duration" }
         introFrames.forEach { require(File(it).isFile) { "An intro frame is missing" } }
+        val backgroundColor = call.argument<Number>("backgroundColor")?.toInt() ?: android.graphics.Color.WHITE
+        val progressColor = call.argument<Number>("progressColor")?.toInt() ?: android.graphics.Color.rgb(26, 115, 232)
         var globalStart = 0.0
         val cards = clips.mapIndexed { i, c -> CardSpec(
             layout.gallery.width() * ((c["cardWidth"] as? Number)?.toFloat() ?: .78f).coerceIn(.45f, 1f),
@@ -188,7 +190,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                     val y = 1 - 2 * (layout.gallery.centerY() + shift) / layout.height
                     Matrix().apply { postScale(scale, scale); postTranslate(x, y) }
                 },
-                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames)))
+                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames, backgroundColor, progressColor)))
             )
             EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()

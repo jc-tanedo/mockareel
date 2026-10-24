@@ -13,7 +13,13 @@ void main() {
   testWidgets(
     'render map header, sheet reveal, gallery motion and featured review',
     (tester) async {
-      final out = Directory('/tmp/mockareel-maps-preview');
+      final darkOutput =
+          Platform.environment['MOCKAREEL_DARK_OUTPUT'] == 'true';
+      final out = Directory(
+        darkOutput
+            ? '/tmp/mockareel-maps-preview-dark'
+            : '/tmp/mockareel-maps-preview',
+      );
       final paths = <String>[];
       await tester.runAsync(() async {
         await out.create(recursive: true);
@@ -69,6 +75,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final p = ReelProject(
+        darkOutput: darkOutput,
         mapHeaderPath: paths.first,
         sheetIntroSeconds: .9,
         slideSeconds: .4,

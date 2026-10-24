@@ -6,7 +6,7 @@ A Flutter editor for vertical place reels. Android is the first video-export tar
 
 The template follows the supplied screen recording: a map header (or optional photo), a white place sheet with editable details and teal action chips, and a horizontal gallery of rounded cards that scrolls left, snaps a card fully into view, then holds. Tabs, a place-specific footer button and hours stay fixed beneath the gallery. Movable text layers and decorative story controls can be added. The editor uses charcoal panels, violet selection highlights and a thumbnail timeline with a selected-clip inspector.
 
-1. Find a place with Google Places or edit its details manually. New projects use a **Map** header: location lookup automatically requests a map image, or use **Header image → Load Google map / Upload map image**. Change map zoom and reload when needed. Photo headers remain available, and older projects retain their original photo mode. **Template details** includes the alternate name, review count, price, hours and header-photo selection. **Template buttons** suggests actions from the place types and available phone/website; edit labels/icons, add/remove buttons, toggle the Menu tab, or replace the footer label. Non-food places do not get Menu by default.
+1. Find a place with Google Places or edit its details manually. New projects use a **Map** header: location lookup automatically requests a map image, or use **Header image → Load Google map / Upload map image**. Change map zoom and reload when needed. Photo headers remain available, and older projects retain their original photo mode. Choose **Output theme → Light / Dark** below the preview in Place to style the reel independently of the editor. The selection is saved per project and applies to the live preview, MP4, transparent PNG and snapshot PNG. **Template details** includes the alternate name, review count, price, hours and header-photo selection. **Template buttons** suggests actions from the place types and available phone/website; edit labels/icons, add/remove buttons, toggle the Menu tab, or replace the footer label. Non-food places do not get Menu by default.
 2. Open **Timeline** and select photos and videos. Selected originals are copied into app storage so picker-cache expiry does not break projects.
 3. Set durations, trim video starts, reorder cards, and add captions. **Card framing** controls width, height, zoom and horizontal crop. **Left-scroll snap** adjusts the entry speed; the reference-pace preset gives five cards a 7.8-second timeline.
 4. Adjust **Opening scroll reveal** in Timeline (0 disables it; new projects default to 0.9 seconds). The place sheet slides up over the map before the gallery advances. **Featured review (optional)** in Place adds editable name, 1–5 star rating and text below the gallery. A blank or disabled review stays hidden.
@@ -16,7 +16,7 @@ The template follows the supplied screen recording: a map header (or optional ph
 8. Export a 1080 × 1920 H.264 MP4 with an AAC soundtrack when music is selected, then play/share it or save it to `Movies/Mockareel` on Android 10+. Photos render at 30 fps; video cards retain their source cadence. Slide time is included in each card's duration.
 9. Export a **Transparent template PNG** for compositing, or a **Full snapshot PNG** with the selected card. Both are 1080 × 1920. The cutout has real transparency in the gallery; optional captions remain part of the overlay.
 
-Projects autosave, including when leaving the app. The folder button opens the project library or creates a new project. Portable `.mockareel` backups include originals, timings, framing, captions, header selection, music, text layers, map image, opening animation and featured review; they can be imported on another device. Older projects open with default framing.
+Projects autosave, including when leaving the app. The folder button opens the project library or creates a new project. Portable `.mockareel` backups include originals, timings, framing, captions, header selection, music, text layers, map image, opening animation, featured review and output theme; they can be imported on another device. Older projects open with default framing.
 
 ## Google Places
 
@@ -39,7 +39,7 @@ bash tool/build_android.sh
 
 Run Flutter tests and APK builds sequentially: both regenerate plugin registration, so concurrent runs can leave a test-only plugin in the release registrant.
 
-The APK is `build/app/outputs/flutter-apk/app-release.apk`. Version 0.5.0+5 uses the existing development signing key and can update the previous preview without uninstalling it.
+The APK is `build/app/outputs/flutter-apk/app-release.apk`. Version 0.6.0+6 uses the existing development signing key and can update the previous preview without uninstalling it.
 
 Flutter tests cover narrow layouts, real PNG export/share flows, cutout alpha, fixed header/footer pixels, moving and snapped card positions, crop direction, duration/trim bounds, media ownership, backup restoration and Places requests. Four host-side Kotlin tests cover native sheet reveal, synchronized intro frames, entry motion and timestamp normalization for clipped/concatenated inputs.
 

@@ -39,6 +39,41 @@ void main() {
     expect(find.textContaining('Add at least one photo'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets(
+    'output theme toggles and saves independently of the editor theme',
+    (tester) async {
+      await open(tester);
+      expect((await store.restore()).darkOutput, false);
+      await tester.ensureVisible(find.byTooltip('Dark output'));
+      await tester.tap(find.byTooltip('Dark output'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Save project'));
+      await tester.pumpAndSettle();
+      expect((await store.restore()).darkOutput, true);
+      expect(
+        Theme.of(tester.element(find.byType(EditorPage))).brightness,
+        Brightness.dark,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await open(tester);
+      final picker = tester.widget<SegmentedButton<bool>>(
+        find.byType(SegmentedButton<bool>),
+      );
+      expect(picker.selected, {true});
+      await tester.ensureVisible(find.byTooltip('Light output'));
+      await tester.tap(find.byTooltip('Light output'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Save project'));
+      await tester.pumpAndSettle();
+      expect((await store.restore()).darkOutput, false);
+      expect(
+        Theme.of(tester.element(find.byType(EditorPage))).brightness,
+        Brightness.dark,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   testWidgets('edited place persists and restores with the project', (
     tester,
   ) async {

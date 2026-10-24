@@ -62,6 +62,7 @@ void main() {
       await file.writeAsBytes([1, 5, 9, 2]);
       final retained = await first.retainMedia(file.path, 'music.mp3');
       final p = ReelProject(
+        darkOutput: true,
         music: MusicTrack(
           path: retained,
           name: 'Summer',
@@ -93,6 +94,7 @@ void main() {
       await Directory('${root.path}/first').delete(recursive: true);
       await file.delete();
       expect(await File(restored.music!.path).readAsBytes(), [1, 5, 9, 2]);
+      expect(restored.darkOutput, p.darkOutput);
       expect(restored.music!.trimStart, 3);
       expect(restored.music!.volume, .4);
       expect(restored.music!.loop, false);

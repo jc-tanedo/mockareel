@@ -58,6 +58,7 @@ void main() {
       await source.delete();
       final p = ReelProject(
         title: 'Cafe reel',
+        darkOutput: true,
         headerMode: 'photo',
         sheetIntroSeconds: 0,
         heroClipId: 'clip',
@@ -92,6 +93,7 @@ void main() {
       await Directory('${root.path}/first/media').delete(recursive: true);
       expect(imported.id, isNot(p.id));
       expect(imported.place.name, 'My cafe');
+      expect(imported.darkOutput, true);
       expect(imported.heroClipId, imported.clips.single.id);
       expect(imported.storyBadge, 'weekend find');
       expect(imported.storyChrome, true);

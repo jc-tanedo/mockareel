@@ -98,6 +98,8 @@ internal class ScrollOverlay(
     private val clipDuration: Double,
     private val introSeconds: Double,
     private val introFrames: List<String>,
+    private val backgroundColor: Int,
+    private val progressColor: Int,
 ) : BitmapOverlay() {
     private var frame: Bitmap? = null
     private var ui: Bitmap? = null
@@ -125,7 +127,7 @@ internal class ScrollOverlay(
         val offset = starts[index] - entry
         canvas.save()
         canvas.clipRect(gallery)
-        canvas.drawColor(Color.WHITE)
+        canvas.drawColor(backgroundColor)
         for (i in max(0, index - 1) until cards.size) {
             val card = cards[i]
             val left = gallery.left + starts[i] - offset
@@ -152,7 +154,7 @@ internal class ScrollOverlay(
         canvas.save(); canvas.clipRect(gallery)
         val active = cards[index]
         val left = gallery.left + starts[index] - offset
-        paint.color = Color.rgb(26, 115, 232)
+        paint.color = progressColor
         canvas.drawRect(left, gallery.bottom - 3 * layout.scale,
             left + active.width * (elapsed / clipDuration).coerceIn(0.0, 1.0).toFloat(), gallery.bottom, paint)
         canvas.restore()

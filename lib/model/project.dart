@@ -300,7 +300,7 @@ class ReelProject {
   final String id;
   String title, storyBadge;
   String? heroClipId;
-  bool storyChrome;
+  bool storyChrome, darkOutput;
   double slideSeconds, sheetIntroSeconds;
   String headerMode;
   String? mapHeaderPath;
@@ -317,6 +317,7 @@ class ReelProject {
     this.title = 'Untitled reel',
     this.storyBadge = '',
     this.storyChrome = false,
+    this.darkOutput = false,
     this.heroClipId,
     this.headerMode = 'map',
     this.mapHeaderPath,
@@ -387,6 +388,7 @@ class ReelProject {
         ? null
         : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
     storyChrome: json['storyChrome'] == true,
+    darkOutput: json['darkOutput'] == true,
     heroClipId: json['heroClipId'] as String?,
     headerMode: json['headerMode'] as String? ?? 'photo',
     mapHeaderPath: json['mapHeaderPath'] as String?,
@@ -413,6 +415,7 @@ class ReelProject {
     'tags': tags.map((t) => t.toJson()).toList(),
     'music': music?.toJson(),
     'storyChrome': storyChrome,
+    'darkOutput': darkOutput,
     'heroClipId': heroClipId,
     'headerMode': headerMode,
     'mapHeaderPath': mapHeaderPath,

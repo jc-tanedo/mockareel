@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
+import '../widgets/output_palette.dart';
 
 class NativeRenderer {
   static const channel = MethodChannel('dev.mockareel/render');
@@ -40,6 +41,12 @@ class NativeRenderer {
       'posters': starts,
       'endPosters': ends,
       'layout': TemplateLayout.native,
+      'backgroundColor': OutputPalette(
+        dark: project.darkOutput,
+      ).surface.toARGB32(),
+      'progressColor': OutputPalette(
+        dark: project.darkOutput,
+      ).progress.toARGB32(),
       'slideSeconds': project.slideSeconds,
       'music': project.music?.toJson(),
       'sheetIntroSeconds': introFrames.isEmpty ? 0 : project.sheetIntroSeconds,

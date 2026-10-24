@@ -17,6 +17,7 @@ import 'services/native_renderer.dart';
 import 'services/places.dart';
 import 'services/static_map.dart';
 import 'widgets/template_content_editor.dart';
+import 'widgets/output_theme_picker.dart';
 import 'services/project_store.dart';
 import 'widgets/reel_preview.dart';
 import 'widgets/media_frame.dart';
@@ -986,6 +987,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     padding: const EdgeInsets.all(18),
     children: [
       _preview(),
+      OutputThemePicker(project: _project, onChanged: _change),
       const SizedBox(height: 8),
       FilledButton.icon(
         onPressed: _findPlace,

@@ -6,6 +6,7 @@ import '../model/template_layout.dart';
 import 'media_frame.dart';
 import 'place_overlay.dart';
 import 'music_playback.dart';
+import 'output_palette.dart';
 export 'place_overlay.dart';
 
 class TimelinePreview extends StatefulWidget {
@@ -227,7 +228,7 @@ class ReelCanvas extends StatelessWidget {
                 height: TemplateLayout.galleryHeight,
                 child: ClipRect(
                   child: ColoredBox(
-                    color: Colors.white,
+                    color: OutputPalette(dark: project.darkOutput).surface,
                     child: Stack(
                       children: visible.isEmpty
                           ? [
@@ -276,7 +277,11 @@ class ReelCanvas extends StatelessWidget {
                                     project.clips[index].duration)
                                 .clamp(0, 1),
                         height: 3,
-                        child: const ColoredBox(color: Color(0xff1a73e8)),
+                        child: ColoredBox(
+                          color: OutputPalette(
+                            dark: project.darkOutput,
+                          ).progress,
+                        ),
                       ),
                     ],
                   ),

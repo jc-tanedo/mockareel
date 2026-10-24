@@ -4,6 +4,7 @@ import '../model/project.dart';
 import '../model/template_layout.dart';
 import 'media_frame.dart';
 import 'story_tags.dart';
+import 'output_palette.dart';
 
 /// Only the gallery rectangle is transparent. This surface is shared by the
 /// live preview, transparent PNG, and each frame of the native compositor.
@@ -21,12 +22,10 @@ class PlaceOverlay extends StatelessWidget {
     this.showTags = true,
     this.sheetOffset = 0,
   });
-  static const _teal = Color(0xff075d6b),
-      _pale = Color(0xffddf0f3),
-      _muted = Color(0xff666d72);
   @override
   Widget build(BuildContext context) {
     final p = project.place;
+    final colors = OutputPalette(dark: project.darkOutput);
     final caption = index >= 0 && index < project.clips.length
         ? project.clips[index].caption
         : '';
@@ -36,17 +35,17 @@ class PlaceOverlay extends StatelessWidget {
               (project.heroClip?.isVideo == false
                   ? project.heroClip?.path
                   : null);
-    Widget line(
-      String text, {
-      double size = 10,
-      Color color = _muted,
-      int lines = 1,
-    }) => Text(
-      text,
-      maxLines: lines,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(fontSize: size, color: color, height: 1.2),
-    );
+    Widget line(String text, {double size = 10, Color? color, int lines = 1}) =>
+        Text(
+          text,
+          maxLines: lines,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: size,
+            color: color ?? colors.muted,
+            height: 1.2,
+          ),
+        );
     return MediaQuery.withNoTextScaling(
       child: FittedBox(
         fit: BoxFit.contain,
@@ -54,10 +53,15 @@ class PlaceOverlay extends StatelessWidget {
           width: 360,
           height: 640,
           child: Theme(
-            data: ThemeData.light(useMaterial3: true),
+            data: ThemeData(
+              brightness: project.darkOutput
+                  ? Brightness.dark
+                  : Brightness.light,
+              useMaterial3: true,
+            ),
             child: DefaultTextStyle(
-              style: const TextStyle(
-                color: Color(0xff202124),
+              style: TextStyle(
+                color: colors.text,
                 fontFamily: 'Roboto',
                 decoration: TextDecoration.none,
               ),
@@ -106,7 +110,9 @@ class PlaceOverlay extends StatelessWidget {
                     height: 18,
                     child: ColoredBox(
                       color: project.headerMode == 'map'
-                          ? const Color(0xffe8eadf)
+                          ? (project.darkOutput
+                                ? colors.surface
+                                : const Color(0xffe8eadf))
                           : const Color(0xff193d43),
                     ),
                   ),
@@ -121,34 +127,34 @@ class PlaceOverlay extends StatelessWidget {
                             right: 0,
                             height: 156,
                             child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.vertical(
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(18),
                                 ),
                               ),
                             ),
                           ),
-                          const Positioned(
+                          Positioned(
                             left: 0,
                             top: 250,
                             width: 16,
                             height: 250,
-                            child: ColoredBox(color: Colors.white),
+                            child: ColoredBox(color: colors.surface),
                           ),
-                          const Positioned(
+                          Positioned(
                             right: 0,
                             top: 250,
                             width: 16,
                             height: 250,
-                            child: ColoredBox(color: Colors.white),
+                            child: ColoredBox(color: colors.surface),
                           ),
-                          const Positioned(
+                          Positioned(
                             left: 0,
                             right: 0,
                             top: 500,
                             bottom: 0,
-                            child: ColoredBox(color: Colors.white),
+                            child: ColoredBox(color: colors.surface),
                           ),
                           Positioned(
                             left: 18,
@@ -178,11 +184,15 @@ class PlaceOverlay extends StatelessWidget {
                                   Container(
                                     margin: const EdgeInsets.only(left: 5),
                                     padding: const EdgeInsets.all(5),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xfff1f3f4),
+                                    decoration: BoxDecoration(
+                                      color: colors.iconSurface,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(icon, size: 12, color: _muted),
+                                    child: Icon(
+                                      icon,
+                                      size: 12,
+                                      color: colors.muted,
+                                    ),
                                   ),
                               ],
                             ),
@@ -220,9 +230,9 @@ class PlaceOverlay extends StatelessWidget {
                                     child: line('(${p.reviewCount})', size: 10),
                                   ),
                                 const SizedBox(width: 4),
-                                const Icon(
+                                Icon(
                                   Icons.volume_up_outlined,
-                                  color: _teal,
+                                  color: colors.accent,
                                   size: 12,
                                 ),
                               ],
@@ -252,7 +262,7 @@ class PlaceOverlay extends StatelessWidget {
                             width: 324,
                             child: line(
                               p.hours.isEmpty ? 'Hours not set' : p.hours,
-                              color: const Color(0xff39825d),
+                              color: colors.hours,
                             ),
                           ),
                           Positioned(
@@ -269,8 +279,8 @@ class PlaceOverlay extends StatelessWidget {
                                       margin: const EdgeInsets.only(right: 4),
                                       decoration: BoxDecoration(
                                         color: action.kind == 'directions'
-                                            ? _teal
-                                            : _pale,
+                                            ? colors.accent
+                                            : colors.pale,
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       child: Row(
@@ -281,8 +291,8 @@ class PlaceOverlay extends StatelessWidget {
                                             placeActionIcon(action.kind),
                                             size: 11,
                                             color: action.kind == 'directions'
-                                                ? Colors.white
-                                                : _teal,
+                                                ? colors.primaryText
+                                                : colors.accent,
                                           ),
                                           const SizedBox(width: 3),
                                           Flexible(
@@ -290,8 +300,8 @@ class PlaceOverlay extends StatelessWidget {
                                               action.label,
                                               size: 8,
                                               color: action.kind == 'directions'
-                                                  ? Colors.white
-                                                  : _teal,
+                                                  ? colors.primaryText
+                                                  : colors.accent,
                                             ),
                                           ),
                                         ],
@@ -329,7 +339,7 @@ class PlaceOverlay extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xffeef0f2),
+                                  color: colors.reviewSurface,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Column(
@@ -370,7 +380,7 @@ class PlaceOverlay extends StatelessWidget {
                                                     ? 'Featured review'
                                                     : project.review.author,
                                                 size: 10,
-                                                color: const Color(0xff202124),
+                                                color: colors.text,
                                               ),
                                               Row(
                                                 children: [
@@ -397,7 +407,7 @@ class PlaceOverlay extends StatelessWidget {
                                         project.review.text.trim(),
                                         size: 10,
                                         lines: 4,
-                                        color: const Color(0xff444a50),
+                                        color: colors.reviewText,
                                       ),
                                     ),
                                   ],
@@ -427,7 +437,7 @@ class PlaceOverlay extends StatelessWidget {
                                         border: Border(
                                           bottom: BorderSide(
                                             color: tab == 'Overview'
-                                                ? _teal
+                                                ? colors.accent
                                                 : Colors.transparent,
                                             width: 2,
                                           ),
@@ -437,8 +447,8 @@ class PlaceOverlay extends StatelessWidget {
                                         tab,
                                         size: 8,
                                         color: tab == 'Overview'
-                                            ? _teal
-                                            : _muted,
+                                            ? colors.accent
+                                            : colors.muted,
                                       ),
                                     ),
                                 ],
@@ -451,19 +461,23 @@ class PlaceOverlay extends StatelessWidget {
                               height: 28,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: _pale,
+                                  color: colors.pale,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.open_in_new,
-                                      color: _teal,
+                                      color: colors.accent,
                                       size: 12,
                                     ),
                                     const SizedBox(width: 6),
-                                    line(p.footer, size: 11, color: _teal),
+                                    line(
+                                      p.footer,
+                                      size: 11,
+                                      color: colors.accent,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -474,9 +488,9 @@ class PlaceOverlay extends StatelessWidget {
                               top: 610,
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.schedule,
-                                    color: _muted,
+                                    color: colors.muted,
                                     size: 12,
                                   ),
                                   const SizedBox(width: 8),
@@ -499,7 +513,7 @@ class PlaceOverlay extends StatelessWidget {
                               child: line(
                                 'Photos & videos',
                                 size: 7,
-                                color: const Color(0xff202124),
+                                color: colors.text,
                               ),
                             ),
                             Positioned(
@@ -508,7 +522,7 @@ class PlaceOverlay extends StatelessWidget {
                               child: line(
                                 '${index + 1} / ${project.clips.length}',
                                 size: 7,
-                                color: const Color(0xff1a73e8),
+                                color: colors.progress,
                               ),
                             ),
                             Positioned(
@@ -528,8 +542,8 @@ class PlaceOverlay extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: i == index
-                                            ? const Color(0xff1a73e8)
-                                            : const Color(0xffd4d8de),
+                                            ? colors.progress
+                                            : colors.inactiveDot,
                                       ),
                                     ),
                                 ],
