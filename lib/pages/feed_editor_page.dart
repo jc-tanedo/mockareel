@@ -403,6 +403,42 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         initiallyExpanded: p.feed.opening == 'home',
         children: [
           const SizedBox(height: 12),
+          DropdownButtonFormField<HomeOs>(
+            initialValue: p.feed.homeOs,
+            decoration: const InputDecoration(labelText: 'Home screen OS'),
+            items: [
+              for (final os in HomeOs.values)
+                DropdownMenuItem(value: os, child: Text(os.label)),
+            ],
+            onChanged: (os) {
+              if (os != null) {
+                p.feed.homeOs = os;
+                _change();
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show mock app icons'),
+            subtitle: const Text(
+              'Includes the dock and launcher navigation. Turn off for screenshots that already have icons.',
+            ),
+            value: p.feed.showIcons,
+            onChanged: (v) {
+              p.feed.showIcons = v;
+              _change();
+            },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show home clock & date'),
+            value: p.feed.showClock,
+            onChanged: (v) {
+              p.feed.showClock = v;
+              _change();
+            },
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Show home status bar'),
@@ -456,6 +492,18 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                   : 'Replace home photo / video',
             ),
           ),
+          if (p.feed.homeMedia != null)
+            TextButton.icon(
+              onPressed: () {
+                p.feed.showIcons = false;
+                p.feed.showClock = false;
+                p.feed.showWidget = false;
+                p.feed.showStatus = false;
+                _change();
+              },
+              icon: const Icon(Icons.layers_clear_outlined),
+              label: const Text('Use media without overlays'),
+            ),
           if (p.feed.homeMedia != null)
             ListTile(
               contentPadding: EdgeInsets.zero,

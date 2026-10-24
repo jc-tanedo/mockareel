@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/feed.dart';
 import 'media_frame.dart';
+import 'home_surface.dart';
+export 'home_surface.dart';
 
 const _pink = Color(0xfffe2c55), _cyan = Color(0xff25f4ee);
 
@@ -130,13 +132,15 @@ class FeedCanvas extends StatelessWidget {
         children.add(
           Positioned(
             left: 275 * (1 - amount),
-            top: 316 * (1 - amount),
+            top: f.homeOs.iconTop * (1 - amount),
             width: 50 + 310 * amount,
             height: 50 + 590 * amount,
             child: Opacity(
               opacity: amount.clamp(0, 1),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24 * (1 - amount)),
+                borderRadius: BorderRadius.circular(
+                  f.homeOs.iconRadius * (1 - amount),
+                ),
                 child: FittedBox(
                   fit: BoxFit.fill,
                   child: SizedBox(
@@ -786,244 +790,4 @@ class SearchSurface extends StatelessWidget {
       ),
     );
   }
-}
-
-class HomeSurface extends StatelessWidget {
-  final FeedSettings settings;
-  final bool transparentBackground;
-  const HomeSurface({
-    super.key,
-    required this.settings,
-    this.transparentBackground = false,
-  });
-  @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      if (!transparentBackground)
-        const Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xff555185),
-                  Color(0xff222e53),
-                  Color(0xffb57683),
-                ],
-              ),
-            ),
-          ),
-        ),
-      const Positioned.fill(child: ColoredBox(color: Colors.black26)),
-      if (settings.showStatus)
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: PhoneStatus(time: settings.time),
-        ),
-      Positioned(
-        top: 48,
-        left: 20,
-        right: 20,
-        child: Text(
-          settings.time,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 52,
-            fontWeight: FontWeight.w200,
-            letterSpacing: -2,
-          ),
-        ),
-      ),
-      Positioned(
-        top: 112,
-        left: 20,
-        right: 20,
-        child: Text(
-          settings.date,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13),
-        ),
-      ),
-      if (settings.showWidget)
-        Positioned(
-          top: 155,
-          left: 22,
-          right: 22,
-          height: 130,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .18),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.auto_awesome, size: 15),
-                    SizedBox(width: 6),
-                    Text(
-                      'DAILY NOTE',
-                      style: TextStyle(fontSize: 9, letterSpacing: 1.5),
-                    ),
-                    Spacer(),
-                    Icon(Icons.wb_sunny_outlined, size: 21),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Text(
-                    settings.widgetTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 19,
-                      height: 1.15,
-                    ),
-                  ),
-                ),
-                Text(
-                  settings.widgetText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-        ),
-      for (var row = 0; row < 2; row++)
-        Positioned(
-          top: 316.0 + row * 88,
-          left: 20,
-          right: 20,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [for (var col = 0; col < 4; col++) _app(row * 4 + col)],
-          ),
-        ),
-      const Positioned(
-        top: 495,
-        left: 0,
-        right: 0,
-        child: Text(
-          '•  •  •',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14),
-        ),
-      ),
-      Positioned(
-        top: 540,
-        left: 14,
-        right: 14,
-        height: 70,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .18),
-            borderRadius: BorderRadius.circular(26),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _Dock(Icons.call, Color(0xff37bb77)),
-              _Dock(Icons.public, Color(0xff3699e2)),
-              _Dock(Icons.message, Color(0xff37bb77)),
-              _Dock(Icons.headphones, Color(0xffe25878)),
-            ],
-          ),
-        ),
-      ),
-      Positioned(
-        top: 626,
-        left: 125,
-        width: 110,
-        height: 4,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      ),
-    ],
-  );
-  Widget _app(int i) {
-    const icons = [
-      Icons.photo_library,
-      Icons.camera_alt,
-      Icons.edit_note,
-      Icons.music_note,
-      Icons.wb_sunny,
-      Icons.graphic_eq,
-      Icons.chat,
-      Icons.settings,
-      Icons.map,
-      Icons.mail,
-      Icons.schedule,
-      Icons.videocam,
-    ];
-    const colors = [
-      Color(0xffc86fb2),
-      Color(0xff636773),
-      Color(0xffd1b65e),
-      Colors.black,
-      Color(0xff5da5cb),
-      Color(0xffdf626d),
-      Color(0xff51ae83),
-      Color(0xff758293),
-    ];
-    final iconIndex = i < settings.appIcons.length
-        ? settings.appIcons[i].clamp(0, 11)
-        : i;
-    return SizedBox(
-      width: 64,
-      child: Column(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: colors[i],
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(
-              icons[iconIndex],
-              size: 29,
-              color: i == 3 ? _cyan : Colors.white,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            i < settings.appLabels.length ? settings.appLabels[i] : 'App',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dock extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  const _Dock(this.icon, this.color);
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 49,
-    height: 49,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(13),
-    ),
-    child: Icon(icon, size: 28),
-  );
 }

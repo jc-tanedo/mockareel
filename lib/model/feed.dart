@@ -57,11 +57,23 @@ class FeedPost {
   };
 }
 
+enum HomeOs {
+  iphone('iPhone · iOS', 316, 13),
+  android('Android', 324, 25),
+  pixel('Google Pixel', 332, 25),
+  oneUi('Samsung · One UI', 324, 16);
+
+  final String label;
+  final double iconTop, iconRadius;
+  const HomeOs(this.label, this.iconTop, this.iconRadius);
+}
+
 class FeedSettings {
   String opening, search, time, date, widgetTitle, widgetText;
   List<String> appLabels;
   List<int> appIcons;
-  bool showWidget, showStatus;
+  HomeOs homeOs;
+  bool showWidget, showStatus, showIcons, showClock;
   bool closeToHome;
   double typingSeconds, loadingSeconds, homeSeconds;
   ReelClip? homeMedia;
@@ -74,6 +86,9 @@ class FeedSettings {
     this.widgetText = 'A little inspiration, every day.',
     List<String>? appLabels,
     List<int>? appIcons,
+    this.homeOs = HomeOs.iphone,
+    this.showIcons = true,
+    this.showClock = true,
     this.showWidget = true,
     this.showStatus = true,
     this.closeToHome = false,
@@ -106,6 +121,12 @@ class FeedSettings {
         ?.map((e) => (e as num).toInt().clamp(0, 11))
         .take(8)
         .toList(),
+    homeOs: HomeOs.values.firstWhere(
+      (os) => os.name == j['homeOs'],
+      orElse: () => HomeOs.iphone,
+    ),
+    showIcons: j['showIcons'] != false,
+    showClock: j['showClock'] != false,
     showWidget: j['showWidget'] != false,
     showStatus: j['showStatus'] != false,
     opening: ['search', 'home', 'feed'].contains(j['opening'])
@@ -130,6 +151,9 @@ class FeedSettings {
         : ReelClip.fromJson(Map<String, dynamic>.from(j['homeMedia'] as Map)),
   );
   Map<String, dynamic> toJson() => {
+    'homeOs': homeOs.name,
+    'showIcons': showIcons,
+    'showClock': showClock,
     'appIcons': appIcons,
     'showWidget': showWidget,
     'showStatus': showStatus,

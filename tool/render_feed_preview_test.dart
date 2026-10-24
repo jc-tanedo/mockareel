@@ -127,6 +127,27 @@ void main() {
       );
       await capture(entry.$1);
     }
+    p.feed.opening = 'home';
+    for (final os in HomeOs.values) {
+      p.feed.homeOs = os;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: RepaintBoundary(
+              key: key,
+              child: SizedBox(
+                width: 360,
+                height: 640,
+                child: FeedCanvas(project: p, posterOnly: true),
+              ),
+            ),
+          ),
+        ),
+      );
+      await capture('home-${os.name}');
+    }
+    p.feed.opening = 'search';
+    p.feed.homeOs = HomeOs.iphone;
     // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
     final store = MemoryProjectStore();

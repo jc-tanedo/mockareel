@@ -96,6 +96,9 @@ void main() {
       p.feed.appLabels[0] = 'Gallery';
       p.feed.appIcons[0] = 9;
       p.feed.showWidget = false;
+      p.feed.homeOs = HomeOs.pixel;
+      p.feed.showIcons = false;
+      p.feed.showClock = false;
       p.clips[1].post.verified = true;
       p.clips[1].post.likes = '1.2M';
       await store.save(p);
@@ -116,6 +119,9 @@ void main() {
       expect(restored.feed.appLabels.first, 'Gallery');
       expect(restored.feed.appIcons.first, 9);
       expect(restored.feed.showWidget, false);
+      expect(restored.feed.homeOs, HomeOs.pixel);
+      expect(restored.feed.showIcons, false);
+      expect(restored.feed.showClock, false);
       expect(restored.clips[1].post.verified, true);
       expect(restored.clips[1].post.likes, '1.2M');
       expect(await File(restored.feed.homeMedia!.path).readAsBytes(), [
