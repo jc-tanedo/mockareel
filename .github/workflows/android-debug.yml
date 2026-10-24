@@ -1,7 +1,7 @@
 name: Android debug APK
 on:
   push:
-    branches: [main, work]
+    branches: [main, work, 'poc/**']
   pull_request:
     branches: [main, work]
   workflow_dispatch:

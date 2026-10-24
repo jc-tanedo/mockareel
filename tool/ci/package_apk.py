@@ -22,7 +22,7 @@ subprocess.run([str(build_tools / 'apksigner'), 'verify', str(apk)], check=True)
 subprocess.run([str(build_tools / 'zipalign'), '-c', '-P', '16', '4', str(apk)], check=True)
 badging = subprocess.check_output([str(build_tools / 'aapt'), 'dump', 'badging', str(apk)], text=True).splitlines()[0]
 expected_name = name + ('-debug' if mode == 'debug' else '')
-expected_id = 'dev.mockareel.mockareel' + ('.debug' if mode == 'debug' else '')
+expected_id = 'dev.mockareel.mockareel.mapspoc' + ('.debug' if mode == 'debug' else '')
 if any(expected not in badging for expected in (f"name='{expected_id}'", f"versionName='{expected_name}'", f"versionCode='{code}'")):
     raise SystemExit('APK package or version does not match the source configuration.')
 dist = Path('dist')

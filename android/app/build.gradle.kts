@@ -27,8 +27,8 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "dev.mockareel.mockareel"
-        manifestPlaceholders["appLabel"] = "Mockareel"
+        applicationId = "dev.mockareel.mockareel.mapspoc"
+        manifestPlaceholders["appLabel"] = "Mockareel Maps POC"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -56,7 +56,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            manifestPlaceholders["appLabel"] = "Mockareel Debug"
+            manifestPlaceholders["appLabel"] = "Mockareel Maps POC Debug"
         }
         release {
             signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "distribution" else "debug")

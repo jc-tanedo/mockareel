@@ -18,6 +18,8 @@
 
 Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfaces. Choose a template, add your media, customize the UI, and export a reel. Projects save locally and can be shared as portable backups.
 
+> **Maps WebView POC branch:** key-free search through a hidden, attached WebView. The Android app installs separately as **Mockareel Maps POC**. [Test instructions and limitations](docs/maps-webview-poc.md).
+
 ## Templates
 
 | Template | What you can make |

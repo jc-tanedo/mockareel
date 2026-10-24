@@ -1,3 +1,5 @@
+import 'maps_web_search_page.dart';
+import '../model/maps_web_result.dart';
 import '../widgets/export_monitor.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/project_name_dialog.dart';
@@ -29,7 +31,6 @@ import '../widgets/text_editor.dart';
 import '../widgets/audio_editor.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/place_search_dialog.dart';
 import 'exported_video_page.dart';
 
 class MapsEditorPage extends StatefulWidget {
@@ -335,17 +336,22 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<void> _findPlace() async {
-    if (_key.isEmpty) {
-      await _settings();
-      if (_key.isEmpty || !mounted) return;
-    }
-    final place = await showDialog<PlaceDetails>(
-      context: context,
-      builder: (_) => PlaceSearchDialog(apiKey: _key, initial: _name.text),
+    final imported = await Navigator.of(context).push<MapsWebImport>(
+      MaterialPageRoute(
+        builder: (_) => MapsWebSearchPage(
+          initial: _name.text,
+          requestApiKey: () async {
+            if (_key.isEmpty) await _settings();
+            return _key.isEmpty ? null : _key;
+          },
+        ),
+      ),
     );
-    if (place == null || !mounted) return;
+    if (imported == null || !mounted) return;
+    final place = imported.place;
     setState(() {
       _project.place = place;
+      _project.review = imported.review ?? FeaturedReview(enabled: false);
       _project.mapHeaderPath = null;
       _name.text = place.name;
       _category.text = place.category;
@@ -358,7 +364,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (_project.title == 'Untitled reel') _project.title = place.name;
     });
     _change();
-    if (_project.headerMode == 'map') await _loadMap();
+    if (_project.headerMode == 'map' && _key.isNotEmpty) await _loadMap();
   }
 
   Future<void> _projects() async {
