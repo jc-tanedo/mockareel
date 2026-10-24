@@ -661,6 +661,31 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     _change();
   }
 
+  void _removePost() {
+    if (_busy || p.clips.isEmpty) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final index = _selected;
+    final clip = p.clips.removeAt(index);
+    _selected = max(0, min(index, p.clips.length - 1));
+    _change();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Removed “${clip.name}”'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            if (!mounted || p.clips.contains(clip)) return;
+            _selected = min(index, p.clips.length);
+            p.clips.insert(_selected, clip);
+            _change();
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _posts() => Column(
     children: [
       Padding(
@@ -684,28 +709,40 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       if (p.clips.isNotEmpty) ...[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: DropdownButtonFormField<int>(
-            key: ValueKey('select-$_selected-${p.clips.length}'),
-            initialValue: _selected,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Selected post',
-              isDense: true,
-            ),
-            items: [
-              for (var i = 0; i < p.clips.length; i++)
-                DropdownMenuItem(
-                  value: i,
-                  child: Text(
-                    '${i + 1}. ${p.clips[i].name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  key: ValueKey('select-$_selected-${p.clips.length}'),
+                  initialValue: _selected,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Selected post',
+                    isDense: true,
                   ),
+                  items: [
+                    for (var i = 0; i < p.clips.length; i++)
+                      DropdownMenuItem(
+                        value: i,
+                        child: Text(
+                          '${i + 1}. ${p.clips[i].name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (i) {
+                    if (i != null) setState(() => _selected = i);
+                  },
                 ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: _busy ? null : _removePost,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Remove post'),
+              ),
             ],
-            onChanged: (i) {
-              if (i != null) setState(() => _selected = i);
-            },
           ),
         ),
         _tools(
@@ -715,7 +752,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         ),
         Expanded(
           child: ListView(
-            key: ValueKey('post-$_selected-tool-$_postTool'),
+            key: ValueKey('post-${p.clips[_selected].id}-tool-$_postTool'),
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
             children: _postFields(p.clips[_selected]),
           ),
@@ -723,34 +760,36 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       ] else
         Expanded(
           child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.swipe_up_outlined, size: 35, color: mint),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'One post per photo or video',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Add your media, then edit the poster, caption and counts for each post.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 12,
-                      height: 1.5,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.swipe_up_outlined, size: 35, color: mint),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'One post per photo or video',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _busy ? null : _pickMedia,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add photos & videos'),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Add your media, then edit the poster, caption and counts for each post.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: _busy ? null : _pickMedia,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add photos & videos'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -880,16 +919,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
               tooltip: 'Move post later',
               onPressed: _selected < p.clips.length - 1 ? () => _move(1) : null,
               icon: const Icon(Icons.arrow_downward),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () {
-                p.clips.removeAt(_selected);
-                _selected = max(0, min(_selected, p.clips.length - 1));
-                _change();
-              },
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Remove post'),
             ),
           ],
         ),

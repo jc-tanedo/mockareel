@@ -63,6 +63,7 @@ class FeedCanvas extends StatelessWidget {
         final prev = project.clips[i - 1];
         children.add(
           Positioned(
+            key: ValueKey('outgoing-${prev.id}'),
             left: 0,
             top: entry - 640,
             width: 360,
@@ -82,6 +83,9 @@ class FeedCanvas extends StatelessWidget {
         final c = project.clips[i];
         children.add(
           Positioned(
+            // Keep the entire incoming subtree when the outgoing sibling is
+            // removed at the end of a swipe, including its native video player.
+            key: ValueKey('post-${c.id}'),
             left: 0,
             top: entry,
             width: 360,

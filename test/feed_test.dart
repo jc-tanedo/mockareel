@@ -233,6 +233,60 @@ void main() {
     },
   );
   testWidgets(
+    'remove post stays visible, saves, supports undo and handles the last post',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = MemoryProjectStore();
+      final p = sample();
+      await store.save(p);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          home: FeedEditorPage(store: store, project: p),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Posts').last);
+      await tester.pumpAndSettle();
+      for (final tool in ['Caption', 'Stats', 'Timing & frame', 'Identity']) {
+        await tester.ensureVisible(find.text(tool).last);
+        await tester.tap(find.text(tool).last);
+        await tester.pumpAndSettle();
+        expect(find.text('Remove post').hitTestable(), findsOneWidget);
+      }
+      final original = p.clips.first;
+      await tester.tap(find.text('Remove post'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(p.clips.length, 1);
+      expect((await store.restore()).clips.single.id, p.clips.single.id);
+      expect(find.widgetWithText(TextFormField, 'poster1'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(p.clips.first, same(original));
+      expect((await store.restore()).clips.length, 2);
+      expect(find.widgetWithText(TextFormField, 'poster0'), findsOneWidget);
+      for (var i = 0; i < 2; i++) {
+        await tester.tap(find.text('Remove post'));
+        await tester.pumpAndSettle();
+      }
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(p.clips, isEmpty);
+      expect((await store.restore()).clips, isEmpty);
+      expect(find.text('One post per photo or video'), findsOneWidget);
+      expect(find.text('Remove post'), findsNothing);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(p.clips.single.post.username, 'poster1');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
     'all output scenes including mid-swipe and app close fit the canvas',
     (tester) async {
       final p = sample();
