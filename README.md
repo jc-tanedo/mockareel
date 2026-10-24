@@ -39,7 +39,7 @@ bash tool/build_android.sh
 
 Run Flutter tests and APK builds sequentially: both regenerate plugin registration, so concurrent runs can leave a test-only plugin in the release registrant.
 
-The APK is `build/app/outputs/flutter-apk/app-release.apk`. Version 0.6.0+6 uses the existing development signing key and can update the previous preview without uninstalling it.
+The APK is `build/app/outputs/flutter-apk/app-release.apk`. Version 0.7.0+7 uses the existing development signing key and can update the previous preview without uninstalling it.
 
 Flutter tests cover narrow layouts, real PNG export/share flows, cutout alpha, fixed header/footer pixels, moving and snapped card positions, crop direction, duration/trim bounds, media ownership, backup restoration and Places requests. Four host-side Kotlin tests cover native sheet reveal, synchronized intro frames, entry motion and timestamp normalization for clipped/concatenated inputs.
 
@@ -67,3 +67,9 @@ This generates PNG frames under `/tmp/mockareel-reference-preview`. They demonst
 ## Download
 
 The `apk-preview` branch holds installable APKs separately from source. Open the versioned APK while signed into GitHub with repository access and choose **Download raw file**. Source changes are on `work`.
+
+## App icon
+
+The film-reel fish mark uses a circular reel with four punched reel holes, a center spindle, a forked tail and a small eye/mouth. Lavender `#B1A6FF` on charcoal `#202023` matches the editor. [Brand assets](assets/brand/) include transparent SVG/PNG glyphs, a monochrome SVG, a 1024-pixel launcher icon and a size-review sheet.
+
+Android uses adaptive vector foreground/background layers, round and legacy launchers at every density, and a monochrome layer for Android 13 themed icons. Geometry stays inside the adaptive icon safe zone. Regenerate these assets from one geometry source with `flutter test tool/generate_brand_assets_test.dart`.
