@@ -11,10 +11,25 @@ The app opens to a grid of saved projects with previews of their output. **New p
 Four suggested steps use the same pinned-preview workspace and charcoal/violet editor design: **Sequence → Posts → Audio (optional) → Export**.
 
 1. **Sequence:** open with a typed search, a home-screen app launch, or directly in the feed. A blank search skips the search scene. Set typing time, loading time and vertical swipe duration. Optionally close the app back to the home screen.
-2. **Home screen & status bar:** choose iPhone (iOS), Android, Google Pixel or Samsung One UI. Classic iPhone uses a five-row grid, centered status-bar clock and translucent labeled dock; Pixel uses compact date/weather, folders, a five-icon dock and bottom search; One UI uses grouped widgets, a search bar and four-column icons. Choose a photo/video wallpaper, edit time/date and widget text, and customize eight app labels and icon presets. **Show mock app icons** toggles the grid, dock and launcher navigation without discarding labels. Clock/date, widget and status bar have independent switches. When media is present, **Use media without overlays** hides all generated home chrome and removes its dimming, so a supplied screenshot displays without duplicate icons or widgets. Under **Home apps & dock**, edit grid/dock labels and icons, hide unused grid slots with a blank label, and choose the **Feed launch tile**. Moving it swaps tiles and moves the animation target. Standard Android retains its original eight-slot controls. Home hold duration is editable; short video wallpapers loop. The app launch/close animation uses a still of the first/last post.
+2. **Home screen & status bar:** choose the output OS and a photo/video wallpaper. Customize its date, status bar and available widgets. Short video wallpapers loop. The app launch/close animation uses a still of the first/last post. See the home-screen controls below.
 3. **Posts:** add photos/videos; each becomes a full-screen post. Select a post and use **Identity** (username, profile photo, verification/following), **Caption** (title, caption/hashtags, sound label), **Stats** (likes, comments, saves, shares), or **Timing & frame** (duration, trim, zoom, horizontal crop, reorder/remove). Sidebar and post text slide upward with each post; navigation stays fixed. The outgoing video holds its last frame during a swipe while the incoming video plays.
 4. **Audio:** select actual background music, volume, start offset and looping. The per-post sound label is decorative. Source video audio is muted.
 5. **Export:** render a 1080×1920, 30 fps H.264 MP4, with AAC when music is present; share or save it to the gallery. The native renderer retains moving video textures and composites UI frames during typing, loading, swipes, launch and close.
+
+### Home-screen controls
+
+| Preset | Layout |
+| --- | --- |
+| iPhone · Classic iOS | Five-row app grid, centered status-bar clock, page dots and a translucent, labeled four-app dock. No large dashboard clock or widgets. |
+| Google Pixel | Compact date/weather, open wallpaper, a row of folders/apps, a five-app dock, bottom search bar and gesture handle. |
+| Samsung · One UI | Weather card and briefing/health pills, search bar, four-column apps, dock and three-button navigation. |
+| Android | The original generic eight-slot layout. |
+
+**Home apps & dock** edits the reference presets' labels and vector icons separately for each OS. A blank label hides a grid slot; the feed launch tile remains visible while icons are enabled. **Feed launch tile** moves the feed app by swapping tiles and changes the animation target. Standard Android retains its original eight-slot controls.
+
+**Show mock app icons** toggles the grid, dock and launcher navigation. Other switches apply to the selected preset's date/weather, widgets and status bar. Weather values and widget text are manually editable mock data. iPhone's AM/PM selector can also be set to no suffix.
+
+When using an existing screenshot/recording, **Use media without overlays** hides all mock chrome and removes dimming. Original label/icon choices are retained when hidden. Home hold duration remains editable.
 
 Autosave and `.mockareel` backups include all per-post fields, avatars, home media, sequence settings and music. No account or network connection is needed for this template. These are editable visual mockups; the buttons do not navigate to live social profiles.
 
