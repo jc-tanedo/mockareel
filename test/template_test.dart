@@ -70,6 +70,8 @@ void main() {
   tearDownAll(() async => root.delete(recursive: true));
   ReelProject sample() => ReelProject(
     title: 'Reference template',
+    headerMode: 'photo',
+    sheetIntroSeconds: 0,
     slideSeconds: .35,
     storyBadge: 'ig story idea :',
     place: PlaceDetails(
@@ -107,6 +109,9 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(MaterialApp(home: Container()));
       final context = tester.element(find.byType(Container).first);
+      if (project.mapHeaderPath != null) {
+        await precacheImage(FileImage(File(project.mapHeaderPath!)), context);
+      }
       for (final c in project.clips) {
         await precacheImage(FileImage(File(c.path)), context);
       }
@@ -196,6 +201,36 @@ void main() {
       expect(p.place.reviewCount, '');
     },
   );
+  testWidgets(
+    'map header, opening scroll and featured review are part of raster output',
+    (tester) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final p = sample()
+        ..headerMode = 'map'
+        ..mapHeaderPath = files[2]
+        ..sheetIntroSeconds = 1;
+      p.review = FeaturedReview(
+        author: 'Jose R.',
+        text: 'A lovely spot.',
+        rating: 4,
+      );
+      final opening = await frame(tester, p, 0, artifact: 'map-opening');
+      final settled = await frame(tester, p, 1.1, artifact: 'map-review');
+      expect(pixel(settled, 180, 30), const Color(0xff4caf50));
+      expect(pixel(opening, 30, 300), Colors.white);
+      expect(pixel(settled, 30, 300), const Color(0xfff44336));
+      expect(pixel(settled, 330, 620), const Color(0xffeef0f2));
+      p.review.enabled = false;
+      final hidden = await frame(tester, p, 1.1);
+      expect(pixel(hidden, 330, 620), Colors.white);
+      final transparent = await frame(tester, p, 0, transparent: true);
+      expect(pixel(transparent, 30, 400).a, 0);
+      expect(pixel(transparent, 0, 230).a, 1);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('transparent PNG keeps real alpha only in the photo window', (
     tester,
   ) async {

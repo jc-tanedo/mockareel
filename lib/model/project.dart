@@ -6,6 +6,7 @@ String newId() =>
 class PlaceDetails {
   String name, category, rating, address, localName, reviewCount, price, hours;
   String? placeId;
+  double? latitude, longitude;
   String phone, website;
   List<String> types;
   List<PlaceAction>? actionOverrides;
@@ -49,6 +50,8 @@ class PlaceDetails {
     this.rating = '',
     this.address = '',
     this.placeId,
+    this.latitude,
+    this.longitude,
     this.phone = '',
     this.website = '',
     List<String>? types,
@@ -66,6 +69,8 @@ class PlaceDetails {
     rating: json['rating']?.toString() ?? '',
     address: json['address'] as String? ?? '',
     placeId: json['placeId'] as String?,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
     phone: json['phone'] as String? ?? '',
     website: json['website'] as String? ?? '',
     types: (json['types'] as List? ?? []).cast<String>(),
@@ -85,6 +90,8 @@ class PlaceDetails {
     'rating': rating,
     'address': address,
     'placeId': placeId,
+    'latitude': latitude,
+    'longitude': longitude,
     'phone': phone,
     'website': website,
     'types': types,
@@ -262,12 +269,44 @@ class ReelClip {
   };
 }
 
+class FeaturedReview {
+  String author, text;
+  int rating;
+  bool enabled;
+  FeaturedReview({
+    this.author = '',
+    this.text = '',
+    this.rating = 5,
+    this.enabled = true,
+  }) {
+    rating = rating.clamp(1, 5);
+  }
+  bool get visible => enabled && text.trim().isNotEmpty;
+  factory FeaturedReview.fromJson(Map<String, dynamic> j) => FeaturedReview(
+    author: j['author'] as String? ?? '',
+    text: j['text'] as String? ?? '',
+    rating: (j['rating'] as num?)?.toInt() ?? 5,
+    enabled: j['enabled'] != false,
+  );
+  Map<String, dynamic> toJson() => {
+    'author': author,
+    'text': text,
+    'rating': rating,
+    'enabled': enabled,
+  };
+}
+
 class ReelProject {
   final String id;
   String title, storyBadge;
   String? heroClipId;
   bool storyChrome;
-  double slideSeconds;
+  double slideSeconds, sheetIntroSeconds;
+  String headerMode;
+  String? mapHeaderPath;
+  String mapSource;
+  int mapZoom;
+  FeaturedReview review;
   PlaceDetails place;
   final List<ReelClip> clips;
   final List<StoryTag> tags;
@@ -279,13 +318,23 @@ class ReelProject {
     this.storyBadge = '',
     this.storyChrome = false,
     this.heroClipId,
+    this.headerMode = 'map',
+    this.mapHeaderPath,
+    this.mapSource = 'upload',
+    this.mapZoom = 15,
+    double sheetIntroSeconds = .9,
+    FeaturedReview? review,
     double slideSeconds = .42,
     PlaceDetails? place,
     List<ReelClip>? clips,
     List<StoryTag>? tags,
     this.music,
     DateTime? updatedAt,
-  }) : slideSeconds = slideSeconds.isFinite
+  }) : sheetIntroSeconds = sheetIntroSeconds.isFinite
+           ? sheetIntroSeconds.clamp(0, 2).toDouble()
+           : .9,
+       review = review ?? FeaturedReview(),
+       slideSeconds = slideSeconds.isFinite
            ? slideSeconds.clamp(.15, .8).toDouble()
            : .42,
        id = id ?? newId(),
@@ -339,6 +388,14 @@ class ReelProject {
         : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
     storyChrome: json['storyChrome'] == true,
     heroClipId: json['heroClipId'] as String?,
+    headerMode: json['headerMode'] as String? ?? 'photo',
+    mapHeaderPath: json['mapHeaderPath'] as String?,
+    mapSource: json['mapSource'] as String? ?? 'upload',
+    mapZoom: (json['mapZoom'] as num?)?.toInt() ?? 15,
+    sheetIntroSeconds: (json['sheetIntroSeconds'] as num?)?.toDouble() ?? 0,
+    review: FeaturedReview.fromJson(
+      Map<String, dynamic>.from(json['review'] as Map? ?? {}),
+    ),
     slideSeconds: (json['slideSeconds'] as num?)?.toDouble() ?? .42,
     place: PlaceDetails.fromJson(
       Map<String, dynamic>.from(json['place'] as Map? ?? {}),
@@ -357,6 +414,12 @@ class ReelProject {
     'music': music?.toJson(),
     'storyChrome': storyChrome,
     'heroClipId': heroClipId,
+    'headerMode': headerMode,
+    'mapHeaderPath': mapHeaderPath,
+    'mapSource': mapSource,
+    'mapZoom': mapZoom,
+    'sheetIntroSeconds': sheetIntroSeconds,
+    'review': review.toJson(),
     'slideSeconds': slideSeconds,
     'template': 'maps-place',
     'place': place.toJson(),

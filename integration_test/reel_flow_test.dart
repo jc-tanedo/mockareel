@@ -45,6 +45,13 @@ void main() {
     expect(source['duration'], greaterThanOrEqualTo(3));
     final project = ReelProject(
       title: 'Export integration',
+      headerMode: 'map',
+      mapHeaderPath: green,
+      review: FeaturedReview(
+        author: 'Integration reviewer',
+        text: 'A good place to visit.',
+        rating: 4,
+      ),
       music: MusicTrack(
         path: video.path,
         name: 'Fixture soundtrack',
@@ -150,6 +157,8 @@ void main() {
     expect(restored.music!.trimStart, 2.2);
     expect(await File(restored.music!.path).exists(), true);
     expect(restored.tags.length, 2);
+    expect(await File(restored.mapHeaderPath!).exists(), true);
+    expect(restored.review.rating, 4);
     for (final c in restored.clips) {
       expect(await File(c.path).exists(), true);
     }

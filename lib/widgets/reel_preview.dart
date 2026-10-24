@@ -151,7 +151,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
 class ReelCanvas extends StatelessWidget {
   final ReelProject project;
   final double position;
-  final bool playing, overlayOnly, posterOnly, showTags;
+  final bool playing, overlayOnly, posterOnly, showTags, animateIntro;
   final String? heroPath;
   final Map<String, String> posters;
   const ReelCanvas({
@@ -162,12 +162,16 @@ class ReelCanvas extends StatelessWidget {
     this.overlayOnly = false,
     this.posterOnly = false,
     this.showTags = true,
+    this.animateIntro = true,
     this.heroPath,
     this.posters = const {},
   });
   @override
   Widget build(BuildContext context) {
     final index = project.clipAt(position);
+    final sheetOffset = animateIntro
+        ? TemplateLayout.sheetOffset(project, position)
+        : 0.0;
     final starts = TemplateLayout.starts(project);
     final offset = TemplateLayout.offset(project, position);
     final visible = <Widget>[];
@@ -218,7 +222,7 @@ class ReelCanvas extends StatelessWidget {
             if (!overlayOnly)
               Positioned(
                 left: TemplateLayout.galleryLeft,
-                top: TemplateLayout.galleryTop,
+                top: TemplateLayout.galleryTop + sheetOffset,
                 width: TemplateLayout.galleryWidth,
                 height: TemplateLayout.galleryHeight,
                 child: ClipRect(
@@ -246,8 +250,38 @@ class ReelCanvas extends StatelessWidget {
                 index: max(0, index),
                 heroPath: heroPath,
                 showTags: showTags,
+                sheetOffset: sheetOffset,
               ),
             ),
+            if (!overlayOnly && index >= 0)
+              Positioned(
+                left: TemplateLayout.galleryLeft,
+                top:
+                    TemplateLayout.galleryTop +
+                    sheetOffset +
+                    TemplateLayout.galleryHeight -
+                    3,
+                width: TemplateLayout.galleryWidth,
+                height: 3,
+                child: ClipRect(
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: starts[index] - offset,
+                        top: 0,
+                        width:
+                            project.clips[index].cardWidth *
+                            TemplateLayout.galleryWidth *
+                            ((position - project.startOf(index)) /
+                                    project.clips[index].duration)
+                                .clamp(0, 1),
+                        height: 3,
+                        child: const ColoredBox(color: Color(0xff1a73e8)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

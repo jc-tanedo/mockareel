@@ -15,7 +15,7 @@ class PlacesService {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': key,
             'X-Goog-FieldMask':
-                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types,places.nationalPhoneNumber,places.websiteUri',
+                'places.id,places.displayName,places.formattedAddress,places.rating,places.primaryTypeDisplayName,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.types,places.nationalPhoneNumber,places.websiteUri,places.location',
           },
           body: jsonEncode({
             'textQuery': query.trim(),
@@ -40,6 +40,8 @@ class PlacesService {
         address: p['formattedAddress'] as String? ?? '',
         rating: (p['rating'] as num?)?.toStringAsFixed(1) ?? '',
         placeId: p['id'] as String?,
+        latitude: ((p['location'] as Map?)?['latitude'] as num?)?.toDouble(),
+        longitude: ((p['location'] as Map?)?['longitude'] as num?)?.toDouble(),
         types: (p['types'] as List? ?? []).cast<String>(),
         phone: p['nationalPhoneNumber'] as String? ?? '',
         website: p['websiteUri'] as String? ?? '',

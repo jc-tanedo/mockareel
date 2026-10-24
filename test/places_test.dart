@@ -23,6 +23,7 @@ void main() {
               'places': [
                 {
                   'id': 'place-id',
+                  'location': {'latitude': 14.58, 'longitude': 120.98},
                   'types': ['cafe', 'food'],
                   'nationalPhoneNumber': '12345',
                   'websiteUri': 'https://cafe.example',
@@ -46,6 +47,8 @@ void main() {
       expect(p.category, 'Coffee shop');
       expect(p.address, 'Makati, Philippines');
       expect(p.placeId, 'place-id');
+      expect(p.latitude, 14.58);
+      expect(p.longitude, 120.98);
       expect(p.reviewCount, '123');
       expect(p.price, 'Moderate');
       expect(p.hours, 'Open now');

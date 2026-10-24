@@ -128,6 +128,12 @@ class ProjectStore {
         (data['music'] as Map)['path'] = relative;
         await encoder.addFile(File(music.path), relative);
       }
+      if (project.mapHeaderPath != null) {
+        final relative =
+            'media/map-header.${project.mapHeaderPath!.split('.').last}';
+        data['mapHeaderPath'] = relative;
+        await encoder.addFile(File(project.mapHeaderPath!), relative);
+      }
       final bytes = utf8.encode(jsonEncode(data));
       encoder.addArchiveFile(ArchiveFile('project.json', bytes.length, bytes));
     } finally {
@@ -156,6 +162,8 @@ class ProjectStore {
         for (final clip in [
           ...clips,
           if (json['music'] != null) json['music'],
+          if (json['mapHeaderPath'] != null)
+            {'path': json['mapHeaderPath'], 'isMapHeader': true},
         ]) {
           if (clip.containsKey('id')) {
             final replacementId = newId();
@@ -184,6 +192,9 @@ class ProjectStore {
             output.close();
           }
           clip['path'] = destination.path;
+          if (clip['isMapHeader'] == true) {
+            json['mapHeaderPath'] = destination.path;
+          }
         }
         final p = ReelProject.fromJson(json);
         await save(p);

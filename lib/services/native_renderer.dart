@@ -14,7 +14,11 @@ class NativeRenderer {
       );
   Future<String> thumbnail(String path, double seconds) async => (await channel
       .invokeMethod<String>('thumbnail', {'path': path, 'seconds': seconds}))!;
-  Future<String> export(ReelProject project, List<String> overlays) async {
+  Future<String> export(
+    ReelProject project,
+    List<String> overlays, {
+    List<String> introFrames = const [],
+  }) async {
     final generation = ++_generation;
     final starts = <String>[], ends = <String>[];
     for (final clip in project.clips) {
@@ -38,6 +42,8 @@ class NativeRenderer {
       'layout': TemplateLayout.native,
       'slideSeconds': project.slideSeconds,
       'music': project.music?.toJson(),
+      'sheetIntroSeconds': introFrames.isEmpty ? 0 : project.sheetIntroSeconds,
+      'introFrames': introFrames,
     });
     if (path == null) throw StateError('The renderer did not return a video.');
     return path;

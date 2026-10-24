@@ -138,6 +138,11 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         require(starts.size == clips.size && ends.size == clips.size) { "Missing scene thumbnails" }
         val layout = SheetLayout.from(requireNotNull(call.argument<Map<String, Number>>("layout")))
         val slideSeconds = call.argument<Number>("slideSeconds")?.toDouble() ?: .42
+        val introFrames = call.argument<List<String>>("introFrames") ?: emptyList()
+        val introSeconds = call.argument<Number>("sheetIntroSeconds")?.toDouble() ?: 0.0
+        require(introSeconds.isFinite() && introSeconds in 0.0..2.0) { "Invalid reveal duration" }
+        introFrames.forEach { require(File(it).isFile) { "An intro frame is missing" } }
+        var globalStart = 0.0
         val cards = clips.mapIndexed { i, c -> CardSpec(
             layout.gallery.width() * ((c["cardWidth"] as? Number)?.toFloat() ?: .78f).coerceIn(.45f, 1f),
             layout.gallery.height() * ((c["cardHeight"] as? Number)?.toFloat() ?: 1f).coerceIn(.55f, 1f),
@@ -146,6 +151,8 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         pending = result
         val cache = PosterCache(); posterCache = cache
         val items = clips.mapIndexed { index, clip ->
+            val sceneStart = globalStart
+            globalStart += (clip["duration"] as Number).toDouble()
             val durationMs = ((clip["duration"] as Number).toDouble() * 1000).toLong()
             require(durationMs in 1..30000) { "Invalid clip duration" }
             val isVideo = clip["isVideo"] == true
@@ -177,10 +184,11 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                     val entry = if (index == 0) 0f else ScrollMotion.entryOffset(cards[index - 1].width, layout.gap, clock.elapsed(timeUs), transition)
                     val scale = card.width / layout.width
                     val x = 2 * (layout.gallery.left + entry + card.width / 2) / layout.width - 1
-                    val y = 1 - 2 * layout.gallery.centerY() / layout.height
+                    val shift = SheetMotion.offset(SheetMotion.sampleTime(sceneStart + clock.elapsed(timeUs), introSeconds, introFrames.size), introSeconds) * layout.scale
+                    val y = 1 - 2 * (layout.gallery.centerY() + shift) / layout.height
                     Matrix().apply { postScale(scale, scale); postTranslate(x, y) }
                 },
-                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock)))
+                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames)))
             )
             EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()

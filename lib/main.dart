@@ -15,6 +15,8 @@ import 'package:video_player/video_player.dart';
 import 'model/project.dart';
 import 'services/native_renderer.dart';
 import 'services/places.dart';
+import 'services/static_map.dart';
+import 'widgets/template_content_editor.dart';
 import 'services/project_store.dart';
 import 'widgets/reel_preview.dart';
 import 'widgets/media_frame.dart';
@@ -102,6 +104,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   String _key = '', _status = '', _previewRevision = 'initial';
   String? _captureHeroPath;
   bool _captureSnapshot = false;
+  double? _capturePosition;
   Map<String, String> _capturePosters = {};
   List<TextEditingController> get _controllers => [
     _name,
@@ -152,6 +155,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _captureIndex = 0;
     _captureHeroPath = null;
     _captureSnapshot = false;
+    _capturePosition = null;
     _capturePosters = {};
     _name.text = project.place.name;
     _category.text = project.place.category;
@@ -207,6 +211,67 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   String _error(Object e) => e is PlatformException
       ? e.message ?? e.code
       : e.toString().replaceFirst('Exception: ', '');
+
+  Future<void> _loadMap() async {
+    if (_importing) return;
+    setState(() => _importing = true);
+    final id = _project.id;
+    final place = _project.place;
+    final service = StaticMapService();
+    File? file;
+    try {
+      final bytes = await service.load(
+        _project.place,
+        _key,
+        zoom: _project.mapZoom,
+      );
+      file = File('${_store.root!.path}/media/map_${newId()}.png');
+      await file.writeAsBytes(bytes, flush: true);
+      await _precache(file.path);
+      if (!mounted || id != _project.id || !identical(place, _project.place)) {
+        await file.delete();
+        return;
+      }
+      _project.mapHeaderPath = file.path;
+      _project.mapSource = 'google';
+      _project.headerMode = 'map';
+      _previewRevision = newId();
+      _change();
+    } catch (e) {
+      if (file != null && await file.exists()) await file.delete();
+      _toast(_error(e));
+    } finally {
+      service.dispose();
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<void> _uploadMap() async {
+    if (_importing) return;
+    setState(() => _importing = true);
+    final id = _project.id;
+    String? path;
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      path = await _store.retainMedia(file.path, file.name);
+      await _precache(path);
+      if (!mounted || id != _project.id) {
+        await File(path).delete();
+        return;
+      }
+      _project.mapHeaderPath = path;
+      _project.mapSource = 'upload';
+      _project.headerMode = 'map';
+      _previewRevision = newId();
+      _change();
+    } catch (e) {
+      if (path != null && await File(path).exists()) await File(path).delete();
+      _toast(_error(e));
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
 
   Future<void> _pickMusic() async {
     if (_importing) return;
@@ -358,6 +423,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     if (place == null || !mounted) return;
     setState(() {
       _project.place = place;
+      _project.mapHeaderPath = null;
       _name.text = place.name;
       _category.text = place.category;
       _rating.text = place.rating;
@@ -369,6 +435,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       if (_project.title == 'Untitled reel') _project.title = place.name;
     });
     _change();
+    if (_project.headerMode == 'map') await _loadMap();
   }
 
   Future<void> _projects() async {
@@ -517,8 +584,16 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
   }
 
   Future<void> _prepareCapture({bool snapshot = false}) async {
-    final hero = _project.heroClip;
-    String? heroPath;
+    final hero = _project.headerMode == 'photo' ? _project.heroClip : null;
+    String? heroPath = _project.headerMode == 'map'
+        ? _project.mapHeaderPath
+        : null;
+    if (heroPath != null) await _precache(heroPath);
+    if (_project.headerMode == 'map' && heroPath == null) {
+      throw const FormatException(
+        'Load a Google map or upload a map image in Place before exporting.',
+      );
+    }
     if (hero != null) {
       heroPath = hero.isVideo
           ? await _renderer.thumbnail(hero.path, hero.trimStart)
@@ -646,6 +721,24 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         await file.writeAsBytes(data);
         overlays.add(file.path);
       }
+      final introFrames = <String>[];
+      for (
+        var frame = 0;
+        frame <
+            (min(_project.sheetIntroSeconds, _project.duration) * 30).ceil();
+        frame++
+      ) {
+        if (!mounted) return;
+        final position = frame / 30;
+        setState(() {
+          _capturePosition = position;
+          _captureIndex = max(0, _project.clipAt(position));
+        });
+        final file = File('${temp.path}/intro_$frame.png');
+        await file.writeAsBytes(await _capturePng());
+        introFrames.add(file.path);
+      }
+      if (mounted) setState(() => _capturePosition = null);
       _progressSubscription = _renderer.progress.listen((value) {
         if (mounted) {
           setState(() {
@@ -654,7 +747,11 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
           });
         }
       });
-      final path = await _renderer.export(_project, overlays);
+      final path = await _renderer.export(
+        _project,
+        overlays,
+        introFrames: introFrames,
+      );
       if (!mounted) return;
       setState(() => _status = 'Reel exported');
       await Navigator.of(context).push(
@@ -673,6 +770,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _exporting = false;
+          _capturePosition = null;
           _progress = null;
         });
       }
@@ -721,11 +819,13 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                     child: ReelCanvas(
                       project: _project,
                       position:
+                          _capturePosition ??
                           _project.startOf(_captureIndex) +
-                          TemplateLayout.transitionDuration(
-                            _project,
-                            _captureIndex,
-                          ),
+                              TemplateLayout.transitionDuration(
+                                _project,
+                                _captureIndex,
+                              ),
+                      animateIntro: _capturePosition != null,
                       overlayOnly: !_captureSnapshot,
                       posterOnly: true,
                       heroPath: _captureHeroPath,
@@ -906,6 +1006,13 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         keyboard: const TextInputType.numberWithOptions(decimal: true),
       ),
       _field('Address', _address),
+      TemplateContentEditor(
+        project: _project,
+        loading: _importing,
+        onChanged: _change,
+        onLoadMap: _loadMap,
+        onUploadMap: _uploadMap,
+      ),
       PlaceActionsEditor(
         key: ValueKey('actions-${_project.id}-${_project.place.placeId}'),
         place: _project.place,
@@ -931,7 +1038,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
               _change();
             },
           ),
-          if (_project.clips.isNotEmpty)
+          if (_project.headerMode == 'photo' && _project.clips.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: DropdownButtonFormField<String>(
@@ -999,6 +1106,33 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     children: [
       _preview(maxHeight: 320),
       _addMedia(),
+      ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: const Text('Opening scroll reveal'),
+        subtitle: Text(
+          _project.sheetIntroSeconds == 0
+              ? 'Off'
+              : '${_project.sheetIntroSeconds.toStringAsFixed(1)}s · sheet slides up over the map',
+        ),
+        children: [
+          _framingControl(
+            'Reveal duration',
+            _project.sheetIntroSeconds,
+            0,
+            2,
+            '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
+            (v) {
+              _project.sheetIntroSeconds = v < .1 ? 0 : v;
+              _previewRevision = newId();
+              _change();
+            },
+          ),
+          const Text(
+            'The place sheet scrolls upward, then cards slide left. Set duration to zero to disable the opening reveal.',
+            style: TextStyle(fontSize: 12, color: Colors.white54),
+          ),
+        ],
+      ),
       ExpansionTile(
         title: const Text('Left-scroll snap'),
         tilePadding: EdgeInsets.zero,

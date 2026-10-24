@@ -8,6 +8,13 @@ abstract final class TemplateLayout {
   static const galleryWidth = 328.0, galleryHeight = 250.0;
   static const gap = 8.0, radius = 12.0;
   static const exportScale = 3.0;
+  static const introDistance = 130.0;
+  static double sheetOffset(ReelProject p, double time) {
+    if (p.sheetIntroSeconds <= 0 || time >= p.sheetIntroSeconds) return 0;
+    final t = (time / p.sheetIntroSeconds).clamp(0.0, 1.0);
+    return introDistance * pow(1 - t, 3);
+  }
+
   static double transitionDuration(ReelProject p, int index) =>
       index <= 0 ? 0 : min(p.slideSeconds, p.clips[index].duration * .45);
   static List<double> starts(ReelProject p) {

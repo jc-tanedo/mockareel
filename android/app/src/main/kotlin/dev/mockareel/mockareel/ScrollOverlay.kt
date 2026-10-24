@@ -16,6 +16,19 @@ internal object ScrollMotion {
     }
 }
 
+internal object SheetMotion {
+    // UI intro frames are captured at 30 fps. Match texture/mask geometry to the
+    // same frame, including microsecond timestamps just below 1/30 second.
+    fun sampleTime(time: Double, duration: Double, frames: Int): Double {
+        if (frames <= 0 || time >= duration) return time
+        return min((time * 30).roundToInt(), frames - 1) / 30.0
+    }
+    fun offset(time: Double, duration: Double): Float {
+        if (duration <= 0 || time >= duration) return 0f
+        return (130 * (1 - (time / duration).coerceIn(0.0, 1.0)).pow(3)).toFloat()
+    }
+}
+
 internal class ClipClock {
     private var firstTimeUs: Long? = null
     fun begin(timeUs: Long) { if (firstTimeUs == null) firstTimeUs = timeUs }
@@ -81,9 +94,14 @@ internal class ScrollOverlay(
     private val uiPath: String,
     private val posters: PosterCache,
     private val clock: ClipClock,
+    private val globalStart: Double,
+    private val clipDuration: Double,
+    private val introSeconds: Double,
+    private val introFrames: List<String>,
 ) : BitmapOverlay() {
     private var frame: Bitmap? = null
     private var ui: Bitmap? = null
+    private var loadedUiPath: String? = null
     private var lastTimeUs: Long? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
@@ -93,20 +111,27 @@ internal class ScrollOverlay(
         clock.begin(presentationTimeUs)
         lastTimeUs = presentationTimeUs
         val bitmap = frame ?: Bitmap.createBitmap(layout.width, layout.height, Bitmap.Config.ARGB_8888).also { frame = it }
-        val overlay = ui ?: requireNotNull(BitmapFactory.decodeFile(uiPath)).also { ui = it }
+        val elapsed = clock.elapsed(presentationTimeUs)
+        val globalTime = SheetMotion.sampleTime(globalStart + elapsed, introSeconds, introFrames.size)
+        val shift = SheetMotion.offset(globalTime, introSeconds) * layout.scale
+        val gallery = RectF(layout.gallery).apply { offset(0f, shift) }
+        val introIndex = (globalTime * 30).roundToInt()
+        val path = if (globalTime < introSeconds && introIndex < introFrames.size) introFrames[introIndex] else uiPath
+        if (loadedUiPath != path) { ui?.recycle(); ui = requireNotNull(BitmapFactory.decodeFile(path)); loadedUiPath = path }
+        val overlay = requireNotNull(ui)
         bitmap.eraseColor(Color.TRANSPARENT)
         val canvas = Canvas(bitmap)
         val entry = if (index == 0) 0f else ScrollMotion.entryOffset(cards[index - 1].width, layout.gap, clock.elapsed(presentationTimeUs), duration)
         val offset = starts[index] - entry
         canvas.save()
-        canvas.clipRect(layout.gallery)
+        canvas.clipRect(gallery)
         canvas.drawColor(Color.WHITE)
         for (i in max(0, index - 1) until cards.size) {
             val card = cards[i]
-            val left = layout.gallery.left + starts[i] - offset
-            if (left >= layout.gallery.right) break
-            if (left + card.width <= layout.gallery.left) continue
-            val rect = RectF(left, layout.gallery.centerY() - card.height / 2, left + card.width, layout.gallery.centerY() + card.height / 2)
+            val left = gallery.left + starts[i] - offset
+            if (left >= gallery.right) break
+            if (left + card.width <= gallery.left) continue
+            val rect = RectF(left, gallery.centerY() - card.height / 2, left + card.width, gallery.centerY() + card.height / 2)
             if (i == index) {
                 canvas.drawRoundRect(rect, layout.radius, layout.radius, clear)
             } else {
@@ -123,6 +148,14 @@ internal class ScrollOverlay(
         }
         canvas.restore()
         canvas.drawBitmap(overlay, null, Rect(0, 0, layout.width, layout.height), paint)
+        // Match the timed blue progress line in Flutter; the dots/counter are in the UI surface.
+        canvas.save(); canvas.clipRect(gallery)
+        val active = cards[index]
+        val left = gallery.left + starts[index] - offset
+        paint.color = Color.rgb(26, 115, 232)
+        canvas.drawRect(left, gallery.bottom - 3 * layout.scale,
+            left + active.width * (elapsed / clipDuration).coerceIn(0.0, 1.0).toFloat(), gallery.bottom, paint)
+        canvas.restore()
         return bitmap
     }
     override fun release() {

@@ -58,6 +58,8 @@ void main() {
       await source.delete();
       final p = ReelProject(
         title: 'Cafe reel',
+        headerMode: 'photo',
+        sheetIntroSeconds: 0,
         heroClipId: 'clip',
         storyBadge: 'weekend find',
         storyChrome: true,
