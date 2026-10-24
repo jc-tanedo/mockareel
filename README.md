@@ -1,23 +1,21 @@
 # Mockareel Android preview
 
-[Download v0.6.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.6.0.apk)
+[Download v0.7.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.7.0.apk)
 
 Install over the previous preview using the same development signing key.
 
-## v0.6.0
+## v0.7.0 — film reel fish icon
 
-Choose **Place → Output theme → Light / Dark** below the preview. The setting applies to the reel's place sheet, typography, buttons, review card, gallery gaps and progress indicators. It affects preview, MP4, transparent PNG and snapshot PNG, and is saved per project and included in portable backups. The editor retains its existing appearance. Media images keep their original colors.
+A minimal circular film reel becomes a fish, with four reel perforations, a central spindle, a forked tail, and a small eye and mouth. The app icon uses lavender on charcoal. Android adaptive icons, round/legacy launchers and Android 13 monochrome themed icons are included.
 
-Existing projects default to Light until changed.
+[Icon preview sheet](icon-preview-0.7.0.png) · [SVG glyph](mockareel.svg) · [Monochrome SVG](mockareel-monochrome.svg) · [1024px app icon](mockareel-icon.png) · [Transparent glyph PNG](mockareel-mark.png)
 
-Source: `06b836d6d32f1bac436c096472a92450ea4c682c` on `work`.
+Editable brand assets and the reproducible shared-geometry asset exporter are in `assets/brand` and `tool/generate_brand_assets_test.dart` on the source branch.
 
-Validation: static analysis clean, 28 Flutter tests, 4 native motion tests, dark template visual review, release build and APK integrity/signature checks. Native encoding still needs physical-device verification.
+Source: `8b323f0912fef214f830cb6c46a4fe1567f2f32e` on `work`.
 
-[Dark output preview](output-dark-0.6.0.png) · [Light output preview](output-light-0.6.0.png)
+Validation: asset exporter passed, static analysis clean, launcher density sizes and XML/SVG validated, release APK built with its signature, archive integrity and alignment checks passing. No editor or render behavior changed in this release.
 
-The images demonstrate Flutter rendering with crops from the supplied reference recordings; they are not recordings of native Android MP4 export. The gallery photos are illustrative.
-
-SHA-256: `6bf529f190124ce03c30f97fd5185f68057f6701765bb22602a752812616d275`
+SHA-256: `7d2bcac5f32738708b495e1166c08976c9efdcaa6001caeab1bfb57436ed739d`
 
 Earlier versioned APKs and reference previews remain available on this branch.
