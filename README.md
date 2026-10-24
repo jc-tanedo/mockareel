@@ -1,27 +1,25 @@
 # Mockareel Android preview
 
-[Download v0.9.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.9.0.apk)
+[Download v0.10.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.10.0.apk)
 
-Install over the previous preview using the same development signing key. Saved projects and device settings are preserved.
+Install over the previous preview. The development signing certificate is unchanged, so saved projects and settings are preserved.
 
-## v0.9.0 — project library and TikTok-style FYP scroll
+## v0.10.0 — home screen OS presets and screenshot controls
 
-- The app opens to a thumbnail grid of saved projects. New project opens a template gallery with Maps place story and TikTok FYP scroll. Editor back arrows return to the library and save changes.
-- FYP sequence: typed search and loading → first post → timed vertical swipes → optional app close to a home screen. Alternatively start with a home-screen app launch or directly in the feed. Empty search skips the search scene.
-- Every post has its own username, profile image, title, caption, sound label, verification/following state and engagement counts. Duration, video trim, crop, zoom, reorder and removal controls are available per post.
-- Home screen: photo/video wallpaper, editable time/date, optional widget/status bar, widget text and eight editable app labels/icon presets. Short video wallpapers loop. Launch/close animates a still of the first/last post.
-- Four suggested editor steps: Sequence → Posts → Audio (optional) → Export. Pinned preview, expandable canvas and focused inspectors follow the existing charcoal/violet workspace.
-- Android MP4 export uses native moving video textures, animated UI surfaces and optional background music. Source video audio stays muted. Outgoing videos hold their final frame during swipes; incoming videos play.
-- Autosave and portable backups include avatars, home media, post metadata and sequence settings. Existing Maps projects remain supported.
+In the FYP editor, open **Sequence → Home screen & status bar**.
 
-[Project library](library-0.9.0.png) · [Template gallery](templates-0.9.0.png) · [Post output](post-0.9.0.png) · [Home screen](home-0.9.0.png) · [Post editor](editor-posts-0.9.0.png)
+- Select iPhone (iOS), standard Android, Google Pixel or Samsung One UI. Each preset has distinct clock/widget styling, icon shapes, dock and launcher navigation. Launch/close animation targets match the selected layout.
+- **Show mock app icons** hides/shows the generated grid, dock, page indicators and launcher navigation. Custom labels and icon choices are retained when hidden.
+- Clock/date, widget and status bar have independent visibility switches.
+- After supplying a photo/video, **Use media without overlays** hides all generated home chrome and removes its dimming. Use this for screenshots or recordings that already contain their own icons and widgets.
+- The OS and all visibility choices persist through autosave, reopening and portable backups. Older projects keep the iPhone preset and visible icons.
 
-Screenshots are Flutter renders with illustrative media cropped from the supplied reference recording, not physical-device captures.
+[ iPhone ](home-iphone-0.10.0.png) · [ Android ](home-android-0.10.0.png) · [ Pixel ](home-pixel-0.10.0.png) · [ Samsung One UI ](home-oneUi-0.10.0.png)
 
-Source: `9b91b115623ec11de0a92e47e1d7881bc307b7b8` on `work`.
+Screenshots are Flutter renders, not physical-device captures. Existing Maps and FYP features remain available; older versioned APKs and previews are preserved on this branch.
 
-Validation: clean static analysis, 39 Flutter tests, five Kotlin motion/clock tests, visual review and release APK signature/archive/alignment checks. Tests exercise actual export UI frame capture (typed search, transparent video regions, outgoing post and animated closing), scene boundaries, library/editor navigation, saved independent post data, backup media and Maps regressions. Native MP4 encoding still needs physical-device verification; device integration coverage is included in source.
+Source: `13d2f22f977b74281bda57f915aa7b28e3e635ec` on `work`.
 
-SHA-256: `fed2a94c83aa6fa7d70bc0490a0619b19da84f3d9be496273444df3c9b15ed62`
+Validation: 43 Flutter tests pass, static analysis is clean, all four presets were visually reviewed, and the release APK passed signature, archive and 16 KB alignment checks. Coverage includes saved OS/visibility settings, portable backups, editor controls, all preset layouts, icon/dock hiding, unmodified screenshot pixels, animated export UI capture and Maps regressions. Native encoding still needs physical-device verification; native renderer code is unchanged in this release.
 
-Earlier versioned APKs and previews remain available on this branch.
+SHA-256: `8ac23b2c1b025d47c5080b72314bcf70cded9757ca945380ef3ffe8bd5d760cd`
