@@ -1,25 +1,24 @@
 # Mockareel Android preview
 
-[Download v0.10.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.10.0.apk)
+[Download v0.10.1 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.10.1.apk)
 
-Install over the previous preview. The development signing certificate is unchanged, so saved projects and settings are preserved.
+Install over your current preview; the signing certificate and application ID are unchanged.
 
-## v0.10.0 — home screen OS presets and screenshot controls
+## v0.10.1 — tablet typing fix and repository cleanup
 
-In the FYP editor, open **Sequence → Home screen & status bar**.
+- Fixed the FYP search field losing focus and closing the keyboard when a tablet/wide editor switches into keyboard layout. A stable inspector now retains the text field, input connection and edits.
+- Hardened portable-backup imports with ZIP preflight, bounded extraction, malformed-schema handling and cleanup on failure.
+- Split app startup, theme, editor screens, dialogs and models into clearer modules. Project data remains compatible.
+- Shorter README and linked guides; private security-reporting guidance, ongoing redacted secret scanning and formatting checks.
 
-- Select iPhone (iOS), standard Android, Google Pixel or Samsung One UI. Each preset has distinct clock/widget styling, icon shapes, dock and launcher navigation. Launch/close animation targets match the selected layout.
-- **Show mock app icons** hides/shows the generated grid, dock, page indicators and launcher navigation. Custom labels and icon choices are retained when hidden.
-- Clock/date, widget and status bar have independent visibility switches.
-- After supplying a photo/video, **Use media without overlays** hides all generated home chrome and removes its dimming. Use this for screenshots or recordings that already contain their own icons and widgets.
-- The OS and all visibility choices persist through autosave, reopening and portable backups. Older projects keep the iPhone preset and visible icons.
+Home-screen visuals are unchanged while more accurate reference examples are being gathered.
 
-[ iPhone ](home-iphone-0.10.0.png) · [ Android ](home-android-0.10.0.png) · [ Pixel ](home-pixel-0.10.0.png) · [ Samsung One UI ](home-oneUi-0.10.0.png)
+[Repository audit report](https://github.com/jc-tanedo/mockareel/blob/main/docs/security-review-2026-10-24.md) · [User guide](https://github.com/jc-tanedo/mockareel/blob/main/docs/user-guide.md)
 
-Screenshots are Flutter renders, not physical-device captures. Existing Maps and FYP features remain available; older versioned APKs and previews are preserved on this branch.
+Source: `cb5a0bbf0289efd5e676f2fc46d5c1101362e27c` on `main` and `work`.
 
-Source: `13d2f22f977b74281bda57f915aa7b28e3e635ec` on `work`.
+Validation: 51 Flutter tests, five Kotlin motion tests, five release-metadata tests, clean analysis/formatting, workflow linting, Markdown link checks and a release APK build. Signature, ZIP integrity and 16 KB alignment checks passed. No credential-pattern matches were found in this APK. Native encoding still needs physical-device verification.
 
-Validation: 43 Flutter tests pass, static analysis is clean, all four presets were visually reviewed, and the release APK passed signature, archive and 16 KB alignment checks. Coverage includes saved OS/visibility settings, portable backups, editor controls, all preset layouts, icon/dock hiding, unmodified screenshot pixels, animated export UI capture and Maps regressions. Native encoding still needs physical-device verification; native renderer code is unchanged in this release.
+SHA-256: `71de3fc8b860c387e290ea04cc79e32972240e07074ba26489d6658113595cde`
 
-SHA-256: `8ac23b2c1b025d47c5080b72314bcf70cded9757ca945380ef3ffe8bd5d760cd`
+Earlier versioned APKs and preview images remain on this branch.
