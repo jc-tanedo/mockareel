@@ -1,3 +1,4 @@
+import '../model/app_window_motion.dart';
 import 'package:flutter/widgets.dart';
 import '../model/project.dart';
 import '../model/feed_timeline.dart';
@@ -18,7 +19,7 @@ abstract final class FeedCapturePlan {
       case 'home-open':
         if (elapsed <= p.feed.homeSeconds) return 'hold';
       case 'home-close':
-        if (elapsed >= .65) return 'hold';
+        if (elapsed >= AppWindowMotion.closeSeconds) return 'hold';
     }
     return 'frame-$frame';
   }

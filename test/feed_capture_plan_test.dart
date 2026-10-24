@@ -26,21 +26,21 @@ void main() {
       ); // Three typed states + 24 moving-dot frames.
       expect(keys.take(20).toSet().length, 1);
       expect(keys.skip(60).toSet().length, 24);
-      const opening = FeedScene('home-open', 0, 0, 2.6);
-      const closing = FeedScene('home-close', 0, 0, 2.65);
+      const opening = FeedScene('home-open', 0, 0, 2.46);
+      final closing = FeedScene('home-close', 0, 0, p.feed.outroDuration);
       expect(
         List.generate(
-          78,
+          74,
           (i) => FeedCapturePlan.key(p, opening, i),
         ).toSet().length,
-        18,
+        14,
       );
       expect(
         List.generate(
-          80,
+          71,
           (i) => FeedCapturePlan.key(p, closing, i),
         ).toSet().length,
-        21,
+        12,
       );
       const swipe = FeedScene('post', 1, 0, 3);
       expect(

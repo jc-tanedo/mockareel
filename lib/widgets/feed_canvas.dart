@@ -1,3 +1,4 @@
+import '../model/app_window_motion.dart';
 import '../model/feed_timeline.dart';
 import 'dart:io';
 import 'dart:math';
@@ -41,24 +42,23 @@ class FeedCanvas extends StatelessWidget {
   Widget _postLayer(
     ReelClip c,
     double elapsed, {
-    double amount = 1,
+    AppWindowFrame? window,
     bool home = false,
   }) {
-    final icon = project.feed.launchIcon;
     return Positioned(
       key: ValueKey('post-${c.id}'),
-      left: icon.left * (1 - amount),
-      top: home
-          ? icon.top * (1 - amount)
-          : FeedTimeline.entry(project, project.clips.indexOf(c), elapsed),
-      width: icon.size + (360 - icon.size) * amount,
-      height: icon.size + (640 - icon.size) * amount,
+      left: window?.left ?? 0,
+      top:
+          window?.top ??
+          FeedTimeline.entry(project, project.clips.indexOf(c), elapsed),
+      width: window?.width ?? 360,
+      height: window?.height ?? 640,
       child: Opacity(
-        opacity: amount.clamp(0, 1),
+        opacity: window?.opacity ?? 1,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(icon.radius * (1 - amount)),
+          borderRadius: BorderRadius.circular(window?.radius ?? 0),
           child: FittedBox(
-            fit: BoxFit.fill,
+            fit: BoxFit.cover,
             child: SizedBox(
               width: 360,
               height: 640,
@@ -142,27 +142,45 @@ class FeedCanvas extends StatelessWidget {
       );
     } else {
       final home = f.homeMedia;
-      if (!overlayOnly && home != null) {
-        children.add(
-          Positioned.fill(child: _media(home, elapsed % home.duration)),
-        );
-      }
+      final opening = s.kind == 'home-open';
+      final window = AppWindowMotion.at(
+        icon: f.launchIcon,
+        opening: opening,
+        elapsed: elapsed,
+        hold: f.homeSeconds,
+      );
       children.add(
         Positioned.fill(
-          child: HomeSurface(settings: f, transparentBackground: home != null),
+          child: Stack(
+            children: [
+              if (!overlayOnly && home != null)
+                Positioned.fill(child: _media(home, elapsed % home.duration)),
+              Positioned.fill(
+                child: Transform.scale(
+                  scale: window.backdropScale,
+                  child: RepaintBoundary(
+                    child: HomeSurface(
+                      settings: f,
+                      transparentBackground: home != null,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: window.backdropShade),
+                ),
+              ),
+            ],
+          ),
         ),
       );
-      final opening = s.kind == 'home-open';
-      final t = opening
-          ? ((elapsed - f.homeSeconds) / .6).clamp(0.0, 1.0)
-          : (elapsed / .65).clamp(0.0, 1.0);
-      final amount = opening ? pow(t, .7).toDouble() : pow(1 - t, 3).toDouble();
       if (project.clips.isNotEmpty) {
         final c = project.clips[opening ? 0 : project.clips.length - 1];
         // Preload the opening video even while its app tile is invisible. The
         // same player and widget ancestry continue into/out of the feed scene.
         children.add(
-          _postLayer(c, opening ? 0 : c.duration, amount: amount, home: true),
+          _postLayer(c, opening ? 0 : c.duration, window: window, home: true),
         );
       }
     }

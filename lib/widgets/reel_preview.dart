@@ -1,5 +1,5 @@
 import '../model/feed_timeline.dart';
-import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -28,11 +28,10 @@ class TimelinePreview extends StatefulWidget {
 }
 
 class _TimelinePreviewState extends State<TimelinePreview>
-    with WidgetsBindingObserver {
-  Timer? _timer;
-  final _clock = Stopwatch();
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final Ticker _ticker;
   double _base = 0, _position = 0;
-  bool get _playing => _timer != null;
+  bool get _playing => _ticker.isActive;
   double get _duration => widget.project.isFeed
       ? FeedTimeline.duration(widget.project)
       : widget.project.duration;
@@ -46,9 +45,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
       : widget.project.startOf(widget.selected) +
             TemplateLayout.transitionDuration(widget.project, widget.selected);
   void _pause() {
-    _timer?.cancel();
-    _timer = null;
-    _clock.stop();
+    _ticker.stop();
     if (mounted) setState(() {});
   }
 
@@ -56,25 +53,24 @@ class _TimelinePreviewState extends State<TimelinePreview>
     if (widget.project.clips.isEmpty) return;
     if (_position >= _duration - .03) _position = 0;
     _base = _position;
-    _clock.reset();
-    _clock.start();
-    _timer = Timer.periodic(const Duration(milliseconds: 40), (_) {
-      if (!mounted) return;
-      setState(
-        () => _position = min(
-          _duration,
-          _base + _clock.elapsedMilliseconds / 1000,
-        ),
-      );
-      if (_position >= _duration) _pause();
-    });
+    _ticker.start();
     setState(() {});
+  }
+
+  void _tick(Duration elapsed) {
+    if (!mounted) return;
+    setState(
+      () =>
+          _position = min(_duration, _base + elapsed.inMicroseconds / 1000000),
+    );
+    if (_position >= _duration) _pause();
   }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _ticker = createTicker(_tick);
     _position = _selectedStart;
   }
 
@@ -97,7 +93,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
+    _ticker.dispose();
     super.dispose();
   }
 

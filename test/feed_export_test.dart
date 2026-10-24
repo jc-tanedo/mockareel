@@ -1,3 +1,4 @@
+import 'package:mockareel/model/app_window_motion.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -111,9 +112,13 @@ void main() {
                 await alpha(frames[2][0] as String, 540, 800) == 255;
             checks['incoming texture exposed'] =
                 await alpha(frames[2][3] as String, 540, 800) == 0;
-            checks['closing animated'] = (frames[3] as List).length == 35;
+            checks['closing animated'] =
+                (frames[3] as List).length ==
+                (p.feed.outroDuration * 30).ceil();
             checks['typing samples reused'] = frames[0][0] == frames[0][1];
-            checks['home hold reused'] = frames[3][21] == frames[3][34];
+            checks['home hold reused'] =
+                frames[3][(AppWindowMotion.closeSeconds * 30).ceil()] ==
+                (frames[3] as List).last;
             request = args;
           } catch (e) {
             captureError = e;

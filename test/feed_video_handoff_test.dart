@@ -1,3 +1,4 @@
+import 'package:mockareel/model/app_window_motion.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,10 +100,21 @@ void main() {
 
     final controller = await show(0);
     expect(controller.value.isPlaying, isFalse);
-    for (final time in [.51, 1.09, 1.1, 2.0, 4.09, 4.1, 4.3, 4.76]) {
+    final start = p.feed.introDuration;
+    final end = start + p.clips.single.duration;
+    for (final time in [
+      p.feed.homeSeconds + .01,
+      start - .01,
+      start,
+      start + 1,
+      end - .01,
+      end,
+      end + .2,
+      end + AppWindowMotion.closeSeconds + .01,
+    ]) {
       expect(await show(time), same(controller), reason: 'Continuity at $time');
       expect(platform.created, 1);
-      expect(controller.value.isPlaying, time >= 1.1 && time < 4.1);
+      expect(controller.value.isPlaying, time >= start && time < end);
       expect(tester.takeException(), isNull);
     }
     await tester.pumpWidget(const SizedBox());

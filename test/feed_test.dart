@@ -51,14 +51,14 @@ void main() {
       expect(FeedTimeline.at(p, 2.8).postIndex, 0);
       expect(FeedTimeline.at(p, 5.8).postIndex, 1);
       expect(FeedTimeline.at(p, 8.8).kind, 'home-close');
-      expect(FeedTimeline.duration(p), closeTo(11.45, .0001));
+      expect(FeedTimeline.duration(p), closeTo(11.16, .0001));
       expect(FeedTimeline.entry(p, 1, 0), 640);
       expect(FeedTimeline.entry(p, 1, p.slideSeconds), 0);
       p.feed.search = '  ';
       expect(FeedTimeline.scenes(p).first.kind, 'post');
       p.feed.opening = 'home';
       expect(FeedTimeline.scenes(p).first.kind, 'home-open');
-      expect(FeedTimeline.postStart(p, 1), 5.6);
+      expect(FeedTimeline.postStart(p, 1), 5.46);
       final old = ReelProject.fromJson({'clips': []});
       expect(old.isFeed, false);
     },

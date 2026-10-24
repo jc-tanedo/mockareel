@@ -1,3 +1,4 @@
+import 'app_window_motion.dart';
 import 'home_apps.dart';
 import 'home_os.dart';
 export 'home_apps.dart';
@@ -113,9 +114,10 @@ class FeedSettings {
   double get introDuration => hasSearch
       ? typingSeconds + loadingSeconds
       : opening == 'home'
-      ? homeSeconds + .6
+      ? homeSeconds + AppWindowMotion.launchSeconds
       : 0;
-  double get outroDuration => closeToHome ? .65 + homeSeconds : 0;
+  double get outroDuration =>
+      closeToHome ? AppWindowMotion.closeSeconds + homeSeconds : 0;
   static Map<String, List<HomeApp>> _profiles(
     dynamic json, {
     bool dock = false,
