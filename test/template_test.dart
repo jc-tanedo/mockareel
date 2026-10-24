@@ -1,3 +1,4 @@
+import 'package:mockareel/app.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -7,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/template_layout.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/services/native_renderer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'support/memory_project_store.dart';

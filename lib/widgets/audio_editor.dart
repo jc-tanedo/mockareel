@@ -1,7 +1,7 @@
+import '../model/feed_timeline.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import '../model/feed.dart';
 
 class AudioEditor extends StatelessWidget {
   final ReelProject project;

@@ -127,3 +127,17 @@ app.*.symbols
 !/android/gradlew.bat
 !/android/gradle/wrapper/gradle-wrapper.jar
 /dist/
+
+# Local credentials and signing material.
+.env
+.env.*
+!.env.example
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+.secrets/
+*.mockareel
+/*.mp4
+/*.mov

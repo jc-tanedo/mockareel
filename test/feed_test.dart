@@ -1,7 +1,9 @@
+import 'package:mockareel/model/feed_timeline.dart';
+import 'package:mockareel/app.dart';
+import 'package:mockareel/pages/maps_editor_page.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/feed.dart';
 import 'package:mockareel/pages/feed_editor_page.dart';
@@ -169,7 +171,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Maps place story'));
       await tester.pumpAndSettle();
-      expect(find.byType(EditorPage), findsOneWidget);
+      expect(find.byType(MapsEditorPage), findsOneWidget);
       await tester.tap(find.byTooltip('Back to projects'));
       await tester.pumpAndSettle();
       expect((await store.projects()).length, 2);

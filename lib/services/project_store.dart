@@ -4,11 +4,14 @@ import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/project.dart';
+import 'project_archive.dart';
+export 'project_archive.dart' show BackupLimits;
 
 class ProjectStore {
   Directory? root;
   Future<void> _writes = Future.value();
-  ProjectStore({this.root});
+  final BackupLimits backupLimits;
+  ProjectStore({this.root, this.backupLimits = const BackupLimits()});
   Future<void> initialize() async {
     root ??= Directory(
       '${(await getApplicationDocumentsDirectory()).path}/mockareel',
@@ -57,6 +60,8 @@ class ProjectStore {
         );
       } on FormatException {
         /* Keep other projects accessible if one file is damaged. */
+      } on TypeError {
+        /* A valid JSON document may still contain an invalid project schema. */
       }
     }
     results.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -156,20 +161,17 @@ class ProjectStore {
   }
 
   Future<ReelProject> importBackup(String path) async {
-    final stream = InputFileStream(path);
+    final archive = await ProjectArchive.open(path, backupLimits);
     try {
-      final archive = ZipDecoder().decodeStream(stream);
-      final manifest = archive.findFile('project.json');
-      if (manifest == null || manifest.size > 1024 * 1024) {
-        throw const FormatException('This is not a Mockareel project.');
-      }
-      final json =
-          jsonDecode(utf8.decode(manifest.content)) as Map<String, dynamic>;
+      final json = archive.manifest();
       if (json['version'] != 2) {
         throw const FormatException('Unsupported project version.');
       }
       json['id'] = newId();
       final clips = json['clips'] as List;
+      if (clips.length > backupLimits.clips) {
+        throw const FormatException('This project contains too many clips.');
+      }
       final written = <File>[];
       try {
         for (final clip in [
@@ -185,12 +187,6 @@ class ProjectStore {
             }
             clip['id'] = replacementId;
           }
-          final entry = archive.findFile(clip['path'] as String);
-          if (entry == null || !entry.isFile) {
-            throw const FormatException(
-              'A media file is missing from this backup.',
-            );
-          }
           // Archive paths never become destination paths, preventing path traversal.
           final ext = (clip['path'] as String)
               .split('.')
@@ -198,36 +194,20 @@ class ProjectStore {
               .replaceAll(RegExp('[^a-zA-Z0-9]'), '');
           final destination = File('${root!.path}/media/${newId()}.$ext');
           written.add(destination);
-          final output = OutputFileStream(destination.path);
-          try {
-            entry.writeContent(output);
-          } finally {
-            output.close();
-          }
+          archive.extract(clip['path'] as String, destination.path);
           clip['path'] = destination.path;
           if (clip['isMapHeader'] == true) {
             json['mapHeaderPath'] = destination.path;
           }
         }
         Future<String> restoreExtra(String source) async {
-          final entry = archive.findFile(source);
-          if (entry == null || !entry.isFile) {
-            throw const FormatException(
-              'An image is missing from this backup.',
-            );
-          }
           final ext = source
               .split('.')
               .last
               .replaceAll(RegExp('[^a-zA-Z0-9]'), '');
           final file = File('${root!.path}/media/${newId()}.$ext');
           written.add(file);
-          final output = OutputFileStream(file.path);
-          try {
-            entry.writeContent(output);
-          } finally {
-            output.close();
-          }
+          archive.extract(source, file.path);
           return file.path;
         }
 
@@ -253,8 +233,10 @@ class ProjectStore {
         }
         rethrow;
       }
+    } on TypeError {
+      throw const FormatException('Invalid project backup fields.');
     } finally {
-      stream.close();
+      archive.close();
     }
   }
 }

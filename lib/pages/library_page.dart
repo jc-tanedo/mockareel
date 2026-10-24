@@ -1,8 +1,9 @@
+import '../model/feed_timeline.dart';
+import '../pages/maps_editor_page.dart';
+import '../theme/app_theme.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import '../main.dart';
 import '../model/project.dart';
-import '../model/feed.dart';
 import '../services/project_store.dart';
 import '../widgets/reel_preview.dart';
 import 'feed_editor_page.dart';
@@ -53,7 +54,7 @@ class _LibraryPageState extends State<LibraryPage> {
       MaterialPageRoute<void>(
         builder: (_) => project.isFeed
             ? FeedEditorPage(store: _store, project: project)
-            : EditorPage(store: _store, initialProject: project),
+            : MapsEditorPage(store: _store, initialProject: project),
       ),
     );
     await _load();

@@ -1,8 +1,8 @@
+import '../model/feed_timeline.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import '../model/feed.dart';
 import 'feed_canvas.dart';
 import '../model/template_layout.dart';
 import 'media_frame.dart';

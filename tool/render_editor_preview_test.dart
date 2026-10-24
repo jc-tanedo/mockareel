@@ -1,3 +1,4 @@
+import 'package:mockareel/app.dart';
 // Optional editor screenshots: flutter test tool/render_editor_preview_test.dart
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../test/support/memory_project_store.dart';

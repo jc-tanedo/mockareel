@@ -1,3 +1,7 @@
+import '../widgets/project_name_dialog.dart';
+import '../model/feed_timeline.dart';
+import '../pages/exported_video_page.dart';
+import '../theme/app_theme.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -8,7 +12,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import '../main.dart' show ExportedVideoPage, mint;
 import '../model/project.dart';
 import '../model/feed.dart';
 import '../services/native_renderer.dart';
@@ -92,29 +95,10 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   }
 
   Future<void> _rename() async {
-    final controller = TextEditingController(text: p.title);
     final title = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Project name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 80,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (_) => ProjectNameDialog(initialValue: p.title),
     );
-    // Dialog animations can still hold the controller for a frame.
     if (title != null && title.isNotEmpty && mounted) {
       p.title = title;
       _change();

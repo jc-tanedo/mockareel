@@ -1,7 +1,8 @@
+import 'package:mockareel/app.dart';
+import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/widgets/creation_steps.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
@@ -58,7 +59,7 @@ void main() {
       await tester.pumpAndSettle();
       expect((await store.restore()).darkOutput, true);
       expect(
-        Theme.of(tester.element(find.byType(EditorPage))).brightness,
+        Theme.of(tester.element(find.byType(MapsEditorPage))).brightness,
         Brightness.dark,
       );
       await tester.pumpWidget(const SizedBox());
@@ -76,7 +77,7 @@ void main() {
       await tester.pumpAndSettle();
       expect((await store.restore()).darkOutput, false);
       expect(
-        Theme.of(tester.element(find.byType(EditorPage))).brightness,
+        Theme.of(tester.element(find.byType(MapsEditorPage))).brightness,
         Brightness.dark,
       );
       expect(tester.takeException(), isNull);

@@ -1,3 +1,6 @@
+import 'package:mockareel/model/feed_timeline.dart';
+import 'package:mockareel/app.dart';
+import 'package:mockareel/pages/exported_video_page.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -5,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/feed.dart';
 import 'package:mockareel/pages/feed_editor_page.dart';

@@ -1,3 +1,4 @@
+import 'package:mockareel/app.dart';
 // Optional visual review: flutter test tool/render_feed_preview_test.dart
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/feed.dart';
 import 'package:mockareel/pages/feed_editor_page.dart';

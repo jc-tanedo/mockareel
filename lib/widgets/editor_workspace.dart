@@ -93,22 +93,26 @@ class _EditorWorkspaceState extends State<EditorWorkspace> {
           ),
         ),
       );
-      if (wide && !keyboard) {
-        return Row(
-          children: [
-            Expanded(flex: 5, child: stage()),
-            const VerticalDivider(width: 1),
-            Expanded(flex: 4, child: widget.inspector),
-          ],
-        );
-      }
-      return Column(
+      final sideBySide = wide && !keyboard;
+      // Keep one Flex and a stable inspector element while the keyboard changes
+      // orientation. Replacing Row with Column recreates focused text fields.
+      return Flex(
+        direction: sideBySide ? Axis.horizontal : Axis.vertical,
         children: [
-          if (!hidePreview) SizedBox(height: stageHeight, child: stage()),
-          if (!_expanded || hidePreview) ...[
+          if (sideBySide)
+            Expanded(flex: 5, child: stage())
+          else if (!hidePreview)
+            SizedBox(height: stageHeight, child: stage()),
+          if (sideBySide)
+            const VerticalDivider(width: 1)
+          else if (!_expanded || hidePreview)
             const Divider(height: 1),
-            Expanded(child: widget.inspector),
-          ],
+          if (sideBySide || !_expanded || hidePreview)
+            Expanded(
+              key: const ValueKey('workspace-inspector'),
+              flex: sideBySide ? 4 : 1,
+              child: widget.inspector,
+            ),
         ],
       );
     },

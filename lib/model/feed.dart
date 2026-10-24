@@ -1,5 +1,5 @@
-import 'dart:math';
-import 'project.dart';
+import 'reel_clip.dart';
+export 'feed_post.dart';
 
 double _number(
   Map<String, dynamic> j,
@@ -10,51 +10,6 @@ double _number(
 ) {
   final n = (j[key] as num?)?.toDouble() ?? fallback;
   return n.isFinite ? n.clamp(lo, hi) : fallback;
-}
-
-class FeedPost {
-  String username, title, caption, sound, likes, comments, saves, shares;
-  String? avatarPath;
-  bool verified, following;
-  FeedPost({
-    this.username = 'yourname',
-    this.title = '',
-    this.caption = 'A little moment worth sharing. #fyp',
-    this.sound = 'original sound',
-    this.likes = '24.8K',
-    this.comments = '128',
-    this.saves = '2,041',
-    this.shares = '386',
-    this.avatarPath,
-    this.verified = false,
-    this.following = false,
-  });
-  factory FeedPost.fromJson(Map<String, dynamic> j) => FeedPost(
-    username: j['username'] as String? ?? 'yourname',
-    title: j['title'] as String? ?? '',
-    caption: j['caption'] as String? ?? 'A little moment worth sharing. #fyp',
-    sound: j['sound'] as String? ?? 'original sound',
-    likes: j['likes'] as String? ?? '24.8K',
-    comments: j['comments'] as String? ?? '128',
-    saves: j['saves'] as String? ?? '2,041',
-    shares: j['shares'] as String? ?? '386',
-    avatarPath: j['avatarPath'] as String?,
-    verified: j['verified'] == true,
-    following: j['following'] == true,
-  );
-  Map<String, dynamic> toJson() => {
-    'username': username,
-    'title': title,
-    'caption': caption,
-    'sound': sound,
-    'likes': likes,
-    'comments': comments,
-    'saves': saves,
-    'shares': shares,
-    'avatarPath': avatarPath,
-    'verified': verified,
-    'following': following,
-  };
 }
 
 enum HomeOs {
@@ -170,53 +125,4 @@ class FeedSettings {
     'homeSeconds': homeSeconds,
     'homeMedia': homeMedia?.toJson(),
   };
-}
-
-/// The same scene plan drives scrubbing, playback and native export.
-class FeedScene {
-  final String kind;
-  final int postIndex;
-  final double start, duration;
-  const FeedScene(this.kind, this.postIndex, this.start, this.duration);
-}
-
-abstract final class FeedTimeline {
-  static List<FeedScene> scenes(ReelProject p) {
-    final result = <FeedScene>[];
-    var start = 0.0;
-    void add(String kind, int index, double seconds) {
-      result.add(FeedScene(kind, index, start, seconds));
-      start += seconds;
-    }
-
-    if (p.feed.introDuration > 0) {
-      add(p.feed.hasSearch ? 'search' : 'home-open', 0, p.feed.introDuration);
-    }
-    for (var i = 0; i < p.clips.length; i++) {
-      add('post', i, p.clips[i].duration);
-    }
-    if (p.feed.closeToHome) {
-      add('home-close', max(0, p.clips.length - 1), p.feed.outroDuration);
-    }
-    return result;
-  }
-
-  static double duration(ReelProject p) =>
-      scenes(p).fold(0, (n, s) => n + s.duration);
-  static FeedScene at(ReelProject p, double time) {
-    final all = scenes(p);
-    return all.firstWhere(
-      (s) => time < s.start + s.duration,
-      orElse: () => all.isEmpty ? const FeedScene('post', 0, 0, 0) : all.last,
-    );
-  }
-
-  static double postStart(ReelProject p, int index) =>
-      p.feed.introDuration + p.startOf(index);
-  static double transition(ReelProject p, int index) =>
-      index == 0 ? 0 : min(p.slideSeconds, p.clips[index].duration * .45);
-  static double entry(ReelProject p, int index, double elapsed) {
-    final d = transition(p, index);
-    return d <= 0 ? 0 : 640 * pow(1 - (elapsed / d).clamp(0, 1), 3).toDouble();
-  }
 }

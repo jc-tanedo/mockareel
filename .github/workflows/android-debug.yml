@@ -22,6 +22,7 @@ jobs:
       - name: Analyze and test
         run: bash tool/ci/check_android.sh
       - name: Restore optional stable debug signing key
+        if: github.event_name != 'pull_request'
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
