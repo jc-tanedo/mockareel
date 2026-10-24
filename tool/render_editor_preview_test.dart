@@ -52,6 +52,8 @@ void main() {
     await store.save(
       ReelProject(
         title: 'Tokyo after hours',
+        headerMode: 'photo',
+        sheetIntroSeconds: 0,
         place: PlaceDetails(
           name: 'Kura Sushi Nishishinjuku',
           category: 'Conveyor belt sushi restaurant',
@@ -92,9 +94,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    for (final tab in ['Timeline', 'Text']) {
-      await tester.tap(find.text(tab).last);
-      await tester.pumpAndSettle();
+    Future<void> capture(String name) async {
       await tester.runAsync(() async {
         final image =
             await (key.currentContext!.findRenderObject()!
@@ -102,10 +102,31 @@ void main() {
                 .toImage();
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         await File(
-          '${output.path}/${tab.toLowerCase()}.png',
+          '${output.path}/$name.png',
         ).writeAsBytes(bytes!.buffer.asUint8List());
         image.dispose();
       });
+    }
+
+    for (final tab in ['Place', 'Timeline', 'Text', 'Audio', 'Export']) {
+      await tester.tap(find.text(tab).last);
+      await tester.pumpAndSettle();
+      await capture(tab.toLowerCase());
+      if (tab == 'Place') {
+        for (final tool in ['Look', 'Header', 'Buttons', 'Review']) {
+          await tester.ensureVisible(find.text(tool));
+          await tester.tap(find.text(tool));
+          await tester.pumpAndSettle();
+          await capture('place-${tool.toLowerCase()}');
+        }
+      }
+      if (tab == 'Timeline') {
+        for (final tool in ['Frame', 'Motion']) {
+          await tester.tap(find.text(tool));
+          await tester.pumpAndSettle();
+          await capture('timeline-${tool.toLowerCase()}');
+        }
+      }
     }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

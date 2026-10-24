@@ -93,6 +93,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
   Widget build(BuildContext context) {
     final p = widget.project;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (p.music != null)
           MusicPlayback(
@@ -119,6 +120,17 @@ class _TimelinePreviewState extends State<TimelinePreview>
         ),
         Row(
           children: [
+            IconButton(
+              tooltip: 'Restart preview',
+              visualDensity: VisualDensity.compact,
+              onPressed: p.clips.isEmpty
+                  ? null
+                  : () {
+                      _pause();
+                      setState(() => _position = 0);
+                    },
+              icon: const Icon(Icons.replay, size: 18),
+            ),
             IconButton(
               tooltip: _playing ? 'Pause preview' : 'Play preview',
               onPressed: p.clips.isEmpty

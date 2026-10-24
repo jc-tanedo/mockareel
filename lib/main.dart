@@ -18,6 +18,8 @@ import 'services/places.dart';
 import 'services/static_map.dart';
 import 'widgets/template_content_editor.dart';
 import 'widgets/output_theme_picker.dart';
+import 'widgets/editor_workspace.dart';
+import 'widgets/creation_steps.dart';
 import 'services/project_store.dart';
 import 'widgets/reel_preview.dart';
 import 'widgets/media_frame.dart';
@@ -99,6 +101,7 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
       _price = TextEditingController(),
       _hours = TextEditingController();
   ReelProject _project = ReelProject();
+  int _placeTool = 0, _timelineTool = 0;
   int _tab = 0, _selected = 0, _captureIndex = 0, _editRevision = 0;
   bool _ready = false, _importing = false, _exporting = false, _dirty = false;
   double? _progress;
@@ -879,60 +882,98 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
                     color: mint,
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Maps API settings',
-                  onPressed: _settings,
-                  icon: const Icon(Icons.settings_outlined),
+                PopupMenuButton<String>(
+                  tooltip: 'More project options',
+                  icon: const Icon(Icons.more_horiz),
+                  onSelected: (action) {
+                    switch (action) {
+                      case 'settings':
+                        _settings();
+                      case 'rename':
+                        _rename();
+                      case 'backup':
+                        _backup();
+                      case 'projects':
+                        _projects();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'rename',
+                      child: Text('Rename project'),
+                    ),
+                    PopupMenuItem(
+                      value: 'settings',
+                      child: Text('Maps API settings'),
+                    ),
+                    PopupMenuItem(
+                      value: 'backup',
+                      child: Text('Share project backup'),
+                    ),
+                    PopupMenuItem(
+                      value: 'projects',
+                      child: Text('Open or import a project'),
+                    ),
+                  ],
                 ),
               ],
             ),
-            body: switch (_tab) {
-              0 => _editTab(),
-              1 => _timelineTab(),
-              2 => TextEditor(
-                key: ValueKey(_project.id),
-                project: _project,
-                selectedClip: _selected,
-                onChanged: _change,
-              ),
-              3 => AudioEditor(
-                project: _project,
-                preview: _preview(),
-                importing: _importing,
-                onPick: _pickMusic,
-                onChanged: _change,
-              ),
-              _ => _exportTab(),
-            },
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() {
-                _tab = i;
-                _previewRevision = newId();
-              }),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.edit_location_alt_outlined),
-                  label: 'Place',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.video_collection_outlined),
-                  label: 'Timeline',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.text_fields),
-                  label: 'Text',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.music_note_outlined),
-                  label: 'Audio',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.ios_share),
-                  label: 'Export',
+            body: Column(
+              children: [
+                if (MediaQuery.viewInsetsOf(context).bottom == 0)
+                  CreationStepHeading(
+                    step: _tab,
+                    onNext: () => _goToStep(min(4, _tab + 1)),
+                  ),
+                Expanded(
+                  child: _tab == 2
+                      ? TextEditor(
+                          keyboardVisible:
+                              MediaQuery.viewInsetsOf(context).bottom > 0,
+                          key: ValueKey(_project.id),
+                          project: _project,
+                          selectedClip: _selected,
+                          onChanged: _change,
+                        )
+                      : EditorWorkspace(
+                          key: ValueKey('workspace-$_tab'),
+                          keyboardVisible:
+                              MediaQuery.viewInsetsOf(context).bottom > 0,
+                          previewFraction: _tab == 1
+                              ? .48
+                              : _tab == 4
+                              ? .50
+                              : .56,
+                          previewBuilder: (height) =>
+                              _preview(maxHeight: height),
+                          inspector: switch (_tab) {
+                            0 => _editTab(),
+                            1 => _timelineTab(),
+                            3 => AudioEditor(
+                              project: _project,
+                              importing: _importing,
+                              onPick: _pickMusic,
+                              onChanged: _change,
+                            ),
+                            _ => _exportTab(),
+                          },
+                        ),
                 ),
               ],
             ),
+            bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+                ? null
+                : CreationSteps(
+                    selected: _tab,
+                    completed: [
+                      _project.place.name.trim().isNotEmpty,
+                      _project.clips.isNotEmpty,
+                      _project.tags.isNotEmpty,
+                      _project.music != null,
+                      false,
+                    ],
+                    onSelected: _goToStep,
+                  ),
           ),
           if (_exporting)
             Positioned.fill(
@@ -983,101 +1024,132 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     selected: _selected,
     maxHeight: maxHeight,
   );
-  Widget _editTab() => ListView(
-    padding: const EdgeInsets.all(18),
+  void _goToStep(int step) => setState(() {
+    _tab = step;
+    _previewRevision = newId();
+  });
+
+  Widget _editTab() => Column(
     children: [
-      _preview(),
-      OutputThemePicker(project: _project, onChanged: _change),
-      const SizedBox(height: 8),
-      FilledButton.icon(
-        onPressed: _findPlace,
-        icon: const Icon(Icons.search),
-        label: const Text('Find a place on Google Maps'),
+      InspectorTabs(
+        labels: const ['Details', 'Look', 'Header', 'Buttons', 'Review'],
+        selected: _placeTool,
+        onSelected: (i) => setState(() => _placeTool = i),
       ),
-      const SizedBox(height: 20),
-      const Text(
-        'PLACE DETAILS',
-        style: TextStyle(color: mint, fontSize: 11, letterSpacing: 1.5),
-      ),
-      const SizedBox(height: 12),
-      _field('Place name', _name),
-      _field('Category & description', _category),
-      _field(
-        'Rating',
-        _rating,
-        keyboard: const TextInputType.numberWithOptions(decimal: true),
-      ),
-      _field('Address', _address),
-      TemplateContentEditor(
-        project: _project,
-        loading: _importing,
-        onChanged: _change,
-        onLoadMap: _loadMap,
-        onUploadMap: _uploadMap,
-      ),
-      PlaceActionsEditor(
-        key: ValueKey('actions-${_project.id}-${_project.place.placeId}'),
-        place: _project.place,
-        onChanged: _change,
-      ),
-      ExpansionTile(
-        title: const Text('Template details'),
-        tilePadding: EdgeInsets.zero,
-        children: [
-          _field('Local / alternate place name', _localName),
-          _field('Review count', _reviews, keyboard: TextInputType.number),
-          _field('Price / price range', _price),
-          _field('Hours / open status', _hours),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Story controls overlay'),
-            subtitle: const Text(
-              'Add the reference’s decorative story controls',
-            ),
-            value: _project.storyChrome,
-            onChanged: (v) {
-              _project.storyChrome = v;
-              _change();
-            },
-          ),
-          if (_project.headerMode == 'photo' && _project.clips.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('hero-${_project.id}-${_project.heroClip?.id}'),
-                initialValue: _project.heroClip?.id,
-                decoration: const InputDecoration(
-                  labelText: 'Peeking header photo',
-                ),
-                isExpanded: true,
-                items: _project.clips
-                    .map(
-                      (c) => DropdownMenuItem(
-                        value: c.id,
-                        child: Text(
-                          c.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (id) {
-                  _project.heroClipId = id;
-                  _previewRevision = newId();
+      Expanded(
+        child: ListView(
+          key: ValueKey('place-inspector-$_placeTool'),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          children: switch (_placeTool) {
+            0 => [
+              FilledButton.icon(
+                onPressed: _findPlace,
+                icon: const Icon(Icons.search, size: 18),
+                label: const Text('Find a place on Google Maps'),
+              ),
+              const SizedBox(height: 16),
+              _field('Place name', _name),
+              _field('Category & description', _category),
+              _field('Address', _address),
+              ExpansionTile(
+                title: const Text('More place details'),
+                tilePadding: EdgeInsets.zero,
+                children: [
+                  _field(
+                    'Rating',
+                    _rating,
+                    keyboard: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  _field('Local / alternate place name', _localName),
+                  _field(
+                    'Review count',
+                    _reviews,
+                    keyboard: TextInputType.number,
+                  ),
+                  _field('Price / price range', _price),
+                  _field('Hours / open status', _hours),
+                ],
+              ),
+            ],
+            1 => [
+              OutputThemePicker(project: _project, onChanged: _change),
+              const Divider(height: 28),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Story controls overlay'),
+                subtitle: const Text('Decorative controls from the reference'),
+                value: _project.storyChrome,
+                onChanged: (v) {
+                  _project.storyChrome = v;
                   _change();
                 },
               ),
-            ),
-        ],
+            ],
+            2 => [
+              TemplateContentEditor(
+                project: _project,
+                loading: _importing,
+                showReview: false,
+                onChanged: _change,
+                onLoadMap: _loadMap,
+                onUploadMap: _uploadMap,
+              ),
+              if (_project.headerMode == 'photo' && _project.clips.isNotEmpty)
+                _heroPicker(),
+              if (_project.headerMode == 'photo' && _project.clips.isEmpty)
+                TextButton.icon(
+                  onPressed: () => _goToStep(1),
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text('Add media in Timeline'),
+                ),
+            ],
+            3 => [
+              PlaceActionsEditor(
+                key: ValueKey(
+                  'actions-${_project.id}-${_project.place.placeId}',
+                ),
+                place: _project.place,
+                expanded: true,
+                onChanged: _change,
+              ),
+            ],
+            _ => [
+              TemplateContentEditor(
+                project: _project,
+                loading: _importing,
+                showHeader: false,
+                expanded: true,
+                onChanged: _change,
+                onLoadMap: _loadMap,
+                onUploadMap: _uploadMap,
+              ),
+            ],
+          },
+        ),
       ),
-      const Text(
-        'All details remain editable after lookup.',
-        style: TextStyle(fontSize: 12, color: Colors.white60),
-      ),
-      const SizedBox(height: 18),
-      _addMedia(),
     ],
+  );
+
+  Widget _heroPicker() => DropdownButtonFormField<String>(
+    key: ValueKey('hero-${_project.id}-${_project.heroClip?.id}'),
+    initialValue: _project.heroClip?.id,
+    decoration: const InputDecoration(labelText: 'Peeking header photo'),
+    isExpanded: true,
+    items: _project.clips
+        .map(
+          (c) => DropdownMenuItem(
+            value: c.id,
+            child: Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        )
+        .toList(),
+    onChanged: (id) {
+      _project.heroClipId = id;
+      _previewRevision = newId();
+      _change();
+    },
   );
   Widget _field(
     String name,
@@ -1103,159 +1175,264 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         : const Icon(Icons.add_photo_alternate_outlined),
     label: Text(_importing ? 'Importing media…' : 'Add photos & videos'),
   );
-  Widget _timelineTab() => ListView(
-    padding: const EdgeInsets.all(18),
-    children: [
-      _preview(maxHeight: 320),
-      _addMedia(),
-      ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        title: const Text('Opening scroll reveal'),
-        subtitle: Text(
-          _project.sheetIntroSeconds == 0
-              ? 'Off'
-              : '${_project.sheetIntroSeconds.toStringAsFixed(1)}s · sheet slides up over the map',
-        ),
+  Widget _timelineTab() => LayoutBuilder(
+    builder: (context, bounds) {
+      final compact =
+          bounds.maxHeight < 240 || MediaQuery.viewInsetsOf(context).bottom > 0;
+      return Column(
         children: [
-          _framingControl(
-            'Reveal duration',
-            _project.sheetIntroSeconds,
-            0,
-            2,
-            '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
-            (v) {
-              _project.sheetIntroSeconds = v < .1 ? 0 : v;
-              _previewRevision = newId();
-              _change();
-            },
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: compact && _project.clips.isNotEmpty
+                      ? DropdownButton<int>(
+                          value: _selected,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          items: [
+                            for (var i = 0; i < _project.clips.length; i++)
+                              DropdownMenuItem(
+                                value: i,
+                                child: Text(
+                                  '${i + 1}. ${_project.clips[i].name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                          ],
+                          onChanged: (i) {
+                            if (i != null) {
+                              setState(() {
+                                _selected = i;
+                                _previewRevision = newId();
+                              });
+                            }
+                          },
+                        )
+                      : Text(
+                          '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white60,
+                          ),
+                        ),
+                ),
+                TextButton.icon(
+                  onPressed: _importing ? null : _pickMedia,
+                  icon: const Icon(Icons.add, size: 17),
+                  label: Text(_importing ? 'Importing…' : 'Add media'),
+                ),
+              ],
+            ),
           ),
-          const Text(
-            'The place sheet scrolls upward, then cards slide left. Set duration to zero to disable the opening reveal.',
-            style: TextStyle(fontSize: 12, color: Colors.white54),
-          ),
-        ],
-      ),
-      ExpansionTile(
-        title: const Text('Left-scroll snap'),
-        tilePadding: EdgeInsets.zero,
-        children: [
-          _framingControl(
-            'Slide speed',
-            _project.slideSeconds,
-            .15,
-            .8,
-            '${_project.slideSeconds.toStringAsFixed(2)}s',
-            (v) {
-              _project.slideSeconds = v;
-              _change();
-            },
-          ),
-          const Text(
-            'Each card slides in, snaps fully into view, then holds. Slide time is included in the clip duration.',
-            style: TextStyle(fontSize: 12, color: Colors.white60),
-          ),
-          TextButton(
-            onPressed: _project.clips.isEmpty
-                ? null
-                : () {
-                    for (final c in _project.clips) {
-                      c.duration = 1.56;
-                      c.normalize();
-                    }
-                    _project.slideSeconds = .35;
+          if (_project.clips.isNotEmpty) ...[
+            if (!compact)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: _clipStrip(),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: InspectorTabs(
+                    labels: const ['Timing', 'Frame', 'Motion'],
+                    selected: _timelineTool,
+                    onSelected: (i) => setState(() => _timelineTool = i),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove clip ${_selected + 1}',
+                  icon: const Icon(Icons.delete_outline, size: 19),
+                  onPressed: () {
+                    _project.clips.removeAt(_selected);
+                    _selected = min(
+                      _selected,
+                      max(0, _project.clips.length - 1),
+                    );
+                    _captureIndex = 0;
                     _previewRevision = newId();
                     _change();
                   },
-            child: const Text('Use reference pace · 1.56s per card'),
-          ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            Expanded(
+              child: ListView(
+                key: ValueKey('timeline-inspector-$_timelineTool'),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                children: [
+                  if (_timelineTool == 2)
+                    _motionInspector()
+                  else
+                    _clipCard(_selected.clamp(0, _project.clips.length - 1)),
+                ],
+              ),
+            ),
+          ] else
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const Icon(
+                    Icons.video_collection_outlined,
+                    color: Colors.white30,
+                    size: 34,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Start with your photos & videos',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Add media, tap a clip to edit it, then set the pace.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  _addMedia(),
+                ],
+              ),
+            ),
         ],
+      );
+    },
+  );
+
+  Widget _motionInspector() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Opening scroll reveal',
+        style: TextStyle(fontWeight: FontWeight.w600),
       ),
-      const SizedBox(height: 16),
-      Text(
-        '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
-        style: const TextStyle(color: mint),
+      const SizedBox(height: 12),
+      _framingControl(
+        'Reveal duration',
+        _project.sheetIntroSeconds,
+        0,
+        2,
+        '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
+        (v) {
+          _project.sheetIntroSeconds = v < .1 ? 0 : v;
+          _previewRevision = newId();
+          _change();
+        },
       ),
-      const SizedBox(height: 8),
-      if (_project.clips.isEmpty)
-        const Padding(
-          padding: EdgeInsets.all(20),
-          child: Text(
-            'Add your photos and videos to build the reel. Every clip gets its own timing and caption.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      if (_project.clips.isNotEmpty) ...[
-        _clipStrip(),
-        const SizedBox(height: 18),
-        const Text(
-          'CLIP INSPECTOR',
-          style: TextStyle(
-            fontSize: 10,
-            letterSpacing: 2,
-            color: Colors.white54,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _clipCard(_selected.clamp(0, _project.clips.length - 1)),
-      ],
+      const Text(
+        'Set to zero to start with the sheet already in position.',
+        style: TextStyle(fontSize: 11, color: Colors.white54),
+      ),
+      const Divider(height: 28),
+      const Text(
+        'Left-scroll snap',
+        style: TextStyle(fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 12),
+      _framingControl(
+        'Slide speed',
+        _project.slideSeconds,
+        .15,
+        .8,
+        '${_project.slideSeconds.toStringAsFixed(2)}s',
+        (v) {
+          _project.slideSeconds = v;
+          _change();
+        },
+      ),
+      const Text(
+        'Slide time is included in each clip’s duration.',
+        style: TextStyle(fontSize: 11, color: Colors.white54),
+      ),
+      TextButton(
+        onPressed: () {
+          for (final c in _project.clips) {
+            c.duration = 1.56;
+            c.normalize();
+          }
+          _project.slideSeconds = .35;
+          _previewRevision = newId();
+          _change();
+        },
+        child: const Text('Use reference pace · 1.56s per card'),
+      ),
     ],
   );
   Widget _clipStrip() => SizedBox(
-    height: 96,
+    height: 72,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       itemCount: _project.clips.length,
       separatorBuilder: (_, _) => const SizedBox(width: 5),
       itemBuilder: (_, i) {
         final c = _project.clips[i];
-        return InkWell(
-          onTap: () => setState(() {
-            _selected = i;
-            _previewRevision = newId();
-          }),
-          child: Container(
-            width: (c.duration * 12).clamp(78, 150),
-            decoration: BoxDecoration(
-              color: panel,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: i == _selected ? mint : Colors.white12,
-                width: 2,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipPoster(clip: c),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black87],
+        return Semantics(
+          label: 'Clip ${i + 1}: ${c.name}',
+          selected: i == _selected,
+          button: true,
+          child: Tooltip(
+            message: c.name,
+            child: InkWell(
+              onTap: () => setState(() {
+                _selected = i;
+                _previewRevision = newId();
+              }),
+              child: Container(
+                width: (c.duration * 12).clamp(78, 150),
+                decoration: BoxDecoration(
+                  color: panel,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: i == _selected ? mint : Colors.white12,
+                    width: 2,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipPoster(clip: c),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black87],
+                          ),
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        left: 6,
+                        top: 5,
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 6,
+                        right: 4,
+                        bottom: 6,
+                        child: Text(
+                          '${c.duration.toStringAsFixed(1)}s',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    left: 6,
-                    top: 5,
-                    child: Text(
-                      '${i + 1}',
-                      style: const TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                  ),
-                  Positioned(
-                    left: 6,
-                    right: 4,
-                    bottom: 6,
-                    child: Text(
-                      '${c.duration.toStringAsFixed(1)}s',
-                      style: const TextStyle(fontSize: 11, color: Colors.white),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -1275,156 +1452,119 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  clip.isVideo ? Icons.videocam_outlined : Icons.image_outlined,
-                  color: mint,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${index + 1}. ${clip.name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            if (_timelineTool == 0) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Duration · ${clip.duration.toStringAsFixed(1)}s',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Preview clip ${index + 1}',
-                  onPressed: () => setState(() {
-                    _selected = index;
-                    _previewRevision = newId();
-                  }),
-                  icon: const Icon(Icons.play_arrow),
-                ),
-                IconButton(
-                  tooltip: 'Remove clip ${index + 1}',
-                  onPressed: () {
-                    _project.clips.removeAt(index);
-                    _selected = min(
-                      _selected,
-                      max(0, _project.clips.length - 1),
-                    );
-                    _captureIndex = 0;
-                    _previewRevision = newId();
-                    _change();
-                  },
-                  icon: const Icon(Icons.close, size: 19),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Duration · ${clip.duration.toStringAsFixed(1)}s',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  IconButton(
+                    tooltip: 'Move clip earlier',
+                    onPressed: index == 0 ? null : () => _move(index, -1),
+                    icon: const Icon(Icons.chevron_left, size: 18),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Move clip up',
-                  onPressed: index == 0 ? null : () => _move(index, -1),
-                  icon: const Icon(Icons.arrow_upward, size: 18),
-                ),
-                IconButton(
-                  tooltip: 'Move clip down',
-                  onPressed: index == _project.clips.length - 1
-                      ? null
-                      : () => _move(index, 1),
-                  icon: const Icon(Icons.arrow_downward, size: 18),
-                ),
-              ],
-            ),
-            Slider(
-              value: clip.duration,
-              min: min(.5, clip.maxDuration),
-              max: max(.5, clip.maxDuration),
-              onChanged: (v) {
-                clip.duration = v;
-                clip.normalize();
-                _change();
-              },
-            ),
-            if (clip.isVideo && clip.sourceDuration > clip.duration + .01) ...[
-              Text(
-                'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  IconButton(
+                    tooltip: 'Move clip later',
+                    onPressed: index == _project.clips.length - 1
+                        ? null
+                        : () => _move(index, 1),
+                    icon: const Icon(Icons.chevron_right, size: 18),
+                  ),
+                ],
               ),
               Slider(
-                value: clip.trimStart,
-                max: max(.01, clip.sourceDuration - clip.duration),
+                value: clip.duration,
+                min: min(.5, clip.maxDuration),
+                max: max(.5, clip.maxDuration),
                 onChanged: (v) {
-                  clip.trimStart = v;
+                  clip.duration = v;
                   clip.normalize();
                   _change();
                 },
               ),
-            ],
-            ExpansionTile(
-              key: ValueKey('framing-${clip.id}'),
-              title: const Text('Card framing'),
-              tilePadding: EdgeInsets.zero,
-              children: [
-                _framingControl(
-                  'Card width',
-                  clip.cardWidth,
-                  .45,
-                  1,
-                  '${(clip.cardWidth * 328).round()} px',
-                  (v) {
-                    clip.cardWidth = v;
-                    _change();
-                  },
+              if (clip.isVideo &&
+                  clip.sourceDuration > clip.duration + .01) ...[
+                Text(
+                  'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
-                _framingControl(
-                  'Card height',
-                  clip.cardHeight,
-                  .55,
-                  1,
-                  '${(clip.cardHeight * 250).round()} px',
-                  (v) {
-                    clip.cardHeight = v;
-                    _change();
-                  },
-                ),
-                _framingControl(
-                  'Zoom',
-                  clip.zoom,
-                  1,
-                  3,
-                  '${clip.zoom.toStringAsFixed(2)}×',
-                  (v) {
-                    clip.zoom = v;
-                    _change();
-                  },
-                ),
-                _framingControl(
-                  'Horizontal crop',
-                  clip.panX,
-                  -1,
-                  1,
-                  '${(clip.panX * 100).round()}%',
-                  (v) {
-                    clip.panX = v;
+                Slider(
+                  value: clip.trimStart,
+                  max: max(.01, clip.sourceDuration - clip.duration),
+                  onChanged: (v) {
+                    clip.trimStart = v;
+                    clip.normalize();
                     _change();
                   },
                 ),
               ],
-            ),
-            TextFormField(
-              key: ValueKey('caption-${clip.id}'),
-              initialValue: clip.caption,
-              maxLength: 120,
-              decoration: const InputDecoration(
-                labelText: 'Caption (optional)',
-                counterText: '',
+              TextFormField(
+                key: ValueKey('caption-${clip.id}'),
+                initialValue: clip.caption,
+                maxLength: 120,
+                decoration: const InputDecoration(
+                  labelText: 'Caption (optional)',
+                  counterText: '',
+                ),
+                onChanged: (v) {
+                  clip.caption = v;
+                  _change();
+                },
               ),
-              onChanged: (v) {
-                clip.caption = v;
-                _change();
-              },
-            ),
+            ],
+            if (_timelineTool == 1)
+              Column(
+                children: [
+                  _framingControl(
+                    'Card width',
+                    clip.cardWidth,
+                    .45,
+                    1,
+                    '${(clip.cardWidth * 328).round()} px',
+                    (v) {
+                      clip.cardWidth = v;
+                      _change();
+                    },
+                  ),
+                  _framingControl(
+                    'Card height',
+                    clip.cardHeight,
+                    .55,
+                    1,
+                    '${(clip.cardHeight * 250).round()} px',
+                    (v) {
+                      clip.cardHeight = v;
+                      _change();
+                    },
+                  ),
+                  _framingControl(
+                    'Zoom',
+                    clip.zoom,
+                    1,
+                    3,
+                    '${clip.zoom.toStringAsFixed(2)}×',
+                    (v) {
+                      clip.zoom = v;
+                      _change();
+                    },
+                  ),
+                  _framingControl(
+                    'Horizontal crop',
+                    clip.panX,
+                    -1,
+                    1,
+                    '${(clip.panX * 100).round()}%',
+                    (v) {
+                      clip.panX = v;
+                      _change();
+                    },
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -1439,78 +1579,128 @@ class _EditorPageState extends State<EditorPage> with WidgetsBindingObserver {
     _change();
   }
 
-  Widget _exportTab() => ListView(
-    padding: const EdgeInsets.all(22),
-    children: [
-      const SizedBox(height: 16),
-      const Icon(Icons.movie_creation_outlined, size: 55, color: mint),
-      const SizedBox(height: 18),
-      const Text(
-        'Your place. Your story.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
-      ),
-      const SizedBox(height: 12),
-      Text(
-        '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
-        textAlign: TextAlign.center,
-      ),
-      const SizedBox(height: 10),
-      const Text(
-        'Vertical MP4 · 1080 × 1920\nCards scroll left and snap\nYour music, text, framing and place details included',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Colors.white60, height: 1.7),
-      ),
-      const SizedBox(height: 26),
-      FilledButton.icon(
-        onPressed: _project.clips.isEmpty || _importing ? null : _export,
-        icon: const Icon(Icons.file_download_outlined),
-        label: const Text('Render MP4'),
-      ),
-      if (_project.clips.isEmpty)
-        const Padding(
-          padding: EdgeInsets.all(12),
-          child: Text(
-            'Add at least one photo or video in Timeline to export.',
-            textAlign: TextAlign.center,
+  Widget _exportTab() {
+    final needsMap =
+        _project.headerMode == 'map' && _project.mapHeaderPath == null;
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: panel,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '1080 × 1920',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Vertical MP4 · H.264 · ${_project.music == null ? 'Silent' : 'With music'}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                      style: const TextStyle(color: mint, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_project.clips.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Add at least one photo or video in Timeline to export.',
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                ),
+              if (needsMap)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Your map header needs an image.',
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _placeTool = 2;
+                          _goToStep(0);
+                        },
+                        child: const Text('Set up header'),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 12),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Still images'),
+                subtitle: const Text('Transparent template or full snapshot'),
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: needsMap ? null : () => _exportPng(false),
+                    icon: const Icon(Icons.layers_outlined),
+                    label: const Text('Transparent template PNG'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _project.clips.isEmpty || needsMap
+                        ? null
+                        : () => _exportPng(true),
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('Full snapshot PNG'),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+              const Divider(height: 24),
+              TextButton.icon(
+                onPressed: _backup,
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Share project backup'),
+              ),
+              const Text(
+                'Your project and media autosave on this device.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+            ],
           ),
         ),
-      const SizedBox(height: 12),
-      OutlinedButton.icon(
-        onPressed: () => _exportPng(false),
-        icon: const Icon(Icons.layers_outlined),
-        label: const Text('Transparent template PNG'),
-      ),
-      OutlinedButton.icon(
-        onPressed: _project.clips.isEmpty ? null : () => _exportPng(true),
-        icon: const Icon(Icons.image_outlined),
-        label: const Text('Full snapshot PNG'),
-      ),
-      const SizedBox(height: 22),
-      const Divider(),
-      const SizedBox(height: 12),
-      const Text(
-        'Keep creating later',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'Projects autosave on this device. Backups include the media, timings, captions and place details so they can be imported on another device.',
-        style: TextStyle(color: Colors.white60, height: 1.5),
-      ),
-      const SizedBox(height: 12),
-      OutlinedButton.icon(
-        onPressed: _backup,
-        icon: const Icon(Icons.inventory_2_outlined),
-        label: const Text('Share project backup'),
-      ),
-      TextButton.icon(
-        onPressed: _projects,
-        icon: const Icon(Icons.folder_open_outlined),
-        label: const Text('Open or import a project'),
-      ),
-    ],
-  );
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _project.clips.isEmpty || _importing || needsMap
+                  ? null
+                  : _export,
+              icon: const Icon(Icons.file_download_outlined),
+              label: const Text('Render MP4'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class PlaceSearchDialog extends StatefulWidget {

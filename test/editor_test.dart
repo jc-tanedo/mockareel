@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/main.dart';
 import 'package:mockareel/model/project.dart';
+import 'package:mockareel/widgets/creation_steps.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
 import 'support/memory_project_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -44,6 +47,8 @@ void main() {
     (tester) async {
       await open(tester);
       expect((await store.restore()).darkOutput, false);
+      await tester.tap(find.text('Look'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.byTooltip('Dark output'));
       await tester.tap(find.byTooltip('Dark output'));
       await tester.pumpAndSettle();
@@ -56,6 +61,8 @@ void main() {
       );
       await tester.pumpWidget(const SizedBox());
       await open(tester);
+      await tester.tap(find.text('Look'));
+      await tester.pumpAndSettle();
       final picker = tester.widget<SegmentedButton<bool>>(
         find.byType(SegmentedButton<bool>),
       );
@@ -70,6 +77,109 @@ void main() {
         Theme.of(tester.element(find.byType(EditorPage))).brightness,
         Brightness.dark,
       );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'numbered steps guide forward without requiring optional text or music',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('Step 3 of 5, Text, optional'))
+            .getSemanticsData()
+            .hasAction(ui.SemanticsAction.tap),
+        true,
+      );
+      semantics.dispose();
+      expect(find.text('STEP 1 OF 5'), findsOneWidget);
+      for (final next in ['Timeline', 'Text', 'Audio', 'Export']) {
+        await tester.tap(find.byTooltip('Next step: $next'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('STEP 5 OF 5'), findsOneWidget);
+      expect((await store.restore()).tags, isEmpty);
+      expect((await store.restore()).music, isNull);
+      await tester.tap(find.text('Place').last);
+      await tester.pumpAndSettle();
+      expect(find.text('STEP 1 OF 5'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'preview stays pinned while the inspector scrolls and expands on demand',
+    (tester) async {
+      await open(tester);
+      final rect = tester.getRect(find.byType(TimelinePreview));
+      await tester.drag(
+        find.byKey(const ValueKey('place-inspector-0')),
+        const Offset(0, -170),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(TimelinePreview)), rect);
+      await tester.tap(find.byTooltip('Expand preview'));
+      await tester.pumpAndSettle();
+      expect(find.text('Details'), findsNothing);
+      expect(
+        tester.getSize(find.byType(TimelinePreview)).height,
+        greaterThan(rect.height),
+      );
+      await tester.tap(find.byTooltip('Show editing controls'));
+      await tester.pumpAndSettle();
+      expect(find.text('Details'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets('controls fit a short phone and landscape with real clips', (
+    tester,
+  ) async {
+    await store.save(
+      ReelProject(
+        clips: [
+          ReelClip(
+            id: 'one',
+            path: '/missing.jpg',
+            name: 'A very long media filename.jpg',
+            isVideo: false,
+          ),
+        ],
+      ),
+    );
+    await open(tester);
+    for (final size in [const Size(320, 568), const Size(844, 390)]) {
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      for (final step in ['Timeline', 'Text', 'Audio', 'Export', 'Place']) {
+        await tester.tap(find.text(step).last);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: '$size $step');
+      }
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets(
+    'keyboard gives the inspector space while preserving the focused field',
+    (tester) async {
+      await open(tester);
+      final field = find.widgetWithText(TextField, 'Place name');
+      await tester.ensureVisible(field);
+      await tester.tap(field);
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(find.byType(CreationSteps), findsNothing);
+      expect(find.byType(TimelinePreview), findsNothing);
+      await tester.enterText(field, 'Keyboard edit');
+      tester.view.resetViewInsets();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(find.byType(CreationSteps), findsOneWidget);
+      await tester.tap(find.byTooltip('Save project'));
+      await tester.pumpAndSettle();
+      expect((await store.restore()).place.name, 'Keyboard edit');
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

@@ -4,13 +4,13 @@ import '../model/project.dart';
 
 class AudioEditor extends StatelessWidget {
   final ReelProject project;
-  final Widget preview;
+  final Widget? preview;
   final bool importing;
   final VoidCallback onPick, onChanged;
   const AudioEditor({
     super.key,
     required this.project,
-    required this.preview,
+    this.preview,
     required this.importing,
     required this.onPick,
     required this.onChanged,
@@ -21,7 +21,7 @@ class AudioEditor extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        preview,
+        if (preview != null) preview!,
         const SizedBox(height: 12),
         const Text(
           'SOUNDTRACK',
@@ -71,25 +71,31 @@ class AudioEditor extends StatelessWidget {
               onChanged();
             },
           ),
-          Text('Start music at · ${m.trimStart.toStringAsFixed(1)}s'),
-          Slider(
-            value: m.trimStart,
-            max: max(.001, m.sourceDuration - .1),
-            onChanged: (v) {
-              m.trimStart = v;
-              m.normalize();
-              onChanged();
-            },
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Loop to fit reel'),
-            subtitle: const Text('Repeat from the selected start point'),
-            value: m.loop,
-            onChanged: (v) {
-              m.loop = v;
-              onChanged();
-            },
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Timing & loop'),
+            children: [
+              Text('Start music at · ${m.trimStart.toStringAsFixed(1)}s'),
+              Slider(
+                value: m.trimStart,
+                max: max(.001, m.sourceDuration - .1),
+                onChanged: (v) {
+                  m.trimStart = v;
+                  m.normalize();
+                  onChanged();
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Loop to fit reel'),
+                subtitle: const Text('Repeat from the selected start point'),
+                value: m.loop,
+                onChanged: (v) {
+                  m.loop = v;
+                  onChanged();
+                },
+              ),
+            ],
           ),
           const Text(
             'Press play above to hear the soundtrack with your reel. Original clip audio is muted.',
@@ -99,7 +105,7 @@ class AudioEditor extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              'Choose an MP3, M4A, WAV, or other supported audio file from your device. Your soundtrack is included in the exported MP4 and project backup.',
+              'Add music from your device, or continue to Export for a silent reel.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white54, height: 1.6),
             ),

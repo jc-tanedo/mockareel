@@ -376,6 +376,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Export').last);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Still images'));
+      await tester.tap(find.text('Still images'));
+      await tester.pumpAndSettle();
       for (final label in ['Transparent template PNG', 'Full snapshot PNG']) {
         final count = paths.length;
         await tester.ensureVisible(find.text(label));

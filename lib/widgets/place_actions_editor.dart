@@ -4,10 +4,12 @@ import 'story_tags.dart';
 
 class PlaceActionsEditor extends StatefulWidget {
   final PlaceDetails place;
+  final bool expanded;
   final VoidCallback onChanged;
   const PlaceActionsEditor({
     super.key,
     required this.place,
+    this.expanded = false,
     required this.onChanged,
   });
   @override
@@ -26,6 +28,7 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
   void _customize() => place.actionOverrides ??= place.suggestedActions;
   @override
   Widget build(BuildContext context) => ExpansionTile(
+    initiallyExpanded: widget.expanded,
     tilePadding: EdgeInsets.zero,
     title: const Text('Template buttons'),
     subtitle: const Text('Suggested from this place · fully editable'),
