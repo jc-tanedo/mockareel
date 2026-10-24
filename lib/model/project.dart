@@ -7,7 +7,7 @@ import 'dart:math';
 
 class PlaceDetails {
   String name, category, rating, address, localName, reviewCount, price, hours;
-  String? placeId;
+  String? placeId, mapsUrl;
   double? latitude, longitude;
   String phone, website;
   List<String> types;
@@ -52,6 +52,7 @@ class PlaceDetails {
     this.rating = '',
     this.address = '',
     this.placeId,
+    this.mapsUrl,
     this.latitude,
     this.longitude,
     this.phone = '',
@@ -71,6 +72,7 @@ class PlaceDetails {
     rating: json['rating']?.toString() ?? '',
     address: json['address'] as String? ?? '',
     placeId: json['placeId'] as String?,
+    mapsUrl: json['mapsUrl'] as String?,
     latitude: (json['latitude'] as num?)?.toDouble(),
     longitude: (json['longitude'] as num?)?.toDouble(),
     phone: json['phone'] as String? ?? '',
@@ -92,6 +94,7 @@ class PlaceDetails {
     'rating': rating,
     'address': address,
     'placeId': placeId,
+    'mapsUrl': mapsUrl,
     'latitude': latitude,
     'longitude': longitude,
     'phone': phone,

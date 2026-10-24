@@ -1,4 +1,5 @@
 import 'maps_web_search_page.dart';
+import 'maps_web_header_page.dart';
 import '../model/maps_web_result.dart';
 import '../widgets/export_monitor.dart';
 import '../widgets/maps_key_dialog.dart';
@@ -63,6 +64,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   ExportPhase _exportPhase = ExportPhase.preparing;
   double _exportPosition = 0;
   String _exportFormat = 'H.264 · 1080 × 1920 · 30 fps';
+  bool _useApiHeaders = false;
   String _key = '', _status = '', _previewRevision = 'initial';
   String? _captureHeroPath;
   bool _captureSnapshot = false;
@@ -102,6 +104,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       _key = prefs.getString('mapsApiKey') ?? _buildKey;
+      _useApiHeaders = prefs.getBool('mapsUseApiHeaders') ?? false;
       _setProject(project);
       setState(() => _ready = true);
     } catch (e) {
@@ -182,11 +185,14 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     final service = StaticMapService();
     File? file;
     try {
-      final bytes = await service.load(
-        _project.place,
-        _key,
-        zoom: _project.mapZoom,
-      );
+      final bytes = _useApiHeaders && _key.isNotEmpty
+          ? await service.load(place, _key, zoom: _project.mapZoom)
+          : await Navigator.of(context).push<Uint8List>(
+              MaterialPageRoute(
+                builder: (_) => MapsWebHeaderPage(place: place),
+              ),
+            );
+      if (bytes == null) return;
       file = File('${_store.root!.path}/media/map_${newId()}.png');
       await file.writeAsBytes(bytes, flush: true);
       await _precache(file.path);
@@ -195,7 +201,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         return;
       }
       _project.mapHeaderPath = file.path;
-      _project.mapSource = 'google';
+      _project.mapSource = _useApiHeaders && _key.isNotEmpty
+          ? 'google'
+          : 'browser';
       _project.headerMode = 'map';
       _previewRevision = newId();
       _change();
@@ -322,16 +330,21 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<void> _settings() async {
-    final value = await showDialog<String>(
+    final value = await showDialog<MapsAdvancedSettings>(
       context: context,
-      builder: (_) => MapsKeyDialog(initialValue: _key),
+      builder: (_) =>
+          MapsKeyDialog(initialValue: _key, useApiHeaders: _useApiHeaders),
     );
     if (value != null) {
-      await (await SharedPreferences.getInstance()).setString(
-        'mapsApiKey',
-        value,
-      );
-      if (mounted) setState(() => _key = value);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('mapsApiKey', value.key);
+      await prefs.setBool('mapsUseApiHeaders', value.useApiHeaders);
+      if (mounted) {
+        setState(() {
+          _key = value.key;
+          _useApiHeaders = value.useApiHeaders;
+        });
+      }
     }
   }
 
@@ -364,7 +377,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (_project.title == 'Untitled reel') _project.title = place.name;
     });
     _change();
-    if (_project.headerMode == 'map' && _key.isNotEmpty) await _loadMap();
+    if (_project.headerMode == 'map' && _key.isNotEmpty && _useApiHeaders) {
+      await _loadMap();
+    }
   }
 
   Future<void> _projects() async {
@@ -791,7 +806,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                     ),
                     PopupMenuItem(
                       value: 'settings',
-                      child: Text('Maps API settings'),
+                      child: Text('Advanced · Google Maps'),
                     ),
                     PopupMenuItem(
                       value: 'backup',
@@ -975,6 +990,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 showReview: false,
                 onChanged: _change,
                 onLoadMap: _loadMap,
+                useApiHeaders: _useApiHeaders && _key.isNotEmpty,
                 onUploadMap: _uploadMap,
               ),
               if (_project.headerMode == 'photo' && _project.clips.isNotEmpty)
@@ -1004,6 +1020,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 expanded: true,
                 onChanged: _change,
                 onLoadMap: _loadMap,
+                useApiHeaders: _useApiHeaders && _key.isNotEmpty,
                 onUploadMap: _uploadMap,
               ),
             ],

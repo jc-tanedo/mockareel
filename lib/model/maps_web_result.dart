@@ -54,6 +54,12 @@ class MapsWebResult {
       rating: rating,
       reviewCount: reviewCount,
       placeId: id,
+      mapsUrl:
+          uri != null &&
+              MapsWebUrls.allowedNavigation(uri) &&
+              uri.scheme == 'https'
+          ? url
+          : null,
       latitude: lat != null && lat.abs() <= 90 ? lat : null,
       longitude: lng != null && lng.abs() <= 180 ? lng : null,
       phone: phone,
@@ -140,6 +146,44 @@ class MapsWebImport {
 }
 
 abstract final class MapsWebUrls {
+  static Uri header(PlaceDetails place) {
+    final saved = place.mapsUrl;
+    if (saved != null && Uri.tryParse(saved)?.scheme == 'https') {
+      try {
+        return browserUri(search(saved));
+      } on FormatException {
+        /* Imported backups may contain an invalid URL. */
+      }
+    }
+    final query = [
+      place.name,
+      place.address,
+    ].where((s) => s.trim().isNotEmpty).join(', ');
+    if (place.placeId != null &&
+        place.placeId!.startsWith('ChIJ') &&
+        query.isNotEmpty) {
+      return Uri.https('www.google.com', '/maps/search/', {
+        'api': '1',
+        'query': query,
+        'query_place_id': place.placeId!,
+        'hl': 'en',
+      });
+    }
+    if (query.isNotEmpty) return search(query);
+    final lat = place.latitude, lng = place.longitude;
+    if (lat != null &&
+        lng != null &&
+        lat.isFinite &&
+        lng.isFinite &&
+        lat.abs() <= 90 &&
+        lng.abs() <= 180) {
+      return search('$lat,$lng');
+    }
+    throw const FormatException(
+      'Find a place or enter a name and address first.',
+    );
+  }
+
   static Uri browserUri(Uri uri) =>
       const {'www.google.com', 'maps.google.com'}.contains(uri.host) &&
           uri.path.startsWith('/maps')

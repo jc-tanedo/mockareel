@@ -18,7 +18,7 @@
 
 Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfaces. Choose a template, add your media, customize the UI, and export a reel. Projects save locally and can be shared as portable backups.
 
-> **Maps WebView POC branch:** key-free search through a hidden, attached WebView. The Android app installs separately as **Mockareel Maps POC**. [Test instructions and limitations](docs/maps-webview-poc.md).
+> **Maps WebView POC branch:** key-free search through a hidden WebView, plus browser map-header capture. The Android app installs separately as **Mockareel Maps POC**. [Test instructions and limitations](docs/maps-webview-poc.md).
 
 ## Templates
 
@@ -40,7 +40,7 @@ Both templates support photos, trimmed video, framing controls and optional back
 - **Output:** 1080 × 1920 MP4 at 30 fps; Maps also exports transparent/full PNG stills.
 - **Audio:** choose background music from your device. Source video audio is muted.
 - **Projects:** autosave on device; `.mockareel` backups include media and editable settings.
-- **Maps:** Google lookup requires your own API key. Manual editing and uploaded map images work without one. [Configure Maps →](docs/google-maps.md)
+- **Maps:** Browser search and map-header capture need no API key. Optional API access is under **Advanced · Google Maps**. [Configure Maps →](docs/google-maps.md)
 
 ## Development
 

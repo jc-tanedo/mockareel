@@ -221,7 +221,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Map header: upload a map image in Header, or use your optional Maps key.',
+          'Map header: capture a Google map without a key in Place → Header.',
           style: TextStyle(color: Colors.white54, fontSize: 12),
         ),
         if (detail.reviews.isNotEmpty) ...[
