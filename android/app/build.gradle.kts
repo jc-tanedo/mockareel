@@ -4,6 +4,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// CI supplies a temporary keystore; local preview builds retain debug signing.
+val releaseStore = System.getenv("ANDROID_KEYSTORE_PATH")
+val releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+val releaseAlias = System.getenv("ANDROID_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+val hasReleaseSigning = listOf(releaseStore, releaseStorePassword, releaseAlias, releaseKeyPassword)
+    .all { !it.isNullOrBlank() }
+if (System.getenv("MOCKAREEL_REQUIRE_RELEASE_SIGNING") == "true" && !hasReleaseSigning) {
+    throw GradleException("Release signing is required. Configure the Android signing secrets.")
+}
+
 android {
     namespace = "dev.mockareel.mockareel"
     compileSdk = flutter.compileSdkVersion
@@ -17,6 +28,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "dev.mockareel.mockareel"
+        manifestPlaceholders["appLabel"] = "Mockareel"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,11 +41,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("distribution") {
+                storeFile = file(requireNotNull(releaseStore))
+                storePassword = releaseStorePassword
+                keyAlias = releaseAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "Mockareel Debug"
+        }
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseSigning) "distribution" else "debug")
         }
     }
 }

@@ -85,6 +85,10 @@ MOCKAREEL_REFERENCE_VIDEO=/path/to/reference.mp4 \
 
 This generates PNG frames under `/tmp/mockareel-reference-preview`. They demonstrate the Flutter template renderer; they are not a recording of native Android MP4 export.
 
+## GitHub Actions
+
+[Android CI and release setup](docs/android-ci.md) documents automatic debug APKs, signed version-tag releases, required signing secrets and local equivalents. Debug APKs install separately as **Mockareel Debug**. Release publishing requires the repository signing secrets; no signing keys are stored in Git.
+
 ## Download
 
 The `apk-preview` branch holds installable APKs separately from source. Open the versioned APK while signed into GitHub with repository access and choose **Download raw file**. Source changes are on `work`.

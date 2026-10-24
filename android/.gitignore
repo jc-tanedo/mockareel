@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# The wrapper is build tooling, not a local SDK artifact.
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar
