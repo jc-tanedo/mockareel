@@ -14,7 +14,7 @@ Four suggested steps use the same pinned-preview workspace and charcoal/violet e
 2. **Home screen & status bar:** choose the output OS and a photo/video wallpaper. Customize its date, status bar and available widgets. Short video wallpapers loop. The app launch/close animation uses a still of the first/last post. See the home-screen controls below.
 3. **Posts:** add photos/videos; each becomes a full-screen post. Select a post and use **Identity** (username, profile photo, verification/following), **Caption** (title, caption/hashtags, sound label), **Stats** (likes, comments, saves, shares), or **Timing & frame** (duration, trim, zoom, horizontal crop, reorder). Use **Remove post** beside the post selector to remove the selected media from any tool; **Undo** restores it. Sidebar and post text slide upward with each post; navigation stays fixed. The outgoing video holds its last frame during a swipe while the incoming video plays.
 4. **Audio:** select actual background music, volume, start offset and looping. The per-post sound label is decorative. Source video audio is muted.
-5. **Export:** render a 1080×1920, 30 fps H.264 MP4, with AAC when music is present; share or save it to the gallery. The native renderer retains moving video textures and composites UI frames during typing, loading, swipes, launch and close.
+5. **Export:** render a 1080×1920, 30 fps H.264 MP4, with AAC when music is present; share or save it to the gallery. The export workspace shows preparation/encoding stages, elapsed time, progress and a scene preview that follows the job. Video media appears as stills in this monitor; it is not a live view of the encoded frames. The native renderer retains moving video textures and composites UI frames during typing, loading, swipes, launch and close.
 
 ### Home-screen controls
 
@@ -51,3 +51,5 @@ The editor follows five suggested steps: **Place → Timeline → Text (optional
 9. The project title opens renaming; the back arrow returns to saved projects. **More project options** includes Maps API settings, rename and portable backups. Projects autosave; explicit Save remains in the header.
 
 Projects autosave, including when leaving the app. The library opens and creates projects. Portable `.mockareel` backups include originals, timings, framing, captions, header selection, music, text layers, map image, opening animation, featured review and output theme; they can be imported on another device. Older projects open with default framing.
+
+During feed export, repeated search-text states and home-screen holds share their prepared images. Loading animations and swipes retain their full 30 fps samples; output remains 1080×1920. The amount of time saved depends on the scene durations and the device encoder.

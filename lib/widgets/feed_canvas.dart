@@ -24,7 +24,7 @@ class FeedCanvas extends StatelessWidget {
     this.posterOnly = false,
     this.posters = const {},
   });
-  Widget _media(ReelClip c, double elapsed, {bool still = false}) =>
+  Widget _media(ReelClip c, double elapsed, {bool still = false, bool? play}) =>
       still || posterOnly
       ? ClipPoster(
           clip: c,
@@ -35,9 +35,51 @@ class FeedCanvas extends StatelessWidget {
       : MediaFrame(
           key: ValueKey(c.id),
           clip: c,
-          position: elapsed.clamp(0, c.duration),
-          playing: playing,
+          position: elapsed.clamp(0, max(0, c.duration - .001)),
+          playing: play ?? playing,
         );
+  Widget _postLayer(
+    ReelClip c,
+    double elapsed, {
+    double amount = 1,
+    bool home = false,
+  }) {
+    final icon = project.feed.launchIcon;
+    return Positioned(
+      key: ValueKey('post-${c.id}'),
+      left: icon.left * (1 - amount),
+      top: home
+          ? icon.top * (1 - amount)
+          : FeedTimeline.entry(project, project.clips.indexOf(c), elapsed),
+      width: icon.size + (360 - icon.size) * amount,
+      height: icon.size + (640 - icon.size) * amount,
+      child: Opacity(
+        opacity: amount.clamp(0, 1),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(icon.radius * (1 - amount)),
+          child: FittedBox(
+            fit: BoxFit.fill,
+            child: SizedBox(
+              width: 360,
+              height: 640,
+              child: Stack(
+                children: [
+                  if (!overlayOnly || home)
+                    Positioned.fill(
+                      child: _media(c, elapsed, play: playing && !home),
+                    ),
+                  Positioned.fill(child: FeedPostSurface(post: c.post)),
+                  if (home)
+                    Positioned.fill(child: FeedChrome(time: project.feed.time)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = FeedTimeline.at(project, position), f = project.feed;
@@ -81,23 +123,7 @@ class FeedCanvas extends StatelessWidget {
       }
       if (project.clips.isNotEmpty) {
         final c = project.clips[i];
-        children.add(
-          Positioned(
-            // Keep the entire incoming subtree when the outgoing sibling is
-            // removed at the end of a swipe, including its native video player.
-            key: ValueKey('post-${c.id}'),
-            left: 0,
-            top: entry,
-            width: 360,
-            height: 640,
-            child: Stack(
-              children: [
-                if (!overlayOnly) Positioned.fill(child: _media(c, elapsed)),
-                Positioned.fill(child: FeedPostSurface(post: c.post)),
-              ],
-            ),
-          ),
-        );
+        children.add(_postLayer(c, elapsed));
       } else {
         children.add(
           const Center(
@@ -131,44 +157,12 @@ class FeedCanvas extends StatelessWidget {
           ? ((elapsed - f.homeSeconds) / .6).clamp(0.0, 1.0)
           : (elapsed / .65).clamp(0.0, 1.0);
       final amount = opening ? pow(t, .7).toDouble() : pow(1 - t, 3).toDouble();
-      if (amount > 0 && project.clips.isNotEmpty) {
+      if (project.clips.isNotEmpty) {
         final c = project.clips[opening ? 0 : project.clips.length - 1];
-        // Match the fourth app tile on the home screen.
+        // Preload the opening video even while its app tile is invisible. The
+        // same player and widget ancestry continue into/out of the feed scene.
         children.add(
-          Positioned(
-            left: f.launchIcon.left * (1 - amount),
-            top: f.launchIcon.top * (1 - amount),
-            width: f.launchIcon.size + (360 - f.launchIcon.size) * amount,
-            height: f.launchIcon.size + (640 - f.launchIcon.size) * amount,
-            child: Opacity(
-              opacity: amount.clamp(0, 1),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(
-                  f.launchIcon.radius * (1 - amount),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.fill,
-                  child: SizedBox(
-                    width: 360,
-                    height: 640,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: _media(
-                            c,
-                            opening ? 0 : c.duration,
-                            still: true,
-                          ),
-                        ),
-                        Positioned.fill(child: FeedPostSurface(post: c.post)),
-                        Positioned.fill(child: FeedChrome(time: f.time)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _postLayer(c, opening ? 0 : c.duration, amount: amount, home: true),
         );
       }
     }

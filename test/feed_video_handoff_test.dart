@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/feed_timeline.dart';
+import 'package:mockareel/model/feed.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/widgets/feed_canvas.dart';
 import 'package:video_player/video_player.dart';
@@ -61,6 +62,53 @@ class _VideoPlatform extends VideoPlayerPlatform {
 }
 
 void main() {
+  testWidgets('home launch and app close retain the video player', (
+    tester,
+  ) async {
+    final previous = VideoPlayerPlatform.instance;
+    final platform = _VideoPlatform();
+    VideoPlayerPlatform.instance = platform;
+    addTearDown(() => VideoPlayerPlatform.instance = previous);
+    final p = ReelProject(
+      template: 'tiktok-feed',
+      feed: FeedSettings(opening: 'home', closeToHome: true, homeSeconds: .5),
+      clips: [
+        ReelClip(
+          id: 'video',
+          path: 'video.mp4',
+          name: 'Video',
+          isVideo: true,
+          duration: 3,
+          sourceDuration: 10,
+          trimStart: 1,
+        ),
+      ],
+    );
+    Future<VideoPlayerController> show(double time) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FeedCanvas(project: p, position: time, playing: true),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      return tester
+          .widget<VideoPlayer>(find.byType(VideoPlayer, skipOffstage: false))
+          .controller;
+    }
+
+    final controller = await show(0);
+    expect(controller.value.isPlaying, isFalse);
+    for (final time in [.51, 1.09, 1.1, 2.0, 4.09, 4.1, 4.3, 4.76]) {
+      expect(await show(time), same(controller), reason: 'Continuity at $time');
+      expect(platform.created, 1);
+      expect(controller.value.isPlaying, time >= 1.1 && time < 4.1);
+      expect(tester.takeException(), isNull);
+    }
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    expect(platform.disposed, [1]);
+  });
   testWidgets('incoming video keeps its player when outgoing post leaves', (
     tester,
   ) async {

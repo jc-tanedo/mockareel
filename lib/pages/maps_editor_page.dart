@@ -1,3 +1,4 @@
+import '../widgets/export_monitor.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/project_name_dialog.dart';
 import 'dart:async';
@@ -57,6 +58,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   int _tab = 0, _selected = 0, _captureIndex = 0, _editRevision = 0;
   bool _ready = false, _importing = false, _exporting = false, _dirty = false;
   double? _progress;
+  bool _cancelled = false;
+  ExportPhase _exportPhase = ExportPhase.preparing;
+  double _exportPosition = 0;
+  String _exportFormat = 'H.264 · 1080 × 1920 · 30 fps';
   String _key = '', _status = '', _previewRevision = 'initial';
   String? _captureHeroPath;
   bool _captureSnapshot = false;
@@ -424,6 +429,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     final paths = <String, String>{};
     if (snapshot) {
       for (final c in _project.clips) {
+        if (_cancelled || !mounted) {
+          throw const FormatException('Export cancelled');
+        }
         paths[c.id] = c.isVideo
             ? await _renderer.thumbnail(c.path, c.trimStart)
             : c.path;
@@ -439,6 +447,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<Uint8List> _capturePng() async {
+    if (_cancelled || !mounted) throw const FormatException('Export cancelled');
     await SchedulerBinding.instance.endOfFrame;
     final boundary =
         _captureKey.currentContext!.findRenderObject()!
@@ -459,6 +468,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     setState(() {
       _exporting = true;
       _status = 'Preparing image…';
+      _cancelled = false;
+      _exportPhase = ExportPhase.preparing;
+      _exportPosition = _project.startOf(_selected);
+      _exportFormat = 'PNG · 1080 × 1920';
       _progress = null;
       _previewRevision = newId();
     });
@@ -472,6 +485,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         '${_store.root!.path}/exports/${snapshot ? 'snapshot' : 'template'}-${newId()}.png',
       );
       await file.writeAsBytes(bytes);
+      if (_cancelled || !mounted) return;
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
@@ -516,7 +530,11 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     setState(() {
       _exporting = true;
       _progress = null;
-      _status = 'Preparing your reel…';
+      _status = 'Preparing media…';
+      _cancelled = false;
+      _exportPhase = ExportPhase.preparing;
+      _exportPosition = 0;
+      _exportFormat = 'H.264 · 1080 × 1920 · 30 fps';
       _previewRevision = newId();
     });
     Directory? temp;
@@ -532,11 +550,20 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       temp = await Directory(
         '${_store.root!.path}/exports/overlay_${newId()}',
       ).create();
-      await _prepareCapture();
+      await _prepareCapture(snapshot: true);
+      if (!mounted || _cancelled) {
+        throw const FormatException('Export cancelled');
+      }
+      setState(() => _captureSnapshot = false);
       final overlays = <String>[];
       for (var i = 0; i < _project.clips.length; i++) {
         if (!mounted) return;
-        setState(() => _captureIndex = i);
+        setState(() {
+          _captureIndex = i;
+          _exportPosition = _project.startOf(i);
+          _status = 'Preparing clip ${i + 1} of ${_project.clips.length}…';
+          _progress = .15 * i / _project.clips.length;
+        });
         final data = await _capturePng();
         final file = File('${temp.path}/$i.png');
         await file.writeAsBytes(data);
@@ -553,18 +580,39 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         final position = frame / 30;
         setState(() {
           _capturePosition = position;
+          _exportPosition = position;
+          _status = 'Preparing opening animation…';
+          _progress =
+              .15 +
+              .20 *
+                  frame /
+                  max(
+                    1,
+                    (min(_project.sheetIntroSeconds, _project.duration) * 30)
+                        .ceil(),
+                  );
           _captureIndex = max(0, _project.clipAt(position));
         });
         final file = File('${temp.path}/intro_$frame.png');
         await file.writeAsBytes(await _capturePng());
         introFrames.add(file.path);
       }
-      if (mounted) setState(() => _capturePosition = null);
+      if (mounted) {
+        setState(() {
+          _capturePosition = null;
+          _exportPhase = ExportPhase.encoding;
+          _exportPosition = 0;
+          _progress = .35;
+          _status = 'Encoding video…';
+        });
+      }
+      if (_cancelled) throw const FormatException('Export cancelled');
       _progressSubscription = _renderer.progress.listen((value) {
         if (mounted) {
           setState(() {
-            _progress = value;
-            _status = 'Rendering MP4 on this device…';
+            _progress = .35 + .65 * value;
+            _exportPosition = _project.duration * value.clamp(0, 1);
+            _status = 'Encoding video…';
           });
         }
       });
@@ -574,7 +622,12 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         introFrames: introFrames,
       );
       if (!mounted) return;
-      setState(() => _status = 'Reel exported');
+      if (_cancelled) return;
+      setState(() {
+        _status = 'Export complete';
+        _exportPhase = ExportPhase.finishing;
+        _progress = 1;
+      });
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
@@ -592,6 +645,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         setState(() {
           _exporting = false;
           _capturePosition = null;
+          _capturePosters = {};
           _progress = null;
         });
       }
@@ -804,40 +858,32 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           ),
           if (_exporting)
             Positioned.fill(
-              child: Material(
-                color: Colors.black87,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(30),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.movie_creation_outlined,
-                          size: 44,
-                          color: mint,
-                        ),
-                        const SizedBox(height: 20),
-                        Text(_status, textAlign: TextAlign.center),
-                        const SizedBox(height: 20),
-                        LinearProgressIndicator(value: _progress),
-                        const SizedBox(height: 12),
-                        Text(
-                          _progress == null
-                              ? 'Keep the app open while rendering'
-                              : '${(_progress! * 100).round()}%',
-                        ),
-                        const SizedBox(height: 18),
-                        TextButton(
-                          onPressed: _progressSubscription == null
-                              ? null
-                              : _renderer.cancel,
-                          child: const Text('Cancel export'),
-                        ),
-                      ],
-                    ),
+              child: ExportMonitor(
+                title: _project.title,
+                status: _status,
+                phase: _exportPhase,
+                progress: _progress,
+                position: _exportPosition,
+                duration: _project.duration,
+                format: _exportFormat,
+                preview: IgnorePointer(
+                  child: ReelCanvas(
+                    project: _project,
+                    position: _exportPosition,
+                    posterOnly: true,
+                    heroPath: _captureHeroPath,
+                    posters: _capturePosters,
                   ),
                 ),
+                onCancel: _cancelled || _exportPhase == ExportPhase.finishing
+                    ? null
+                    : () {
+                        setState(() {
+                          _cancelled = true;
+                          _status = 'Cancelling export…';
+                        });
+                        _renderer.cancel();
+                      },
               ),
             ),
         ],
@@ -845,12 +891,14 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     );
   }
 
-  Widget _preview({double maxHeight = 420}) => TimelinePreview(
-    key: ValueKey(_previewRevision),
-    project: _project,
-    selected: _selected,
-    maxHeight: maxHeight,
-  );
+  Widget _preview({double maxHeight = 420}) => _exporting
+      ? SizedBox(height: maxHeight)
+      : TimelinePreview(
+          key: ValueKey(_previewRevision),
+          project: _project,
+          selected: _selected,
+          maxHeight: maxHeight,
+        );
   void _goToStep(int step) => setState(() {
     _tab = step;
     _previewRevision = newId();

@@ -1,3 +1,5 @@
+import '../widgets/export_monitor.dart';
+import '../services/feed_capture_plan.dart';
 import '../widgets/home_apps_editor.dart';
 import '../widgets/project_name_dialog.dart';
 import '../model/feed_timeline.dart';
@@ -40,7 +42,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   double? _progress;
   Timer? _autosave;
   StreamSubscription<double>? _subscription;
-  double _captureTime = 0;
+  double _captureTime = 0, _exportPosition = 0;
+  ExportPhase _exportPhase = ExportPhase.preparing;
   bool _overlayOnly = false;
   Map<String, String> _posters = {};
   static const _labels = ['Sequence', 'Posts', 'Audio', 'Export'];
@@ -1250,35 +1253,30 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           ),
           if (_exporting)
             Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black87,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.movie_creation_outlined,
-                          size: 36,
-                          color: mint,
-                        ),
-                        const SizedBox(height: 20),
-                        Text(_status, textAlign: TextAlign.center),
-                        const SizedBox(height: 20),
-                        LinearProgressIndicator(value: _progress),
-                        const SizedBox(height: 20),
-                        TextButton(
-                          onPressed: () {
-                            _cancelled = true;
-                            _renderer.cancel();
-                          },
-                          child: const Text('Cancel export'),
-                        ),
-                      ],
-                    ),
+              child: ExportMonitor(
+                title: p.title,
+                status: _status,
+                phase: _exportPhase,
+                progress: _progress,
+                position: _exportPosition,
+                duration: FeedTimeline.duration(p),
+                preview: IgnorePointer(
+                  child: FeedCanvas(
+                    project: p,
+                    position: _exportPosition,
+                    posterOnly: true,
+                    posters: _posters,
                   ),
                 ),
+                onCancel: _cancelled || _exportPhase == ExportPhase.finishing
+                    ? null
+                    : () {
+                        setState(() {
+                          _cancelled = true;
+                          _status = 'Cancelling export…';
+                        });
+                        _renderer.cancel();
+                      },
               ),
             ),
         ],
@@ -1312,6 +1310,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     if (_cancelled || !mounted) throw const FormatException('Export cancelled');
     setState(() {
       _captureTime = time;
+      _exportPosition = time;
       _overlayOnly = overlay;
     });
     await SchedulerBinding.instance.endOfFrame;
@@ -1337,7 +1336,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       _exporting = true;
       _cancelled = false;
       _progress = null;
-      _status = 'Preparing scenes…';
+      _status = 'Preparing media…';
+      _exportPhase = ExportPhase.preparing;
+      _exportPosition = 0;
     });
     Directory? temp;
     try {
@@ -1350,6 +1351,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         ...p.clips,
         if (p.feed.homeMedia != null) p.feed.homeMedia!,
       ]) {
+        if (_cancelled || !mounted) {
+          throw const FormatException('Export cancelled');
+        }
         if (!await File(c.path).exists()) {
           throw FormatException('“${c.name}” is missing. Replace this media.');
         }
@@ -1374,6 +1378,13 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           frames = <List<String>>[],
           transitions = <double>[];
       final scenes = FeedTimeline.scenes(p);
+      final totalFrames = scenes.fold<int>(0, (sum, scene) {
+        final animated = scene.kind == 'post'
+            ? FeedTimeline.transition(p, scene.postIndex)
+            : scene.duration;
+        return sum + (animated * 30).ceil() + 1;
+      });
+      var completedFrames = 0;
       for (var i = 0; i < scenes.length; i++) {
         final s = scenes[i];
         final isPost = s.kind == 'post';
@@ -1385,21 +1396,23 @@ class _FeedEditorPageState extends State<FeedEditorPage>
             : 0.0;
         final animated = isPost ? transition : s.duration;
         final sceneFrames = <String>[];
+        final cached = <String, String>{};
         // UI is static after each swipe; capture only the changing interval.
         for (var frame = 0; frame < (animated * 30).ceil(); frame++) {
-          sceneFrames.add(
-            await _capture(
-              temp,
-              'scene_${i}_$frame',
-              s.start + frame / 30,
-              overlay: true,
-            ),
+          if (_cancelled || !mounted) {
+            throw const FormatException('Export cancelled');
+          }
+          final key = FeedCapturePlan.key(p, s, frame);
+          final path = cached[key] ??= await _capture(
+            temp,
+            'scene_${i}_$frame',
+            s.start + frame / 30,
+            overlay: true,
           );
+          sceneFrames.add(path);
+          completedFrames++;
           if (mounted) {
-            setState(
-              () => _progress =
-                  (i + frame / max(1, animated * 30)) / scenes.length * .35,
-            );
+            setState(() => _progress = completedFrames / totalFrames * .35);
           }
         }
         final overlay = await _capture(
@@ -1408,6 +1421,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           s.start + min(s.duration - .001, animated + .001),
           overlay: true,
         );
+        completedFrames++;
         overlays.add(overlay);
         frames.add(sceneFrames);
         transitions.add(transition);
@@ -1438,10 +1452,19 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         }
       }
       if (_cancelled) throw const FormatException('Export cancelled');
+      if (mounted) {
+        setState(() {
+          _exportPhase = ExportPhase.encoding;
+          _status = 'Encoding video…';
+          _progress = .35;
+          _exportPosition = 0;
+        });
+      }
       _subscription = _renderer.progress.listen((value) {
         if (mounted) {
           setState(() {
-            _status = 'Rendering MP4 on this device…';
+            _status = 'Encoding video…';
+            _exportPosition = FeedTimeline.duration(p) * value.clamp(0, 1);
             _progress = .35 + .65 * value;
           });
         }
@@ -1453,7 +1476,12 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         transitions: transitions,
         music: p.music,
       );
-      if (!mounted) return;
+      if (!mounted || _cancelled) return;
+      setState(() {
+        _exportPhase = ExportPhase.finishing;
+        _status = 'Export complete';
+        _progress = 1;
+      });
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),

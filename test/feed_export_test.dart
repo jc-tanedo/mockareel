@@ -112,6 +112,8 @@ void main() {
             checks['incoming texture exposed'] =
                 await alpha(frames[2][3] as String, 540, 800) == 0;
             checks['closing animated'] = (frames[3] as List).length == 35;
+            checks['typing samples reused'] = frames[0][0] == frames[0][1];
+            checks['home hold reused'] = frames[3][21] == frames[3][34];
             request = args;
           } catch (e) {
             captureError = e;
