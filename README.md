@@ -1,31 +1,32 @@
 # Mockareel Android preview
 
-[Download v0.12.0 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.12.0.apk)
+[Download v0.12.1 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.12.1.apk)
 
 Install over your current preview; signing certificate and application ID are unchanged.
 
-## v0.12.0 — export workspace
+## v0.12.1 — snappier app motion
+
+- Preview playback now follows display vsync instead of a 40 ms timer that limited UI motion to 25 updates per second. Pause, resume, restart and lifecycle handling remain supported.
+- App launch uses a 460 ms critically damped spring; close uses a separate 360 ms spring. Most travel happens early, with a short settling tail and a brief fade near the icon.
+- The app window preserves its contents' proportions, clips to rounded corners and returns to the selected launch tile. Home-screen artwork scales and dims subtly behind the window. The video player remains mounted across home/feed boundaries.
+- Shared motion and duration constants drive preview, the timeline and captured export UI. Export remains 1080×1920 at 30 fps. Repeated home holds still reuse their UI images.
+
+![Launch and close frame samples](window-motion-0.12.1.png)
+
+The image is a Flutter render of sampled animation positions, not a device frame-rate measurement or a native encoded-video capture.
+
+## Export workspace
 
 | Phone | Landscape |
 | --- | --- |
 | ![Export monitor](export-phone-0.12.0.png) | ![Landscape monitor](export-landscape-0.12.0.png) |
 
-- A charcoal/violet encoder-style export workspace for both templates: themed typography, scene preview, job details, Prepare/Encode/Finish stages, percentage, elapsed time and cancellation.
-- The scene preview follows preparation and reported encoding progress. Videos appear as stills; this is not a live view of the encoded frames. Preview players are released during export to avoid competing with the encoder.
-- Feed export reuses identical search-text states and home-screen holds. Every 30 fps sample remains in the scene plan; output stays 1080×1920. In the tested two-second hold examples, opening overlay captures drop from 78 to 18 unique PNGs and closing captures from 80 to 21. Loading dots and swipe animation remain fully sampled. Device speedup has not been benchmarked.
-- Home launch and app close keep the same feed video player mounted, extending the earlier media-to-media flicker fix. The opening video preloads paused, and the closing video pauses inside its last frame rather than replacing its texture.
-- Remove post and Undo from v0.11.1 remain available beside the post selector.
+The export workspace from v0.12.0 retains job stages, elapsed time, percentage, cancellation and a progress-driven scene preview. Video media appears as stills in the monitor. Duplicate search-text states and home holds share prepared PNGs without removing timeline samples.
 
-Source: `6f5842894527fd0242bb12b7965db530d556c31f` on `main` and `work`.
+Source: `ef63dc5b085284d5f1f17019aca0fa7676dfbd2c` on `main` and `work`.
 
-Validation: 60 Flutter tests, five Kotlin tests and five release-metadata tests; formatting/analysis clean; phone/landscape visual review. Tests cover player identity and play/pause through home transitions, repeated UI samples with Unicode text, actual export-frame alpha and shared paths, PNG exports, responsive monitor styling and cancellation control. APK signature, package/version, ZIP integrity, 16 KB alignment and credential-pattern checks passed. Physical-device playback, native encoding and device timing were not run for this update.
+Validation: 62 Flutter tests, five Kotlin tests and five release-metadata tests; formatting/analysis clean; visual review of launch/close samples. New tests cover monotonic spring motion, exact icon/screen endpoints across presets, quick opacity settling and preview progress on successive simulated 120 Hz ticks with pause/resume/restart. Existing tests verify player continuity and actual export-frame masks. APK signature, package/version, ZIP integrity, 16 KB alignment and credential-pattern checks passed. Physical-device smoothness and native encoding were not measured for this update.
 
-SHA-256: `345ad50a67259e780fc77c550b2de5ed8921614c79da20ae373dbc60f3179f7d`
+SHA-256: `b56eb684486923d5dd07da48457ec0f8ff9ecf338bc73511554bf4b574f68a7a`
 
-## Reference home screens
-
-| Classic iPhone | Google Pixel | Samsung One UI |
-| --- | --- | --- |
-| ![Classic iPhone](home-iphone-0.11.0.png) | ![Pixel](home-pixel-0.11.0.png) | ![One UI](home-oneUi-0.11.0.png) |
-
-The images are Flutter renders with original vector icons and wallpapers. Earlier versioned APKs and preview images remain available on this branch.
+Earlier versioned APKs and preview images remain available on this branch.
