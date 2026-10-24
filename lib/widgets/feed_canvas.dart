@@ -132,15 +132,15 @@ class FeedCanvas extends StatelessWidget {
         // Match the fourth app tile on the home screen.
         children.add(
           Positioned(
-            left: 275 * (1 - amount),
-            top: f.homeOs.iconTop * (1 - amount),
-            width: 50 + 310 * amount,
-            height: 50 + 590 * amount,
+            left: f.launchIcon.left * (1 - amount),
+            top: f.launchIcon.top * (1 - amount),
+            width: f.launchIcon.size + (360 - f.launchIcon.size) * amount,
+            height: f.launchIcon.size + (640 - f.launchIcon.size) * amount,
             child: Opacity(
               opacity: amount.clamp(0, 1),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(
-                  f.homeOs.iconRadius * (1 - amount),
+                  f.launchIcon.radius * (1 - amount),
                 ),
                 child: FittedBox(
                   fit: BoxFit.fill,

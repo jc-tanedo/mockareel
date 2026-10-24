@@ -99,6 +99,10 @@ void main() {
       p.feed.appIcons[0] = 9;
       p.feed.showWidget = false;
       p.feed.homeOs = HomeOs.pixel;
+      p.feed.homeApps[0].label = 'Work';
+      p.feed.homeDock[2].glyph = HomeGlyph.tiktok;
+      p.feed.moveLaunch(0);
+      p.feed.weatherTemperature = '28°';
       p.feed.showIcons = false;
       p.feed.showClock = false;
       p.clips[1].post.verified = true;
@@ -122,6 +126,10 @@ void main() {
       expect(restored.feed.appIcons.first, 9);
       expect(restored.feed.showWidget, false);
       expect(restored.feed.homeOs, HomeOs.pixel);
+      expect(restored.feed.homeApps[4].label, 'Work');
+      expect(restored.feed.homeDock[2].glyph, HomeGlyph.tiktok);
+      expect(restored.feed.launchSlot, 0);
+      expect(restored.feed.weatherTemperature, '28°');
       expect(restored.feed.showIcons, false);
       expect(restored.feed.showClock, false);
       expect(restored.clips[1].post.verified, true);

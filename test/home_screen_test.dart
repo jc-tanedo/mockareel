@@ -77,8 +77,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('home-app-3')), findsNothing);
         expect(find.byKey(const ValueKey('home-dock')), findsNothing);
-        expect(find.text(p.feed.widgetTitle), findsOneWidget);
-        expect(find.text(p.feed.time), findsWidgets);
+        expect(
+          find.text(p.feed.widgetTitle),
+          os == HomeOs.android ? findsOneWidget : findsNothing,
+        );
+        expect(find.textContaining(p.feed.time), findsWidgets);
         p.feed.showIcons = true;
       }
       await tester.pumpWidget(const SizedBox());

@@ -1,3 +1,4 @@
+import '../widgets/home_apps_editor.dart';
 import '../widgets/project_name_dialog.dart';
 import '../model/feed_timeline.dart';
 import '../pages/exported_video_page.dart';
@@ -414,15 +415,20 @@ class _FeedEditorPageState extends State<FeedEditorPage>
               _change();
             },
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Show home clock & date'),
-            value: p.feed.showClock,
-            onChanged: (v) {
-              p.feed.showClock = v;
-              _change();
-            },
-          ),
+          if (p.feed.homeOs == HomeOs.android || p.feed.homeOs == HomeOs.pixel)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                p.feed.homeOs == HomeOs.pixel
+                    ? 'Show date'
+                    : 'Show home clock & date',
+              ),
+              value: p.feed.showClock,
+              onChanged: (v) {
+                p.feed.showClock = v;
+                _change();
+              },
+            ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Show home status bar'),
@@ -432,15 +438,20 @@ class _FeedEditorPageState extends State<FeedEditorPage>
               _change();
             },
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Show home widget'),
-            value: p.feed.showWidget,
-            onChanged: (v) {
-              p.feed.showWidget = v;
-              _change();
-            },
-          ),
+          if (p.feed.homeOs != HomeOs.iphone)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                p.feed.homeOs == HomeOs.pixel
+                    ? 'Show weather'
+                    : 'Show home widgets',
+              ),
+              value: p.feed.showWidget,
+              onChanged: (v) {
+                p.feed.showWidget = v;
+                _change();
+              },
+            ),
           _field(
             'Status bar time',
             p.feed.time,
@@ -448,18 +459,74 @@ class _FeedEditorPageState extends State<FeedEditorPage>
             max: 8,
           ),
           _field('Date', p.feed.date, (v) => p.feed.date = v, max: 50),
-          _field(
-            'Widget title',
-            p.feed.widgetTitle,
-            (v) => p.feed.widgetTitle = v,
-            max: 70,
-          ),
-          _field(
-            'Widget note',
-            p.feed.widgetText,
-            (v) => p.feed.widgetText = v,
-            max: 80,
-          ),
+          if (p.feed.homeOs == HomeOs.iphone) ...[
+            DropdownButtonFormField<String>(
+              initialValue: p.feed.iphonePeriod,
+              decoration: const InputDecoration(
+                labelText: 'Status bar time period',
+              ),
+              items: const [
+                DropdownMenuItem(value: 'AM', child: Text('AM')),
+                DropdownMenuItem(value: 'PM', child: Text('PM')),
+                DropdownMenuItem(value: '', child: Text('24-hour / no suffix')),
+              ],
+              onChanged: (v) {
+                if (v != null) {
+                  p.feed.iphonePeriod = v;
+                  _change();
+                }
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Classic iOS uses a full app grid and the status-bar clock, with no large clock or dashboard widgets.',
+                style: TextStyle(fontSize: 11, color: Colors.white54),
+              ),
+            ),
+          ],
+          if (p.feed.homeOs == HomeOs.pixel || p.feed.homeOs == HomeOs.oneUi)
+            _field(
+              'Weather temperature',
+              p.feed.weatherTemperature,
+              (v) => p.feed.weatherTemperature = v,
+              max: 8,
+            ),
+          if (p.feed.homeOs == HomeOs.oneUi) ...[
+            _field(
+              'Weather location',
+              p.feed.weatherLocation,
+              (v) => p.feed.weatherLocation = v,
+              max: 40,
+            ),
+            _field(
+              'Briefing pill',
+              p.feed.briefTitle,
+              (v) => p.feed.briefTitle = v,
+              max: 30,
+            ),
+            _field(
+              'Health pill',
+              p.feed.healthTitle,
+              (v) => p.feed.healthTitle = v,
+              max: 30,
+            ),
+          ],
+
+          if (p.feed.homeOs == HomeOs.android)
+            _field(
+              'Widget title',
+              p.feed.widgetTitle,
+              (v) => p.feed.widgetTitle = v,
+              max: 70,
+            ),
+          if (p.feed.homeOs == HomeOs.android)
+            _field(
+              'Widget note',
+              p.feed.widgetText,
+              (v) => p.feed.widgetText = v,
+              max: 80,
+            ),
           _slider(
             'Home screen hold',
             p.feed.homeSeconds,
@@ -510,68 +577,77 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                 icon: const Icon(Icons.close),
               ),
             ),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: const Text('App labels'),
-            subtitle: const Text(
-              'Eight generic tiles; the fourth opens the feed.',
-            ),
-            children: [
-              for (var i = 0; i < 8; i++)
-                _field(
-                  'App ${i + 1}',
-                  i < p.feed.appLabels.length ? p.feed.appLabels[i] : 'App',
-                  (v) {
-                    while (p.feed.appLabels.length < 8) {
-                      p.feed.appLabels.add('App');
-                    }
-                    p.feed.appLabels[i] = v;
-                  },
-                  max: 16,
-                ),
-              for (var i = 0; i < 8; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DropdownButtonFormField<int>(
-                    key: ValueKey('app-icon-$i'),
-                    initialValue: i < p.feed.appIcons.length
-                        ? p.feed.appIcons[i]
-                        : i,
-                    decoration: InputDecoration(labelText: 'App ${i + 1} icon'),
-                    items: [
-                      for (var n = 0; n < 12; n++)
-                        DropdownMenuItem(
-                          value: n,
-                          child: Text(
-                            const [
-                              'Photos',
-                              'Camera',
-                              'Notes',
-                              'Music note',
-                              'Weather',
-                              'Sound',
-                              'Messages',
-                              'Settings',
-                              'Map',
-                              'Mail',
-                              'Clock',
-                              'Video',
-                            ][n],
-                          ),
-                        ),
-                    ],
-                    onChanged: (n) {
-                      if (n == null) return;
-                      while (p.feed.appIcons.length < 8) {
-                        p.feed.appIcons.add(p.feed.appIcons.length);
+          if (p.feed.homeOs != HomeOs.android)
+            HomeAppsEditor(
+              key: ValueKey(p.feed.homeOs),
+              settings: p.feed,
+              onChanged: _change,
+            )
+          else
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('App labels'),
+              subtitle: const Text(
+                'Eight generic tiles; the fourth opens the feed.',
+              ),
+              children: [
+                for (var i = 0; i < 8; i++)
+                  _field(
+                    'App ${i + 1}',
+                    i < p.feed.appLabels.length ? p.feed.appLabels[i] : 'App',
+                    (v) {
+                      while (p.feed.appLabels.length < 8) {
+                        p.feed.appLabels.add('App');
                       }
-                      p.feed.appIcons[i] = n;
-                      _change();
+                      p.feed.appLabels[i] = v;
                     },
+                    max: 16,
                   ),
-                ),
-            ],
-          ),
+                for (var i = 0; i < 8; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<int>(
+                      key: ValueKey('app-icon-$i'),
+                      initialValue: i < p.feed.appIcons.length
+                          ? p.feed.appIcons[i]
+                          : i,
+                      decoration: InputDecoration(
+                        labelText: 'App ${i + 1} icon',
+                      ),
+                      items: [
+                        for (var n = 0; n < 12; n++)
+                          DropdownMenuItem(
+                            value: n,
+                            child: Text(
+                              const [
+                                'Photos',
+                                'Camera',
+                                'Notes',
+                                'Music note',
+                                'Weather',
+                                'Sound',
+                                'Messages',
+                                'Settings',
+                                'Map',
+                                'Mail',
+                                'Clock',
+                                'Video',
+                              ][n],
+                            ),
+                          ),
+                      ],
+                      onChanged: (n) {
+                        if (n == null) return;
+                        while (p.feed.appIcons.length < 8) {
+                          p.feed.appIcons.add(p.feed.appIcons.length);
+                        }
+                        p.feed.appIcons[i] = n;
+                        _change();
+                      },
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     ],

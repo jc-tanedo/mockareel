@@ -56,4 +56,4 @@ The README is now a concise project overview with branding, build/license/platfo
 
 The change is verified with Dart formatting and analysis, 51 Flutter model/widget/export-surface tests, five native motion tests, five release-metadata tests, workflow linting, Markdown link checks and an Android APK build. New regression tests cover malicious archives and tablet keyboard focus. The keyboard regression failed against the previous layout and passes after the fix. None of these checks substitutes for physical-device codec testing.
 
-Home-screen visual refinements are awaiting the owner's reference examples; this review does not claim the existing presets exactly match their respective operating systems.
+At the time of this review, home-screen visual refinements were awaiting the owner's reference examples. Subsequent home-screen updates are separate from this audit.
