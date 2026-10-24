@@ -1,3 +1,9 @@
+# Experimental Maps lookup test
+
+[Download Mockareel Maps POC 1](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-maps-webview-poc-1.apk) — separate app, no API key for place search. [Instructions, screenshots and limitations](maps-webview-poc-1.md).
+
+---
+
 # Mockareel Android preview
 
 [Download v0.12.1 APK](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-0.12.1.apk)
