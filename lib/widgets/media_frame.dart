@@ -26,8 +26,9 @@ class _MediaFrameState extends State<MediaFrame> {
   String? _error;
   int _generation = 0;
   String _loadedStamp = '';
+  bool _syncing = false, _syncAgain = false, _forceSync = false;
   String get _gifStamp =>
-      '${widget.clip.path}:${widget.clip.trimStart}:${widget.clip.duration}:${widget.clip.loopGif}';
+      '${widget.clip.path}:${widget.clip.isGif}:${widget.clip.trimStart}:${widget.clip.duration}:${widget.clip.loopGif}';
   @override
   void initState() {
     super.initState();
@@ -44,7 +45,7 @@ class _MediaFrameState extends State<MediaFrame> {
     if (!widget.clip.isTimed) return;
     VideoPlayerController? controller;
     try {
-      if (widget.clip.isGif) {
+      if (widget.clip.isGif && generation > 1) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         if (!mounted || generation != _generation) return;
       }
@@ -78,21 +79,76 @@ class _MediaFrameState extends State<MediaFrame> {
   }
 
   Future<void> _sync({bool force = false}) async {
-    final controller = _video;
-    if (controller == null || !controller.value.isInitialized) return;
-    final target =
-        (widget.clip.isGif ? 0 : widget.clip.trimStart) +
-        widget.position.clamp(0, widget.clip.duration - .001);
-    if (force ||
-        !widget.playing ||
-        (controller.value.position.inMilliseconds / 1000 - target).abs() > .4) {
-      await controller.seekTo(Duration(milliseconds: (target * 1000).round()));
-    }
-    if (!mounted || controller != _video) return;
-    if (widget.playing && !controller.value.isPlaying) {
-      await controller.play();
-    } else if (!widget.playing && controller.value.isPlaying) {
-      await controller.pause();
+    _forceSync = _forceSync || force;
+    _syncAgain = true;
+    if (_syncing) return;
+    _syncing = true;
+    VideoPlayerController? active;
+    try {
+      do {
+        _syncAgain = false;
+        final controller = _video;
+        active = controller;
+        if (!mounted || controller == null || !controller.value.isInitialized) {
+          break;
+        }
+        final generation = _generation;
+        final forced = _forceSync;
+        _forceSync = false;
+        final clip = widget.clip;
+        final play = widget.playing && widget.position < clip.duration;
+        final last = clip.isGif
+            ? ((clip.duration * 30).ceil() - 1) / 30
+            : clip.duration - .001;
+        final target =
+            (clip.isGif ? 0 : clip.trimStart) +
+            widget.position.clamp(0, last.clamp(0, clip.duration));
+        // Seek at/before the last encoded GIF sample, not after it through
+        // millisecond rounding. Compare in the same units as the native player.
+        final desired = Duration(
+          milliseconds: clip.isGif
+              ? (target * 1000).floor()
+              : (target * 1000).round(),
+        );
+        bool current() =>
+            mounted && controller == _video && generation == _generation;
+        // Pause before seeking a held frame. Serialize all operations so a late
+        // play/seek cannot overtake the timeline's final pause.
+        if (!play && (controller.value.isPlaying || forced)) {
+          await controller.pause();
+        }
+        if (!current()) {
+          _syncAgain = mounted;
+          continue;
+        }
+        final delta =
+            (controller.value.position.inMilliseconds - desired.inMilliseconds)
+                .abs() /
+            1000;
+        final seek = forced || delta > (play ? .4 : .0005);
+        if (seek) {
+          await controller.seekTo(desired);
+        }
+        if (!current()) {
+          _syncAgain = mounted;
+          continue;
+        }
+        if (_syncAgain) continue;
+        if (play && !controller.value.isPlaying) {
+          await controller.play();
+        } else if (!play && (controller.value.isPlaying || seek || forced)) {
+          await controller.pause();
+        }
+      } while (_syncAgain && mounted);
+    } catch (_) {
+      if (mounted && active == _video) {
+        setState(
+          () => _error =
+              'Preview playback could not update. Try restarting the preview.',
+        );
+      }
+    } finally {
+      _syncing = false;
     }
   }
 

@@ -1,7 +1,7 @@
 name: mockareel
 description: Create mock app reels from your photos and videos.
 publish_to: 'none'
-version: 0.13.0-maps-poc.4+20
+version: 0.13.0-maps-poc.5+21
 
 environment:
   sdk: '>=3.10.0 <4.0.0'

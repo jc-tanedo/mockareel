@@ -124,4 +124,54 @@ void main() {
       });
     },
   );
+  testWidgets(
+    'a GIF discovered after first render replaces uncontrolled image playback',
+    (tester) async {
+      await tester.runAsync(() async {
+        final previous = VideoPlayerPlatform.instance;
+        final platform = GifPreviewPlatform();
+        VideoPlayerPlatform.instance = platform;
+        final clip = ReelClip(
+          id: 'legacy',
+          path: 'missing.gif',
+          name: 'GIF',
+          isVideo: false,
+          duration: 1,
+        );
+        Future<String> prepare(ReelClip _) async => 'prepared.mp4';
+        Future<void> show() async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: MediaFrame(clip: clip, gifVideoBuilder: prepare),
+            ),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 350));
+          await tester.pump();
+          await tester.pump();
+        }
+
+        try {
+          await show();
+          expect(find.byType(VideoPlayer), findsNothing);
+          clip.isGif = true;
+          clip.sourceDuration = 1;
+          clip.normalize();
+          await show();
+          expect(find.byType(VideoPlayer), findsOneWidget);
+          expect(
+            tester
+                .widget<VideoPlayer>(find.byType(VideoPlayer))
+                .controller
+                .value
+                .isPlaying,
+            isFalse,
+          );
+        } finally {
+          await tester.pumpWidget(const SizedBox());
+          await Future<void>.delayed(Duration.zero);
+          VideoPlayerPlatform.instance = previous;
+        }
+      });
+    },
+  );
 }

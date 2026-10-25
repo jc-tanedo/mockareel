@@ -55,3 +55,5 @@ Projects autosave, including when leaving the app. The library opens and creates
 During feed export, repeated search-text states and home-screen holds share their prepared images. Loading animations and swipes retain their full 30 fps samples; output remains 1080×1920. The amount of time saved depends on the scene durations and the device encoder.
 
 GIFs animate in preview and export. In **Timing**, choose duration, start offset and **Loop GIF**. Looping is on by default to fill the clip; turn it off to select a single source segment. Existing GIF photos are detected automatically, even with a misleading filename extension. Originals, timing and loop choices remain in project storage and backups. [GIF timing and caching](gifs.md).
+
+The Maps live preview preloads the next card and holds outgoing media on its last frame during a slide. At the end of the reel, playback stays paused on the final frame; use Restart or Play to begin again.
