@@ -270,7 +270,9 @@ void main() {
           null,
         ),
       );
-      await NativeRenderer().export(p, ['0.png', '1.png', '2.png']);
+      await tester.runAsync(() async {
+        await NativeRenderer().export(p, ['0.png', '1.png', '2.png']);
+      });
       expect(parameters!['backgroundColor'], 0xff202124);
       expect(parameters!['progressColor'], 0xff8ab4f8);
       await tester.pumpWidget(const SizedBox());

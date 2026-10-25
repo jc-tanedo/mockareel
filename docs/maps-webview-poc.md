@@ -29,7 +29,7 @@ The header uses a visible, hybrid-composited Android WebView with a fixed 1000×
 
 Android `PixelCopy` copies just this viewport from the window, including GPU map layers. The Flutter framing page brings it fully into view, locks interaction for capture, and sends bounded physical-pixel coordinates to a Flutter-only method channel. PNG encoding runs off the UI thread; there is no JavaScript-to-native capture bridge. This path requires Android 8/API 26 or newer. The map URL is retained in the place model so reloading opens the same listing. Older projects fall back to their place name/address or exact coordinates.
 
-The story header keeps the map location centered during its opening animation and retains the original bottom branding/attribution pixels as a footer. The saved PNG remains unchanged. Browser framing zoom/pan are captured in this image; re-opening the framing screen returns to the original listing rather than restoring the previous pan. The numeric map-zoom slider applies to optional API headers only.
+The story header reveals a single continuous map behind the moving place sheet, aligned to the bottom so original branding and attribution remain visible. The framing screen outlines the lower area that remains visible after the intro; keep the place inside it. The guide is hidden before capture. Existing headers can be reframed if their marker lies outside that final area. The saved PNG remains unchanged. Browser framing zoom/pan are captured in this image; re-opening the framing screen returns to the original listing rather than restoring the previous pan. The numeric map-zoom slider applies to optional API headers only.
 
 Physical Android capture still needs device verification; browser rendering and native compilation do not validate `PixelCopy` on a phone. Upload/API alternatives remain available if a device cannot capture the map.
 
@@ -40,3 +40,5 @@ Physical Android capture still needs device verification; browser rendering and 
 The exact JS asset can be evaluated by Playwright for a live search → result → details check. Browser research artifacts stay outside the repository; no downloaded Google HTML, Google frontend keys, real review fixtures or private shared coordinates are committed.
 
 Build the branch with `bash tool/build_android.sh`, or the pinned Actions debug workflow. The branch-specific package verifier expects the separate POC application ID. All builds and Flutter/native tests run sequentially because generated plugin registration is shared.
+
+GIF photo clips are converted to a temporary PNG first frame for native video export; originals and project paths stay unchanged. GIF animation is not yet exported. Both Maps and FYP exports use this compatibility path, and temporary images are removed on success, failure or cancellation.

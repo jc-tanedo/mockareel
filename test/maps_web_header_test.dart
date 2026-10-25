@@ -156,34 +156,33 @@ void main() {
     },
   );
 
-  testWidgets(
-    'collapsed map keeps its centered location and original attribution footer',
-    (tester) async {
-      await tester.runAsync(() async {
-        final recorder = ui.PictureRecorder();
-        final canvas = Canvas(recorder);
-        canvas.drawRect(
-          const Rect.fromLTWH(0, 0, 1000, 625),
-          Paint()..color = const Color(0xff0000ff),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(0, 160, 1000, 320),
-          Paint()..color = const Color(0xffff0000),
-        );
-        canvas.drawRect(
-          const Rect.fromLTWH(0, 560, 1000, 65),
-          Paint()..color = const Color(0xff00ff00),
-        );
-        final image = await recorder.endRecording().toImage(1000, 625);
-        final png = await image.toByteData(format: ui.ImageByteFormat.png);
-        final dir = await Directory.systemTemp.createTemp(
-          'maps-header-fixture-',
-        );
-        final file = File('${dir.path}/map.png');
-        await file.writeAsBytes(png!.buffer.asUint8List());
-        addTearDown(() => dir.delete(recursive: true));
-        image.dispose();
-        final boundaryKey = GlobalKey();
+  testWidgets('map stays continuous above its footer throughout the intro', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 0, 1000, 625),
+        Paint()..color = const Color(0xff0000ff),
+      );
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 160, 1000, 320),
+        Paint()..color = const Color(0xffff0000),
+      );
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 560, 1000, 65),
+        Paint()..color = const Color(0xff00ff00),
+      );
+      final image = await recorder.endRecording().toImage(1000, 625);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      final dir = await Directory.systemTemp.createTemp('maps-header-fixture-');
+      final file = File('${dir.path}/map.png');
+      await file.writeAsBytes(png!.buffer.asUint8List());
+      addTearDown(() => dir.delete(recursive: true));
+      image.dispose();
+      final boundaryKey = GlobalKey();
+      for (final height in [94, 140, 224]) {
         await tester.pumpWidget(
           MaterialApp(
             home: Center(
@@ -191,7 +190,7 @@ void main() {
                 key: boundaryKey,
                 child: SizedBox(
                   width: 360,
-                  height: 94,
+                  height: height.toDouble(),
                   child: BrowserMapHeaderImage(path: file.path),
                 ),
               ),
@@ -209,17 +208,18 @@ void main() {
                 .toImage();
         final pixels = (await snapshot.toByteData())!.buffer.asUint8List();
         expect(
-          pixels[(10 * 360 + 180) * 4],
+          pixels[((height - 30) * 360 + 180) * 4 + 2],
           255,
-          reason: 'Location stays visible in the collapsed header',
+          reason:
+              'The map immediately above attribution must not jump to another part of the image at height $height',
         );
         expect(
-          pixels[(90 * 360 + 180) * 4 + 1],
+          pixels[((height - 4) * 360 + 180) * 4 + 1],
           255,
-          reason: 'Original footer stays visible',
+          reason: 'Original footer stays visible at height $height',
         );
         snapshot.dispose();
-      });
-    },
-  );
+      }
+    });
+  });
 }

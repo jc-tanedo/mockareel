@@ -53,3 +53,5 @@ The editor follows five suggested steps: **Place → Timeline → Text (optional
 Projects autosave, including when leaving the app. The library opens and creates projects. Portable `.mockareel` backups include originals, timings, framing, captions, header selection, music, text layers, map image, opening animation, featured review and output theme; they can be imported on another device. Older projects open with default framing.
 
 During feed export, repeated search-text states and home-screen holds share their prepared images. Loading animations and swipes retain their full 30 fps samples; output remains 1080×1920. The amount of time saved depends on the scene durations and the device encoder.
+
+GIFs added as photos export as a still first frame. Their original files remain in project storage and backups. Use an MP4 clip for animated media in the exported video.

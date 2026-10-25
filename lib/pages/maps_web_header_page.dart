@@ -157,26 +157,53 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     aspectRatio: 1000 / 625,
     child: ClipRect(
       key: _frame,
-      child: _controller == null && widget.browserOverride == null
-          ? const ColoredBox(color: ink)
-          : IgnorePointer(
-              ignoring: _busy,
-              child: FittedBox(
-                fit: BoxFit.fill,
-                child: SizedBox(
-                  width: 1000,
-                  height: 625,
-                  child:
-                      widget.browserOverride ??
-                      WebViewWidget.fromPlatformCreationParams(
-                        params: AndroidWebViewWidgetCreationParams(
-                          controller: _controller!.platform,
-                          displayWithHybridComposition: true,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _controller == null && widget.browserOverride == null
+              ? const ColoredBox(color: ink)
+              : IgnorePointer(
+                  ignoring: _busy,
+                  child: FittedBox(
+                    fit: BoxFit.fill,
+                    child: SizedBox(
+                      width: 1000,
+                      height: 625,
+                      child:
+                          widget.browserOverride ??
+                          WebViewWidget.fromPlatformCreationParams(
+                            params: AndroidWebViewWidgetCreationParams(
+                              controller: _controller!.platform,
+                              displayWithHybridComposition: true,
+                            ),
+                          ),
+                    ),
+                  ),
+                ),
+          if (!_busy)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: null,
+              child: IgnorePointer(
+                child: AspectRatio(
+                  aspectRatio: 360 / 94,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: mint.withValues(alpha: .8),
+                          width: 1.5,
                         ),
                       ),
+                    ),
+                  ),
                 ),
               ),
             ),
+        ],
+      ),
     ),
   );
 
@@ -210,7 +237,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
       ),
     const SizedBox(height: 12),
     const Text(
-      'The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.',
+      'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.',
       style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
     ),
   ];
