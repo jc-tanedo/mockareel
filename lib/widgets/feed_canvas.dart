@@ -44,12 +44,15 @@ class FeedCanvas extends StatelessWidget {
     double elapsed, {
     AppWindowFrame? window,
     bool home = false,
+    bool hold = false,
+    double? top,
   }) {
     return Positioned(
       key: ValueKey('post-${c.id}'),
       left: window?.left ?? 0,
       top:
           window?.top ??
+          top ??
           FeedTimeline.entry(project, project.clips.indexOf(c), elapsed),
       width: window?.width ?? 360,
       height: window?.height ?? 640,
@@ -66,7 +69,11 @@ class FeedCanvas extends StatelessWidget {
                 children: [
                   if (!overlayOnly || home)
                     Positioned.fill(
-                      child: _media(c, elapsed, play: playing && !home),
+                      child: _media(
+                        c,
+                        elapsed,
+                        play: playing && !home && !hold,
+                      ),
                     ),
                   Positioned.fill(child: FeedPostSurface(post: c.post)),
                   if (home)
@@ -103,27 +110,38 @@ class FeedCanvas extends StatelessWidget {
       }
       if (i > 0 && entry > 0) {
         final prev = project.clips[i - 1];
-        children.add(
-          Positioned(
-            key: ValueKey('outgoing-${prev.id}'),
-            left: 0,
-            top: entry - 640,
-            width: 360,
-            height: 640,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _media(prev, prev.duration, still: true),
-                ),
-                Positioned.fill(child: FeedPostSurface(post: prev.post)),
-              ],
+        if (!overlayOnly && !posterOnly) {
+          children.add(
+            _postLayer(prev, prev.duration, top: entry - 640, hold: true),
+          );
+        } else {
+          children.add(
+            Positioned(
+              key: ValueKey('outgoing-${prev.id}'),
+              left: 0,
+              top: entry - 640,
+              width: 360,
+              height: 640,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _media(prev, prev.duration, still: true),
+                  ),
+                  Positioned.fill(child: FeedPostSurface(post: prev.post)),
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
       if (project.clips.isNotEmpty) {
         final c = project.clips[i];
         children.add(_postLayer(c, elapsed));
+        if (!overlayOnly && !posterOnly && i + 1 < project.clips.length) {
+          children.add(
+            _postLayer(project.clips[i + 1], 0, top: 640, hold: true),
+          );
+        }
       } else {
         children.add(
           const Center(

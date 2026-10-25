@@ -56,4 +56,4 @@ During feed export, repeated search-text states and home-screen holds share thei
 
 GIFs animate in preview and export. In **Timing**, choose duration, start offset and **Loop GIF**. Looping is on by default to fill the clip; turn it off to select a single source segment. Existing GIF photos are detected automatically, even with a misleading filename extension. Originals, timing and loop choices remain in project storage and backups. [GIF timing and caching](gifs.md).
 
-The Maps live preview preloads the next card and holds outgoing media on its last frame during a slide. At the end of the reel, playback stays paused on the final frame; use Restart or Play to begin again.
+The Maps and FYP live previews preload the next card and hold outgoing media on its last frame during a slide. At the end of the reel, playback stays paused on the final frame; use Restart or Play to begin again.
