@@ -1,3 +1,4 @@
+import 'gif_media.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
@@ -53,11 +54,11 @@ class ProjectStore {
     await for (final entry in Directory('${root!.path}/projects').list()) {
       if (entry is! File || !entry.path.endsWith('.json')) continue;
       try {
-        results.add(
-          ReelProject.fromJson(
-            jsonDecode(await entry.readAsString()) as Map<String, dynamic>,
-          ),
+        final project = ReelProject.fromJson(
+          jsonDecode(await entry.readAsString()) as Map<String, dynamic>,
         );
+        await GifMedia.hydrateProject(project);
+        results.add(project);
       } on FormatException {
         /* Keep other projects accessible if one file is damaged. */
       } on TypeError {
@@ -105,6 +106,7 @@ class ProjectStore {
             ),
           );
         }
+        await GifMedia.hydrateProject(p);
         await save(p);
         return p;
       } on FormatException {
@@ -225,6 +227,7 @@ class ProjectStore {
           home['path'] = await restoreExtra(home['path'] as String);
         }
         final p = ReelProject.fromJson(json);
+        await GifMedia.hydrateProject(p);
         await save(p);
         return p;
       } catch (_) {

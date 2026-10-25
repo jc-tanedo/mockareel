@@ -156,15 +156,38 @@ void main() {
     for (var i = 1; i < p.clips.length; i++) {
       final start = FeedTimeline.postStart(p, i);
       final duration = FeedTimeline.transition(p, i);
+      await show(start - .1);
+      final preloaded = tester
+          .widget<VideoPlayer>(
+            find.descendant(
+              of: find.byKey(ValueKey('post-${p.clips[i].id}')),
+              matching: find.byType(VideoPlayer),
+            ),
+          )
+          .controller;
+      expect(preloaded.value.isPlaying, isFalse);
       await show(start + duration / 2);
       final controller = tester
-          .widget<VideoPlayer>(find.byType(VideoPlayer))
+          .widget<VideoPlayer>(
+            find.descendant(
+              of: find.byKey(ValueKey('post-${p.clips[i].id}')),
+              matching: find.byType(VideoPlayer),
+            ),
+          )
           .controller;
+      expect(controller, same(preloaded));
       final count = platform.created;
       await show(start + duration + .01);
       expect(platform.created, count, reason: 'No decoder restart after swipe');
       expect(
-        tester.widget<VideoPlayer>(find.byType(VideoPlayer)).controller,
+        tester
+            .widget<VideoPlayer>(
+              find.descendant(
+                of: find.byKey(ValueKey('post-${p.clips[i].id}')),
+                matching: find.byType(VideoPlayer),
+              ),
+            )
+            .controller,
         same(controller),
       );
       expect(controller.value.isPlaying, isTrue);

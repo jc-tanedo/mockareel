@@ -55,7 +55,6 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
           MOCKAREEL_REQUIRE_RELEASE_SIGNING: 'true'
         run: |
           umask 077
@@ -63,6 +62,15 @@ jobs:
           trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           bash tool/ci/build_apk.sh release
+      - name: Scan release APK for credentials
+        run: python3 tool/ci/scan_apk_secrets.py build/app/outputs/flutter-apk/app-release.apk
+      - name: Stage release notes
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [[ -f "docs/releases/$RELEASE_TAG.md" ]]; then
+            cp "docs/releases/$RELEASE_TAG.md" dist/release-notes.md
+          fi
       - name: Remove signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/mockareel-release.jks"
@@ -98,9 +106,13 @@ jobs:
             echo "::error::Release $RELEASE_TAG already exists; publish a new version tag."
             exit 1
           fi
-          printf 'Android release built from `%s`.\n\nDownload the APK below. Verify it with the accompanying SHA-256 file.\n' "$RELEASE_COMMIT" > "$RUNNER_TEMP/release-notes.md"
+          if [[ -f dist/release-notes.md ]]; then
+            cp dist/release-notes.md "$RUNNER_TEMP/release-notes.md"
+          else
+            printf 'Android release built from `%s`.\n\nDownload the APK below. Verify it with the accompanying SHA-256 file.\n' "$RELEASE_COMMIT" > "$RUNNER_TEMP/release-notes.md"
+          fi
           args=(--repo "$GH_REPO" --verify-tag --title "Mockareel $RELEASE_VERSION" --generate-notes --notes-file "$RUNNER_TEMP/release-notes.md")
           if [[ "$RELEASE_PRERELEASE" == true ]]; then
             args+=(--prerelease)
           fi
-          gh release create "$RELEASE_TAG" dist/* "${args[@]}"
+          gh release create "$RELEASE_TAG" dist/*.apk dist/*.apk.sha256 "${args[@]}"

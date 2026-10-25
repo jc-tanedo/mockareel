@@ -1,3 +1,7 @@
+import '../services/gif_media.dart';
+import 'maps_web_search_page.dart';
+import 'maps_web_header_page.dart';
+import '../model/maps_web_result.dart';
 import '../widgets/export_monitor.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/project_name_dialog.dart';
@@ -29,7 +33,6 @@ import '../widgets/text_editor.dart';
 import '../widgets/audio_editor.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/place_search_dialog.dart';
 import 'exported_video_page.dart';
 
 class MapsEditorPage extends StatefulWidget {
@@ -62,6 +65,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   ExportPhase _exportPhase = ExportPhase.preparing;
   double _exportPosition = 0;
   String _exportFormat = 'H.264 · 1080 × 1920 · 30 fps';
+  bool _useApiHeaders = false;
   String _key = '', _status = '', _previewRevision = 'initial';
   String? _captureHeroPath;
   bool _captureSnapshot = false;
@@ -101,6 +105,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       _key = prefs.getString('mapsApiKey') ?? _buildKey;
+      _useApiHeaders = prefs.getBool('mapsUseApiHeaders') ?? false;
       _setProject(project);
       setState(() => _ready = true);
     } catch (e) {
@@ -181,11 +186,14 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     final service = StaticMapService();
     File? file;
     try {
-      final bytes = await service.load(
-        _project.place,
-        _key,
-        zoom: _project.mapZoom,
-      );
+      final bytes = _useApiHeaders && _key.isNotEmpty
+          ? await service.load(place, _key, zoom: _project.mapZoom)
+          : await Navigator.of(context).push<Uint8List>(
+              MaterialPageRoute(
+                builder: (_) => MapsWebHeaderPage(place: place),
+              ),
+            );
+      if (bytes == null) return;
       file = File('${_store.root!.path}/media/map_${newId()}.png');
       await file.writeAsBytes(bytes, flush: true);
       await _precache(file.path);
@@ -194,7 +202,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         return;
       }
       _project.mapHeaderPath = file.path;
-      _project.mapSource = 'google';
+      _project.mapSource = _useApiHeaders && _key.isNotEmpty
+          ? 'google'
+          : 'browser';
       _project.headerMode = 'map';
       _previewRevision = newId();
       _change();
@@ -296,6 +306,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             sourceDuration: length,
             duration: video ? min(3.5, length) : 3.5,
           );
+          await GifMedia.hydrate(clip);
           if (!mounted) return;
           _project.clips.add(clip);
           _selected = _project.clips.length - 1;
@@ -310,7 +321,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       }
       if (failures > 0) {
         _toast(
-          '$failures files could not be opened. Try JPG/PNG images or MP4 video.',
+          '$failures files could not be opened. Try JPG/PNG/GIF images or MP4 video.',
         );
       }
     } catch (e) {
@@ -321,31 +332,41 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<void> _settings() async {
-    final value = await showDialog<String>(
+    final value = await showDialog<MapsAdvancedSettings>(
       context: context,
-      builder: (_) => MapsKeyDialog(initialValue: _key),
+      builder: (_) =>
+          MapsKeyDialog(initialValue: _key, useApiHeaders: _useApiHeaders),
     );
     if (value != null) {
-      await (await SharedPreferences.getInstance()).setString(
-        'mapsApiKey',
-        value,
-      );
-      if (mounted) setState(() => _key = value);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('mapsApiKey', value.key);
+      await prefs.setBool('mapsUseApiHeaders', value.useApiHeaders);
+      if (mounted) {
+        setState(() {
+          _key = value.key;
+          _useApiHeaders = value.useApiHeaders;
+        });
+      }
     }
   }
 
   Future<void> _findPlace() async {
-    if (_key.isEmpty) {
-      await _settings();
-      if (_key.isEmpty || !mounted) return;
-    }
-    final place = await showDialog<PlaceDetails>(
-      context: context,
-      builder: (_) => PlaceSearchDialog(apiKey: _key, initial: _name.text),
+    final imported = await Navigator.of(context).push<MapsWebImport>(
+      MaterialPageRoute(
+        builder: (_) => MapsWebSearchPage(
+          initial: _name.text,
+          requestApiKey: () async {
+            if (_key.isEmpty) await _settings();
+            return _key.isEmpty ? null : _key;
+          },
+        ),
+      ),
     );
-    if (place == null || !mounted) return;
+    if (imported == null || !mounted) return;
+    final place = imported.place;
     setState(() {
       _project.place = place;
+      _project.review = imported.review ?? FeaturedReview(enabled: false);
       _project.mapHeaderPath = null;
       _name.text = place.name;
       _category.text = place.category;
@@ -358,7 +379,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (_project.title == 'Untitled reel') _project.title = place.name;
     });
     _change();
-    if (_project.headerMode == 'map') await _loadMap();
+    if (_project.headerMode == 'map' && _key.isNotEmpty && _useApiHeaders) {
+      await _loadMap();
+    }
   }
 
   Future<void> _projects() async {
@@ -421,9 +444,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       );
     }
     if (hero != null) {
-      heroPath = hero.isVideo
-          ? await _renderer.thumbnail(hero.path, hero.trimStart)
-          : hero.path;
+      heroPath = await _renderer.poster(hero);
       await _precache(heroPath);
     }
     final paths = <String, String>{};
@@ -432,9 +453,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         if (_cancelled || !mounted) {
           throw const FormatException('Export cancelled');
         }
-        paths[c.id] = c.isVideo
-            ? await _renderer.thumbnail(c.path, c.trimStart)
-            : c.path;
+        paths[c.id] = await _renderer.poster(c);
         await _precache(paths[c.id]!);
       }
     }
@@ -785,7 +804,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                     ),
                     PopupMenuItem(
                       value: 'settings',
-                      child: Text('Maps API settings'),
+                      child: Text('Advanced · Google Maps'),
                     ),
                     PopupMenuItem(
                       value: 'backup',
@@ -969,6 +988,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 showReview: false,
                 onChanged: _change,
                 onLoadMap: _loadMap,
+                useApiHeaders: _useApiHeaders && _key.isNotEmpty,
                 onUploadMap: _uploadMap,
               ),
               if (_project.headerMode == 'photo' && _project.clips.isNotEmpty)
@@ -998,6 +1018,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 expanded: true,
                 onChanged: _change,
                 onLoadMap: _loadMap,
+                useApiHeaders: _useApiHeaders && _key.isNotEmpty,
                 onUploadMap: _uploadMap,
               ),
             ],
@@ -1332,7 +1353,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 children: [
                   Expanded(
                     child: Text(
-                      'Duration · ${clip.duration.toStringAsFixed(1)}s',
+                      'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1353,23 +1374,35 @@ class _MapsEditorPageState extends State<MapsEditorPage>
               ),
               Slider(
                 value: clip.duration,
-                min: min(.5, clip.maxDuration),
-                max: max(.5, clip.maxDuration),
+                min: clip.minDuration,
+                max: clip.maxDuration,
                 onChanged: (v) {
                   clip.duration = v;
                   clip.normalize();
                   _change();
                 },
               ),
-              if (clip.isVideo &&
-                  clip.sourceDuration > clip.duration + .01) ...[
+              if (clip.isGif)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Loop GIF'),
+                  subtitle: const Text(
+                    'Repeat the animation to fill the clip duration',
+                  ),
+                  value: clip.loopGif,
+                  onChanged: (v) {
+                    clip.setGifLoop(v);
+                    _change();
+                  },
+                ),
+              if (clip.isTimed && clip.maxTrimStart > .001) ...[
                 Text(
-                  'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
+                  'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
                 Slider(
                   value: clip.trimStart,
-                  max: max(.01, clip.sourceDuration - clip.duration),
+                  max: clip.maxTrimStart,
                   onChanged: (v) {
                     clip.trimStart = v;
                     clip.normalize();

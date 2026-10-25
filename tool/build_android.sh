@@ -14,6 +14,6 @@ if key and not re.fullmatch(r'AIza[0-9A-Za-z_-]{35}', key):
     key = ''
 with open(sys.argv[1], 'w') as f:
     json.dump({'MAPS_API_KEY': key}, f)
-print('Building with Places search configured.' if key else 'No build-time Maps key is available. Use Settings in the app for Places search.')
+print('Building with Places search configured.' if key else 'No build-time Maps key is available. Browser lookup and map capture work without one; optional API access is in Advanced settings.')
 PY
 flutter build apk --release --dart-define-from-file="$mockareel_defines" "$@"

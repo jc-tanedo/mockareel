@@ -3,13 +3,14 @@ import '../model/project.dart';
 
 class TemplateContentEditor extends StatelessWidget {
   final ReelProject project;
-  final bool loading, showHeader, showReview, expanded;
+  final bool loading, showHeader, showReview, expanded, useApiHeaders;
   final VoidCallback onChanged, onLoadMap, onUploadMap;
   const TemplateContentEditor({
     super.key,
     required this.project,
     required this.loading,
     this.showHeader = true,
+    this.useApiHeaders = false,
     this.showReview = true,
     this.expanded = false,
     required this.onChanged,
@@ -71,30 +72,33 @@ class TemplateContentEditor extends StatelessWidget {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  const Text('Map zoom'),
-                  Expanded(
-                    child: Slider(
-                      min: 8,
-                      max: 20,
-                      divisions: 12,
-                      value: project.mapZoom.clamp(8, 20).toDouble(),
-                      label: '${project.mapZoom}',
-                      onChanged: loading
-                          ? null
-                          : (v) {
-                              project.mapZoom = v.round();
-                              onChanged();
-                            },
+              if (useApiHeaders)
+                Row(
+                  children: [
+                    const Text('Map zoom'),
+                    Expanded(
+                      child: Slider(
+                        min: 8,
+                        max: 20,
+                        divisions: 12,
+                        value: project.mapZoom.clamp(8, 20).toDouble(),
+                        label: '${project.mapZoom}',
+                        onChanged: loading
+                            ? null
+                            : (v) {
+                                project.mapZoom = v.round();
+                                onChanged();
+                              },
+                      ),
                     ),
-                  ),
-                  Text('${project.mapZoom}'),
-                ],
-              ),
-              const Text(
-                'Load again after changing zoom. Google maps require Maps Static API enabled for your key. You can also upload a map image.',
-                style: TextStyle(
+                    Text('${project.mapZoom}'),
+                  ],
+                ),
+              Text(
+                useApiHeaders
+                    ? 'Load again after changing zoom. Using Maps Static API. Switch to key-free browser capture in Advanced · Google Maps.'
+                    : 'No key needed. Frame the map in the browser and save it as your header. Optional API mode is in Advanced · Google Maps. You can also upload a map image.',
+                style: const TextStyle(
                   color: Colors.white54,
                   fontSize: 12,
                   height: 1.5,

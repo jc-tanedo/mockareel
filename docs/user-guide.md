@@ -42,14 +42,18 @@ The editor follows five suggested steps: **Place → Timeline → Text (optional
 
 1. **Place → Details:** find a Google place or edit its name, category and address. **More place details** holds rating, local name, review count, price and hours.
 2. **Place → Look:** choose the output's Light/Dark theme and optional decorative story controls. This setting is independent of the editor's appearance.
-3. **Place → Header:** use a Google map, upload a map image or choose a header photo. Set zoom and load again to refresh. New projects use Map; older projects retain their previous header.
+3. **Place → Header:** use a Google map, upload a map image or choose a header photo. The default **Load Google map** opens a framing screen without a key: pan/zoom, wait for the tiles, then choose **Use map header**. Optional API mode uses the zoom slider; load again to refresh. New projects use Map; older projects retain their previous header.
 4. **Place → Buttons / Review:** customize suggested actions, footer and Menu visibility, or add an optional featured review. A blank or disabled review stays hidden.
 5. **Timeline:** add photos/videos and select a thumbnail. **Timing** holds duration, video trim, caption and reorder controls; **Frame** holds card width/height, zoom and crop; **Motion** holds opening reveal, slide speed and reference pacing. Original media is copied into app storage. Small screens use a compact clip selector. Long-press thumbnails to see filenames.
 6. **Text:** add movable text layers, tap a layer to style it, duplicate or delete it. Size, rotation and centering are under **Transform**.
 7. **Audio:** choose device music and adjust volume. **Timing & loop** holds the start offset and looping controls. Preview playback and scrubbing follow the reel clock. Original clip audio stays muted; skip this step for silent output.
 8. **Export:** review format and duration, then use the pinned **Render MP4** action. A missing map header links back to its setup panel. **Still images** holds transparent-template and full-snapshot PNG exports. MP4 is 1080×1920 H.264 with AAC when music is present; PNGs are 1080×1920 with real gallery alpha for the cutout.
-9. The project title opens renaming; the back arrow returns to saved projects. **More project options** includes Maps API settings, rename and portable backups. Projects autosave; explicit Save remains in the header.
+9. The project title opens renaming; the back arrow returns to saved projects. **More project options** includes **Advanced · Google Maps**, rename and portable backups. Projects autosave; explicit Save remains in the header.
 
 Projects autosave, including when leaving the app. The library opens and creates projects. Portable `.mockareel` backups include originals, timings, framing, captions, header selection, music, text layers, map image, opening animation, featured review and output theme; they can be imported on another device. Older projects open with default framing.
 
 During feed export, repeated search-text states and home-screen holds share their prepared images. Loading animations and swipes retain their full 30 fps samples; output remains 1080×1920. The amount of time saved depends on the scene durations and the device encoder.
+
+GIFs animate in preview and export. In **Timing**, choose duration, start offset and **Loop GIF**. Looping is on by default to fill the clip; turn it off to select a single source segment. Existing GIF photos are detected automatically, even with a misleading filename extension. Originals, timing and loop choices remain in project storage and backups. [GIF timing and caching](gifs.md).
+
+The Maps and FYP live previews preload the next card and hold outgoing media on its last frame during a slide. At the end of the reel, playback stays paused on the final frame; use Restart or Play to begin again.

@@ -1,3 +1,4 @@
+import 'browser_map_header_image.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -32,7 +33,7 @@ class PlaceOverlay extends StatelessWidget {
     final hero = project.headerMode == 'map'
         ? project.mapHeaderPath
         : heroPath ??
-              (project.heroClip?.isVideo == false
+              (project.heroClip?.isTimed == false
                   ? project.heroClip?.path
                   : null);
     Widget line(String text, {double size = 10, Color? color, int lines = 1}) =>
@@ -95,6 +96,9 @@ class PlaceOverlay extends StatelessWidget {
                                     clip: project.heroClip!,
                                     applyCrop: false,
                                   ))
+                          : project.headerMode == 'map' &&
+                                project.mapSource == 'browser'
+                          ? BrowserMapHeaderImage(path: hero)
                           : Image.file(
                               File(hero),
                               fit: BoxFit.cover,

@@ -59,11 +59,11 @@ class _TimelinePreviewState extends State<TimelinePreview>
 
   void _tick(Duration elapsed) {
     if (!mounted) return;
-    setState(
-      () =>
-          _position = min(_duration, _base + elapsed.inMicroseconds / 1000000),
-    );
-    if (_position >= _duration) _pause();
+    final position = min(_duration, _base + elapsed.inMicroseconds / 1000000);
+    // Stop the clock before rebuilding the final frame, so every child receives
+    // paused playback in the same update as the exact end position.
+    if (position >= _duration) _ticker.stop();
+    setState(() => _position = position);
   }
 
   @override
@@ -83,6 +83,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
       _position = _selectedStart;
     }
     _position = _position.clamp(0, _duration);
+    if (_position >= _duration && _ticker.isActive) _pause();
   }
 
   @override
@@ -189,11 +190,17 @@ class ReelCanvas extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final playbackActive =
+        playing &&
+        position <
+            (project.isFeed
+                ? FeedTimeline.duration(project)
+                : project.duration);
     if (project.isFeed) {
       return FeedCanvas(
         project: project,
         position: position,
-        playing: playing,
+        playing: playbackActive,
         overlayOnly: overlayOnly,
         posterOnly: posterOnly,
         posters: posters,
@@ -211,26 +218,37 @@ class ReelCanvas extends StatelessWidget {
         final clip = project.clips[i];
         final x = starts[i] - offset,
             width = clip.cardWidth * TemplateLayout.galleryWidth;
-        if (x >= TemplateLayout.galleryWidth) break;
-        if (x + width <= 0) continue;
+        if (posterOnly) {
+          if (x >= TemplateLayout.galleryWidth) break;
+          if (x + width <= 0) continue;
+        } else if (x >= TemplateLayout.galleryWidth && i > index + 1) {
+          break;
+        }
         final height = clip.cardHeight * TemplateLayout.galleryHeight;
         visible.add(
           Positioned(
+            key: ValueKey('gallery-${clip.id}'),
             left: x,
             top: (TemplateLayout.galleryHeight - height) / 2,
             width: width,
             height: height,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(TemplateLayout.radius),
-              child: i == index && !posterOnly
+              // Live cards keep one stable player as they move from upcoming
+              // to active to outgoing. Capture/poster mode retains still images.
+              child: !posterOnly
                   ? MediaFrame(
-                      key: ValueKey('playing-${clip.id}'),
+                      key: ValueKey(clip.id),
                       clip: clip,
-                      position: (position - project.startOf(i)).clamp(
-                        0,
-                        clip.duration,
-                      ),
-                      playing: playing,
+                      position: i < index
+                          ? clip.duration
+                          : i == index
+                          ? (position - project.startOf(i)).clamp(
+                              0,
+                              clip.duration,
+                            )
+                          : 0,
+                      playing: i == index && playbackActive,
                     )
                   : ClipPoster(
                       key: ValueKey('poster-${clip.id}-${i < index}'),

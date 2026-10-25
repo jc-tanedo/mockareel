@@ -5,7 +5,8 @@ import 'feed_post.dart';
 class ReelClip {
   final String id, path, name;
   final bool isVideo;
-  final double sourceDuration;
+  double sourceDuration;
+  bool isGif, loopGif;
   double duration, trimStart, cardWidth, cardHeight, zoom, panX;
   String caption;
   FeedPost post;
@@ -15,6 +16,8 @@ class ReelClip {
     required this.name,
     required this.isVideo,
     this.sourceDuration = 0,
+    this.isGif = false,
+    this.loopGif = true,
     this.duration = 3.5,
     this.trimStart = 0,
     this.caption = '',
@@ -26,8 +29,24 @@ class ReelClip {
   }) : post = post ?? FeedPost() {
     normalize();
   }
-  double get maxDuration =>
-      isVideo && sourceDuration > 0 ? min(30, sourceDuration) : 30;
+  bool get isTimed => isVideo || isGif;
+  double get maxDuration => isTimed && !(isGif && loopGif) && sourceDuration > 0
+      ? min(30, sourceDuration)
+      : 30;
+  double get maxTrimStart => !isTimed || sourceDuration <= 0
+      ? 0
+      : isGif && loopGif
+      ? max(0, sourceDuration - .001)
+      : max(0, sourceDuration - duration);
+  double get minDuration => min(isGif ? 1 / 30 : .5, maxDuration);
+  void setGifLoop(bool value) {
+    if (isGif && !value && sourceDuration > 0) {
+      duration = min(duration, max(minDuration, sourceDuration - trimStart));
+    }
+    loopGif = value;
+    normalize();
+  }
+
   void normalize() {
     cardWidth = cardWidth.isFinite ? cardWidth.clamp(.45, 1).toDouble() : .78;
     cardHeight = cardHeight.isFinite ? cardHeight.clamp(.55, 1).toDouble() : 1;
@@ -35,10 +54,10 @@ class ReelClip {
     panX = panX.isFinite ? panX.clamp(-1, 1).toDouble() : 0;
     final max = maxDuration;
     duration = duration.isFinite
-        ? duration.clamp(min(.5, max), max).toDouble()
+        ? duration.clamp(minDuration, max).toDouble()
         : min(3.5, max);
-    trimStart = isVideo && sourceDuration > 0 && trimStart.isFinite
-        ? trimStart.clamp(0, sourceDuration - duration).toDouble()
+    trimStart = isTimed && sourceDuration > 0 && trimStart.isFinite
+        ? trimStart.clamp(0, maxTrimStart).toDouble()
         : 0;
   }
 
@@ -48,6 +67,8 @@ class ReelClip {
     name: json['name'] as String? ?? 'Media',
     isVideo: json['isVideo'] == true,
     sourceDuration: (json['sourceDuration'] as num?)?.toDouble() ?? 0,
+    isGif: json['isGif'] == true,
+    loopGif: json['loopGif'] != false,
     duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
     trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
     caption: json['caption'] as String? ?? '',
@@ -65,6 +86,8 @@ class ReelClip {
     'name': name,
     'isVideo': isVideo,
     'sourceDuration': sourceDuration,
+    'isGif': isGif,
+    'loopGif': loopGif,
     'duration': duration,
     'trimStart': trimStart,
     'caption': caption,

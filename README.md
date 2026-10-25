@@ -18,6 +18,8 @@
 
 Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfaces. Choose a template, add your media, customize the UI, and export a reel. Projects save locally and can be shared as portable backups.
 
+> **New in 0.13:** key-free Maps lookup and map headers, animated GIF timing and looping, and smoother previews. [Release notes](docs/releases/v0.13.0.md).
+
 ## Templates
 
 | Template | What you can make |
@@ -25,7 +27,7 @@ Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfa
 | **Maps place story** | A map or photo header, editable place details and buttons, horizontal media cards, movable text, optional featured review, and light/dark output. |
 | **TikTok FYP scroll** | Typed search or a home-screen opening, editable posts and engagement counts, timed vertical swipes, and an optional app-close ending. |
 
-Both templates support photos, trimmed video, framing controls and optional background music. The FYP home screen includes iPhone, Android, Pixel and Samsung One UI presets, plus controls for using a supplied screenshot without duplicate overlays. Each preset uses its own layout and editable app artwork based on home-screen references.
+Both templates support photos, trimmed video, animated GIFs with timing/loop controls, framing controls and optional background music. The FYP home screen includes iPhone, Android, Pixel and Samsung One UI presets, plus controls for using a supplied screenshot without duplicate overlays. Each preset uses its own layout and editable app artwork based on home-screen references.
 
 ## Get started
 
@@ -38,7 +40,7 @@ Both templates support photos, trimmed video, framing controls and optional back
 - **Output:** 1080 × 1920 MP4 at 30 fps; Maps also exports transparent/full PNG stills.
 - **Audio:** choose background music from your device. Source video audio is muted.
 - **Projects:** autosave on device; `.mockareel` backups include media and editable settings.
-- **Maps:** Google lookup requires your own API key. Manual editing and uploaded map images work without one. [Configure Maps →](docs/google-maps.md)
+- **Maps:** Browser search and map-header capture need no API key. Optional API access is under **Advanced · Google Maps**. [Configure Maps →](docs/google-maps.md)
 
 ## Development
 
@@ -58,7 +60,7 @@ The app uses Dart for editing, models and storage, with Android Media3 for video
 
 ## Status
 
-Mockareel is an early preview. Automated checks cover models, editor interactions, project backups and rendered UI surfaces. Native encoding and live Google map fetching still need physical-device verification. Neighboring videos hold still frames during transitions; app launch/close animations also use a still of the first/last post.
+Mockareel is an early preview. Automated checks cover models, editor interactions, project backups and rendered UI surfaces. Device testing has covered Maps lookup/header capture, GIF playback and MP4 export. Browser lookup depends on Google's page layout; manual editing, uploaded headers and optional API access remain available. App launch/close exports use a still of the first/last post.
 
 ## Contributing
 
