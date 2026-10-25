@@ -1,3 +1,4 @@
+import '../services/gif_media.dart';
 import 'maps_web_search_page.dart';
 import 'maps_web_header_page.dart';
 import '../model/maps_web_result.dart';
@@ -305,6 +306,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             sourceDuration: length,
             duration: video ? min(3.5, length) : 3.5,
           );
+          await GifMedia.hydrate(clip);
           if (!mounted) return;
           _project.clips.add(clip);
           _selected = _project.clips.length - 1;
@@ -319,7 +321,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       }
       if (failures > 0) {
         _toast(
-          '$failures files could not be opened. Try JPG/PNG images or MP4 video.',
+          '$failures files could not be opened. Try JPG/PNG/GIF images or MP4 video.',
         );
       }
     } catch (e) {
@@ -442,9 +444,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       );
     }
     if (hero != null) {
-      heroPath = hero.isVideo
-          ? await _renderer.thumbnail(hero.path, hero.trimStart)
-          : hero.path;
+      heroPath = await _renderer.poster(hero);
       await _precache(heroPath);
     }
     final paths = <String, String>{};
@@ -453,9 +453,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         if (_cancelled || !mounted) {
           throw const FormatException('Export cancelled');
         }
-        paths[c.id] = c.isVideo
-            ? await _renderer.thumbnail(c.path, c.trimStart)
-            : c.path;
+        paths[c.id] = await _renderer.poster(c);
         await _precache(paths[c.id]!);
       }
     }
@@ -1355,7 +1353,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 children: [
                   Expanded(
                     child: Text(
-                      'Duration · ${clip.duration.toStringAsFixed(1)}s',
+                      'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1376,23 +1374,35 @@ class _MapsEditorPageState extends State<MapsEditorPage>
               ),
               Slider(
                 value: clip.duration,
-                min: min(.5, clip.maxDuration),
-                max: max(.5, clip.maxDuration),
+                min: clip.minDuration,
+                max: clip.maxDuration,
                 onChanged: (v) {
                   clip.duration = v;
                   clip.normalize();
                   _change();
                 },
               ),
-              if (clip.isVideo &&
-                  clip.sourceDuration > clip.duration + .01) ...[
+              if (clip.isGif)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Loop GIF'),
+                  subtitle: const Text(
+                    'Repeat the animation to fill the clip duration',
+                  ),
+                  value: clip.loopGif,
+                  onChanged: (v) {
+                    clip.setGifLoop(v);
+                    _change();
+                  },
+                ),
+              if (clip.isTimed && clip.maxTrimStart > .001) ...[
                 Text(
-                  'Start at ${clip.trimStart.toStringAsFixed(1)}s of ${clip.sourceDuration.toStringAsFixed(1)}s',
+                  'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
                   style: const TextStyle(fontSize: 12, color: Colors.white70),
                 ),
                 Slider(
                   value: clip.trimStart,
-                  max: max(.01, clip.sourceDuration - clip.duration),
+                  max: clip.maxTrimStart,
                   onChanged: (v) {
                     clip.trimStart = v;
                     clip.normalize();

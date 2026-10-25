@@ -33,7 +33,7 @@ class PlaceOverlay extends StatelessWidget {
     final hero = project.headerMode == 'map'
         ? project.mapHeaderPath
         : heroPath ??
-              (project.heroClip?.isVideo == false
+              (project.heroClip?.isTimed == false
                   ? project.heroClip?.path
                   : null);
     Widget line(String text, {double size = 10, Color? color, int lines = 1}) =>

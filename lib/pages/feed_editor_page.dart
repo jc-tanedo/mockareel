@@ -1,3 +1,4 @@
+import '../services/gif_media.dart';
 import '../widgets/export_monitor.dart';
 import '../services/feed_capture_plan.dart';
 import '../widgets/home_apps_editor.dart';
@@ -139,7 +140,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     if (video && duration <= 0) {
       throw const FormatException('Video duration unavailable');
     }
-    return ReelClip(
+    final clip = ReelClip(
       id: newId(),
       path: await widget.store.retainMedia(file.path, file.name),
       name: file.name,
@@ -148,6 +149,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       duration: video ? min(5, duration) : 5,
       cardWidth: 1,
     );
+    await GifMedia.hydrate(clip);
+    return clip;
   }
 
   Future<void> _pickMedia() async {
@@ -270,12 +273,13 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     double value,
     double lo,
     double hi,
-    ValueChanged<double> change,
-  ) => Column(
+    ValueChanged<double> change, {
+    int precision = 1,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        '$label · ${value.toStringAsFixed(1)}${label == 'Zoom' ? '×' : 's'}',
+        '$label · ${value.toStringAsFixed(precision)}${label == 'Zoom' ? '×' : 's'}',
         style: const TextStyle(fontSize: 12),
       ),
       Slider(
@@ -567,8 +571,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                p.feed.homeMedia!.isVideo
-                    ? 'Video wallpaper · loops to fit'
+                p.feed.homeMedia!.isTimed
+                    ? 'Animated wallpaper · loops to fit'
                     : 'Photo wallpaper',
               ),
               trailing: IconButton(
@@ -879,27 +883,28 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         _field('Shares', post.shares, (v) => post.shares = v, max: 12),
       ],
       _ => [
-        _slider(
-          'Post duration',
-          c.duration,
-          min(.5, c.maxDuration),
-          c.maxDuration,
-          (v) {
-            c.duration = v;
-            c.normalize();
-          },
-        ),
-        if (c.isVideo && c.sourceDuration > c.duration)
-          _slider(
-            'Trim start',
-            c.trimStart,
-            0,
-            max(.001, c.sourceDuration - c.duration),
-            (v) {
-              c.trimStart = v;
-              c.normalize();
+        _slider('Post duration', c.duration, c.minDuration, c.maxDuration, (v) {
+          c.duration = v;
+          c.normalize();
+        }, precision: c.isGif ? 2 : 1),
+        if (c.isGif)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Loop GIF'),
+            subtitle: const Text(
+              'Repeat the animation to fill the post duration',
+            ),
+            value: c.loopGif,
+            onChanged: (v) {
+              c.setGifLoop(v);
+              _change();
             },
           ),
+        if (c.isTimed && c.maxTrimStart > .001)
+          _slider('Trim start', c.trimStart, 0, c.maxTrimStart, (v) {
+            c.trimStart = v;
+            c.normalize();
+          }, precision: c.isGif ? 2 : 1),
         _slider('Zoom', c.zoom, 1, 3, (v) => c.zoom = v),
         const Text('Horizontal crop', style: TextStyle(fontSize: 12)),
         Slider(
@@ -1358,12 +1363,10 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           throw FormatException('“${c.name}” is missing. Replace this media.');
         }
         for (final end in [false, true]) {
-          final path = c.isVideo
-              ? await _renderer.thumbnail(
-                  c.path,
-                  c.trimStart + (end ? c.duration - .001 : 0),
-                )
-              : c.path;
+          final path = await _renderer.poster(
+            c,
+            position: end ? c.duration - .001 : 0,
+          );
           posters['${c.id}:${end ? 'end' : 'start'}'] = path;
           await _precache(path);
         }
@@ -1446,7 +1449,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           clips.add({
             ...source.toJson(),
             'duration': s.duration,
-            'loopSource': !isPost && source.isVideo,
+            'loopSource': !isPost && source.isTimed,
             'loopDuration': source.duration,
           });
         }

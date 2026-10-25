@@ -54,4 +54,4 @@ Projects autosave, including when leaving the app. The library opens and creates
 
 During feed export, repeated search-text states and home-screen holds share their prepared images. Loading animations and swipes retain their full 30 fps samples; output remains 1080×1920. The amount of time saved depends on the scene durations and the device encoder.
 
-GIFs added as photos export as a still first frame. Their original files remain in project storage and backups. Use an MP4 clip for animated media in the exported video.
+GIFs animate in preview and export. In **Timing**, choose duration, start offset and **Loop GIF**. Looping is on by default to fill the clip; turn it off to select a single source segment. Existing GIF photos are detected automatically, even with a misleading filename extension. Originals, timing and loop choices remain in project storage and backups. [GIF timing and caching](gifs.md).

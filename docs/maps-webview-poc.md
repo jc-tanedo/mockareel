@@ -41,4 +41,4 @@ The exact JS asset can be evaluated by Playwright for a live search â†’ result â
 
 Build the branch with `bash tool/build_android.sh`, or the pinned Actions debug workflow. The branch-specific package verifier expects the separate POC application ID. All builds and Flutter/native tests run sequentially because generated plugin registration is shared.
 
-GIF photo clips are converted to a temporary PNG first frame for native video export; originals and project paths stay unchanged. GIF animation is not yet exported. Both Maps and FYP exports use this compatibility path, and temporary images are removed on success, failure or cancellation.
+GIFs now play as animation in preview and export. Timing controls select the start offset and duration, with an optional loop toggle. Existing GIF photos are detected automatically. Selected frames become a cached MP4 shared by preview and both export templates; original GIFs remain in projects and backups. See [GIF timing and caching](gifs.md).

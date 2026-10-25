@@ -8,10 +8,13 @@ import io.flutter.plugin.common.MethodChannel
 
 @UnstableApi
 class MainActivity : FlutterActivity() {
+    private var gifEncoder: GifVideoEncoder? = null
     private var mapSnapshot: MapSnapshot? = null
     private var renderer: ReelRenderer? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        gifEncoder = GifVideoEncoder(applicationContext)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/gif").setMethodCallHandler(gifEncoder)
         mapSnapshot = MapSnapshot(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/map-snapshot").setMethodCallHandler(mapSnapshot)
         val instance = ReelRenderer(applicationContext)
@@ -20,6 +23,8 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/render-progress").setStreamHandler(instance)
     }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        gifEncoder?.close(); gifEncoder = null
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/gif").setMethodCallHandler(null)
         mapSnapshot?.close()
         mapSnapshot = null
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/map-snapshot").setMethodCallHandler(null)
