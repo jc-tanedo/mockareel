@@ -1,6 +1,6 @@
-# Maps WebView POC 3
+# Maps WebView POC 4
 
-[Download Mockareel Maps POC 3](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-maps-webview-poc-3.apk) — fixes the map intro seam and GIF photo export. Updates the separate POC app. [Instructions and validation](maps-webview-poc-3.md) · [Previous POC 2](maps-webview-poc-2.md).
+[Download Mockareel Maps POC 4](https://github.com/jc-tanedo/mockareel/raw/refs/heads/apk-preview/mockareel-maps-webview-poc-4.apk) — animated GIFs with trimming, looping and cached preview/export. Updates the separate POC app. [Instructions and validation](maps-webview-poc-4.md) · [Previous POC 3](maps-webview-poc-3.md).
 
 ---
 
