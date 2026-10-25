@@ -19,13 +19,16 @@ class GifVideos {
   int _generation = 0;
   GifVideos({this.root});
   Future<String> video(ReelClip clip) async {
-    await GifMedia.hydrate(clip);
-    if (!clip.isGif) throw const FormatException('This media is not a GIF.');
-    final stat = await File(clip.path).stat();
+    final token = _generation;
+    // Snapshot mutable editor fields before the first asynchronous operation.
+    final request = ReelClip.fromJson(clip.toJson());
+    await GifMedia.hydrate(request);
+    if (!request.isGif) throw const FormatException('This media is not a GIF.');
+    final stat = await File(request.path).stat();
     final key = sha256
         .convert(
           utf8.encode(
-            'gif-v1:${clip.path}:${stat.size}:${stat.modified.microsecondsSinceEpoch}:${clip.trimStart}:${clip.duration}:${clip.loopGif}',
+            'gif-v1:${request.path}:${stat.size}:${stat.modified.microsecondsSinceEpoch}:${request.trimStart}:${request.duration}:${request.loopGif}',
           ),
         )
         .toString();
@@ -37,10 +40,9 @@ class GifVideos {
       await target.setLastModified(DateTime.now());
       return target.path;
     }
-    final existing = _pending[key];
+    final pendingKey = '$key:$token';
+    final existing = _pending[pendingKey];
     if (existing != null) return existing;
-    final request = ReelClip.fromJson(clip.toJson());
-    final token = _generation;
     final task = _queue.catchError((Object _) {}).then((_) async {
       if (token != _generation) {
         throw const FormatException('GIF preparation cancelled.');
@@ -50,12 +52,12 @@ class GifVideos {
       await _prune(directory, target.path);
       return _encode(request, target, token);
     });
-    _pending[key] = task;
+    _pending[pendingKey] = task;
     _queue = task.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     try {
       return await task;
     } finally {
-      _pending.remove(key);
+      _pending.remove(pendingKey);
     }
   }
 

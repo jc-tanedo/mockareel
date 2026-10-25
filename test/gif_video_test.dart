@@ -274,4 +274,99 @@ void main() {
       });
     },
   );
+  testWidgets(
+    'GIF cache captures timing before the editor can mutate its clip',
+    (tester) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp('gif-snapshot-test-');
+        final source = File('${dir.path}/source.gif');
+        await source.writeAsBytes(timedGifFixture);
+        final service = GifVideos(root: Directory('${dir.path}/cache'));
+        final clip = ReelClip(
+          id: 'gif',
+          path: source.path,
+          name: 'GIF',
+          isVideo: false,
+          isGif: true,
+          sourceDuration: .6,
+          trimStart: .12,
+          duration: .3,
+          loopGif: false,
+        );
+        final original = ReelClip.fromJson(clip.toJson());
+        var calls = 0;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          GifVideos.channel,
+          (call) async {
+            calls++;
+            final args = call.arguments as Map;
+            expect(args['duration'], .3);
+            expect((args['frames'] as List).map((f) => f['timeUs']), [
+              0,
+              200000,
+            ]);
+            await File(args['output'] as String).writeAsBytes([1, 2, 3]);
+            return null;
+          },
+        );
+        try {
+          final request = service.video(clip);
+          clip.trimStart = .2;
+          clip.duration = .4;
+          final path = await request;
+          expect(await service.video(original), path);
+          expect(calls, 1);
+        } finally {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            GifVideos.channel,
+            null,
+          );
+          await dir.delete(recursive: true);
+        }
+      });
+    },
+  );
+  testWidgets(
+    'cancellation before asynchronous GIF metadata finishes never starts encoding',
+    (tester) async {
+      await tester.runAsync(() async {
+        final dir = await Directory.systemTemp.createTemp(
+          'gif-early-cancel-test-',
+        );
+        final source = File('${dir.path}/source.gif');
+        await source.writeAsBytes(timedGifFixture);
+        final service = GifVideos(root: Directory('${dir.path}/cache'));
+        var encodes = 0;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          GifVideos.channel,
+          (call) async {
+            if (call.method == 'encode') encodes++;
+            return null;
+          },
+        );
+        try {
+          final request = expectLater(
+            service.video(
+              ReelClip(
+                id: 'gif',
+                path: source.path,
+                name: 'GIF',
+                isVideo: false,
+              ),
+            ),
+            throwsFormatException,
+          );
+          await service.cancel();
+          await request;
+          expect(encodes, 0);
+        } finally {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            GifVideos.channel,
+            null,
+          );
+          await dir.delete(recursive: true);
+        }
+      });
+    },
+  );
 }
