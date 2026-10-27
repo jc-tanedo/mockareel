@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 import tempfile
 import uuid
 import zipfile
@@ -136,8 +137,8 @@ def check(s3, repository):
     base(repository, "debug")  # Validate repository before constructing a storage key.
     key = f'{repository}/.checks/{uuid.uuid4().hex}'
     payload = b'Mockareel artifact storage round-trip check\n'
+    s3.put_object(Bucket=BUCKET, Key=key, Body=payload)
     try:
-        s3.put_object(Bucket=BUCKET, Key=key, Body=payload)
         if s3.get_object(Bucket=BUCKET, Key=key)['Body'].read() != payload:
             raise ValueError('S3 round-trip contents differ')
     finally:
@@ -145,7 +146,7 @@ def check(s3, repository):
     print('SeaweedFS HTTPS upload, download and deletion verified.')
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['upload', 'download', 'prune', 'check'])
     parser.add_argument('--kind', choices=['debug', 'release'], default='debug')
@@ -161,3 +162,19 @@ if __name__ == '__main__':
     else:
         prefix = bundle_prefix(repository, args.kind, os.environ['GITHUB_RUN_ID'], args.attempt)
         {'upload': upload, 'download': download}[args.command](store, prefix, args.directory)
+
+
+if __name__ == '__main__':
+    from botocore.exceptions import BotoCoreError, ClientError
+    try:
+        main()
+    except ClientError as error:
+        code = re.sub(r'[^A-Za-z0-9_.-]', '', error.response.get('Error', {}).get('Code', 'Unknown'))
+        status = error.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 'unknown')
+        print(f'::error::SeaweedFS {error.operation_name} failed: {code} (HTTP {status}). '
+              'Check S3 credentials and bucket permissions.', file=sys.stderr)
+        sys.exit(1)
+    except BotoCoreError as error:
+        print(f'::error::SeaweedFS connection/client failure: {type(error).__name__}. '
+              'Check HTTPS endpoint reachability, TLS trust and S3 client configuration.', file=sys.stderr)
+        sys.exit(1)
