@@ -51,6 +51,15 @@ def allowed_file(name):
     return bool(re.fullmatch(r'mockareel-[\w.+-]+\.apk(?:\.sha256)?', name) or name == 'release-notes.md')
 
 
+def sha256_file(path):
+    # Android checks run on the runner's system Python before setup-s3 installs 3.12.
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def upload(s3, prefix, directory):
     files = sorted(path for path in Path(directory).iterdir() if path.is_file() and allowed_file(path.name))
     apks = [path for path in files if path.suffix == '.apk']
@@ -61,8 +70,7 @@ def upload(s3, prefix, directory):
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_STORED) as bundle:
             for path in files:
                 bundle.write(path, path.name)
-        with archive.open('rb') as source:
-            digest = hashlib.file_digest(source, 'sha256').hexdigest()
+        digest = sha256_file(archive)
         s3.upload_file(str(archive), BUCKET, prefix + 'artifact.zip', ExtraArgs={'ContentType': 'application/zip'})
         # Commit marker is written last: partial uploads cannot displace good bundles.
         s3.put_object(Bucket=BUCKET, Key=prefix + 'manifest.json', ContentType='application/json',
@@ -87,8 +95,7 @@ def download(s3, prefix, directory):
     with tempfile.TemporaryDirectory() as temporary:
         archive = Path(temporary) / 'artifact.zip'
         s3.download_file(BUCKET, prefix + 'artifact.zip', str(archive))
-        with archive.open('rb') as source:
-            digest = hashlib.file_digest(source, 'sha256').hexdigest()
+        digest = sha256_file(archive)
         if digest != manifest['sha256']:
             raise ValueError('Downloaded artifact checksum mismatch')
         with zipfile.ZipFile(archive) as bundle:
