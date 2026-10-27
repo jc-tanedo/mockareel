@@ -1,0 +1,29 @@
+name: Retain latest APK artifacts
+on:
+  workflow_run:
+    workflows: [Android debug APK, Publish Android release]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: artifact-retention
+  cancel-in-progress: false
+jobs:
+  prune:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      # Use the default branch's trusted cleanup code, including for PR builds.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-runner
+        with:
+          github-cli: 'true'
+      - name: Keep two newest artifact bundles per build type
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tool/ci/prune_artifacts.py

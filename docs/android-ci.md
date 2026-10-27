@@ -16,6 +16,10 @@ Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel
 
 Debug jobs never receive release signing keys or the Maps key. Configure Maps in the debug app's on-device Settings.
 
+## Artifact storage
+
+**Retain latest APK artifacts** runs after each debug/release workflow completes, or manually from Actions. It keeps the two newest completed-build bundles for debug APKs and the two newest for release builds across branches; older matching Actions artifacts are deleted. In-progress builds and unrelated artifacts are preserved. Cleanup uses trusted default-branch code and its own `actions: write` permission. Existing 14-day debug / 30-day release expiry limits still apply, so bundles may expire earlier when builds are infrequent. Published GitHub Release APKs and checksums are unaffected.
+
 ## Release signing: one-time configuration
 
 In **Settings → Secrets and variables → Actions**, add these repository secrets:
