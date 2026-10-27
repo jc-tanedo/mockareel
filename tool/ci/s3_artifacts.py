@@ -13,7 +13,7 @@ import zipfile
 
 from prune_artifacts import github_api
 
-ENDPOINT = 'https://s3.jczr.dev'
+ENDPOINT = 'https://bucket.s3.jczr.dev'
 BUCKET = 'gh-artifact-store'
 
 

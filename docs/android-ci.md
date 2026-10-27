@@ -18,7 +18,7 @@ Debug jobs never receive release signing keys or the Maps key. Configure Maps in
 
 ## Artifact storage
 
-Build bundles are stored at **https://s3.jczr.dev**, bucket **gh-artifact-store**, using S3 Signature V4, path-style addressing and region `us-east-1`. The bucket can remain private. Configure repository variable `S3_ACCESS_KEY_ID` and repository secret `S3_SECRET_ACCESS_KEY`. The identity needs `ListBucket` plus `GetObject`, `PutObject` and `DeleteObject` under `jc-tanedo/mockareel/`. No AWS account is needed.
+Build bundles are stored at **https://bucket.s3.jczr.dev**, bucket **gh-artifact-store**, using S3 Signature V4, path-style addressing and region `us-east-1`. The bucket can remain private. Configure repository variable `S3_ACCESS_KEY_ID` and repository secret `S3_SECRET_ACCESS_KEY`. The identity needs `ListBucket` plus `GetObject`, `PutObject` and `DeleteObject` under `jc-tanedo/mockareel/`. No AWS account is needed.
 
 Each bundle uses `<owner>/<repo>/<debug|release>/<run-id>-<attempt>/artifact.zip` plus a SHA-256 manifest written after upload. Only APKs, their checksums and release notes are included. Release publishing downloads the exact build attempt's bundle from S3, verifies its digest and filenames, then publishes normal GitHub Release assets. Rerunning only the publish job still uses the original build attempt.
 
@@ -29,7 +29,7 @@ The run summary contains a download link valid for 24 hours. Anyone who can read
 Manually run **Retain latest APK artifacts** to test HTTPS upload, read-back and deletion with a tiny temporary object under `<owner>/<repo>/.checks/`, followed by cleanup. S3 setup installs pinned, hash-verified Python dependencies into runner temporary storage without root privileges. Credentials are injected only into S3 operations, never tests or pull-request builds. For a quick authenticated download with AWS CLI configured for the same endpoint/key:
 
 ```sh
-aws --endpoint-url https://s3.jczr.dev --region us-east-1 s3 cp \
+aws --endpoint-url https://bucket.s3.jczr.dev --region us-east-1 s3 cp \
   s3://gh-artifact-store/jc-tanedo/mockareel/debug/RUN_ID-ATTEMPT/artifact.zip .
 ```
 
