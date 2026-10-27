@@ -1,12 +1,13 @@
 """In-memory S3 regression tests; no real credentials or buckets are used."""
 import io
+import hashlib
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from s3_artifacts import BUCKET, bundle_prefix, check, download, prune, upload
+from s3_artifacts import BUCKET, bundle_prefix, check, download, prune, sha256_file, upload
 
 
 class FakeS3:
@@ -54,6 +55,13 @@ class S3ArtifactsTest(unittest.TestCase):
         (self.dist / 'mockareel-debug.apk').write_bytes(b'APK fixture')
         (self.dist / 'mockareel-debug.apk.sha256').write_text('fixture checksum')
         (self.dist / 'secret.jks').write_bytes(b'must never upload')
+
+    def test_hashing_supports_system_python_without_file_digest(self):
+        data = b'fixture' * 200000
+        path = self.root / 'large-file'
+        path.write_bytes(data)
+        with patch.object(hashlib, 'file_digest', None, create=True):
+            self.assertEqual(sha256_file(path), hashlib.sha256(data).hexdigest())
 
     def test_round_trip_and_only_allowed_files_uploaded(self):
         prefix = bundle_prefix('owner/repo', 'release', 1, 2)
