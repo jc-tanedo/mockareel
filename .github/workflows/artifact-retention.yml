@@ -23,7 +23,20 @@ jobs:
       - uses: ./.github/actions/setup-runner
         with:
           github-cli: 'true'
-      - name: Keep two newest artifact bundles per build type
+      - uses: ./.github/actions/setup-s3
+      - name: Check SeaweedFS storage on manual runs
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          S3_ACCESS_KEY_ID: ${{ vars.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: python3 tool/ci/s3_artifacts.py check
+      - name: Keep two newest SeaweedFS bundles per build type
+        env:
+          GH_TOKEN: ${{ github.token }}
+          S3_ACCESS_KEY_ID: ${{ vars.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: python3 tool/ci/s3_artifacts.py prune
+      - name: Keep two newest legacy GitHub bundles per build type
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tool/ci/prune_artifacts.py

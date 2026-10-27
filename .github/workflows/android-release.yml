@@ -18,6 +18,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 45
     outputs:
+      artifact-attempt: ${{ steps.upload.outputs.attempt }}
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
@@ -75,13 +76,13 @@ jobs:
       - name: Remove signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/mockareel-release.jks"
-      - name: Upload verified release assets
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release-assets
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 30
+      - uses: ./.github/actions/setup-s3
+      - name: Upload verified release assets to SeaweedFS
+        id: upload
+        env:
+          S3_ACCESS_KEY_ID: ${{ vars.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: python3 tool/ci/s3_artifacts.py upload --kind release
   publish:
     needs: build
     runs-on: self-hosted
@@ -98,10 +99,13 @@ jobs:
           github-cli: 'true'
       - name: Clear previous release artifacts
         run: rm -rf -- dist
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: release-assets
-          path: dist
+      - uses: ./.github/actions/setup-s3
+      - name: Download and verify release bundle from SeaweedFS
+        env:
+          ARTIFACT_ATTEMPT: ${{ needs.build.outputs.artifact-attempt }}
+          S3_ACCESS_KEY_ID: ${{ vars.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: python3 tool/ci/s3_artifacts.py download --kind release --attempt "$ARTIFACT_ATTEMPT"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

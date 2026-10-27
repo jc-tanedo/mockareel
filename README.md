@@ -31,7 +31,7 @@ Both templates support photos, trimmed video, animated GIFs with timing/loop con
 
 ## Get started
 
-1. Install an APK from [Releases](https://github.com/jc-tanedo/mockareel/releases) or the **Artifacts** section of an [Android debug build](https://github.com/jc-tanedo/mockareel/actions/workflows/android-debug.yml). Earlier previews remain on [`apk-preview`](https://github.com/jc-tanedo/mockareel/tree/apk-preview).
+1. Install an APK from [Releases](https://github.com/jc-tanedo/mockareel/releases) or the run summary of an [Android debug build](https://github.com/jc-tanedo/mockareel/actions/workflows/android-debug.yml). Earlier previews remain on [`apk-preview`](https://github.com/jc-tanedo/mockareel/tree/apk-preview).
 2. Select **New project**, choose a template, and add your photos or videos.
 3. Follow the numbered editor steps, preview the sequence, and select **Render MP4**.
 

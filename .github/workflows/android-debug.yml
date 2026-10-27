@@ -33,10 +33,14 @@ jobs:
           fi
       - name: Build debug APK
         run: bash tool/ci/build_apk.sh debug
-      - name: Upload APK and checksum
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: mockareel-debug-${{ github.run_number }}-${{ github.run_attempt }}
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 14
+      - uses: ./.github/actions/setup-s3
+        if: github.event_name != 'pull_request'
+      - name: Upload APK and checksum to SeaweedFS
+        if: github.event_name != 'pull_request'
+        env:
+          S3_ACCESS_KEY_ID: ${{ vars.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: python3 tool/ci/s3_artifacts.py upload --kind debug
+      - name: Explain pull-request artifact policy
+        if: github.event_name == 'pull_request'
+        run: echo 'PR checks and APK build passed. S3 uploads run only on pushes/manual runs so PR code receives no storage credentials.' >> "$GITHUB_STEP_SUMMARY"

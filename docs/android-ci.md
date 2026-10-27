@@ -10,7 +10,7 @@ Persistent runners reuse installed toolchains. Gradle configuration is updated w
 
 ## Debug APKs
 
-**Android debug APK** runs on pushes and pull requests targeting `main` or `work` (push builds also cover `poc/**` branches), and can be run manually. It checks release-version validation, Dart analysis, Flutter tests and native Android unit tests, then builds a universal debug APK. Download the APK and `.sha256` file from the run's **Artifacts** section (retained for 14 days).
+**Android debug APK** runs on pushes and pull requests targeting `main` or `work` (push builds also cover `poc/**` branches), and can be run manually. It checks release-version validation, Dart analysis, Flutter tests and native Android unit tests, then builds a universal debug APK. Push/manual builds upload an APK/checksum ZIP to SeaweedFS. Download it from the run's **Summary** using the 24-hour signed link; S3 objects remain until retention removes them. Pull requests build and test but do not upload artifacts or receive S3 credentials.
 
 Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel Debug**, so they can coexist with release/preview APKs and keep separate project data. A fresh GitHub runner normally generates a fresh debug signing certificate. Optionally add repository secret `ANDROID_DEBUG_KEYSTORE_BASE64` with a standard Android debug keystore (alias `androiddebugkey`, store/key passwords `android`) to keep push/manual debug builds update-compatible. Pull request builds never restore signing secrets, including for same-repository branches; debug certificates may be reused on a persistent runner, so use isolated runner accounts if separate certificates are required. Release projects are unaffected.
 
@@ -18,7 +18,20 @@ Debug jobs never receive release signing keys or the Maps key. Configure Maps in
 
 ## Artifact storage
 
-**Retain latest APK artifacts** runs after each debug/release workflow completes, or manually from Actions. It keeps the two newest completed-build bundles for debug APKs and the two newest for release builds across branches; older matching Actions artifacts are deleted. In-progress builds and unrelated artifacts are preserved. Cleanup uses trusted default-branch code and its own `actions: write` permission. Existing 14-day debug / 30-day release expiry limits still apply, so bundles may expire earlier when builds are infrequent. Published GitHub Release APKs and checksums are unaffected.
+Build bundles are stored at **https://s3.jczr.dev**, bucket **gh-artifact-store**, using S3 Signature V4, path-style addressing and region `us-east-1`. The bucket can remain private. Configure repository variable `S3_ACCESS_KEY_ID` and repository secret `S3_SECRET_ACCESS_KEY`. The identity needs `ListBucket` plus `GetObject`, `PutObject` and `DeleteObject` under `jc-tanedo/mockareel/`. No AWS account is needed.
+
+Each bundle uses `<owner>/<repo>/<debug|release>/<run-id>-<attempt>/artifact.zip` plus a SHA-256 manifest written after upload. Only APKs, their checksums and release notes are included. Release publishing downloads the exact build attempt's bundle from S3, verifies its digest and filenames, then publishes normal GitHub Release assets. Rerunning only the publish job still uses the original build attempt.
+
+**Retain latest APK artifacts** runs after each debug/release workflow completes, or manually from Actions. It keeps the two newest completed bundles per type across branches and removes older bundles and incomplete uploads from finished runs. Active runs and unrelated objects are preserved. The bucket's own lifecycle rules can expire files sooner; use no expiry rules on this prefix if the newest two must remain indefinitely. Legacy GitHub Actions artifacts still use the previous two-bundle cleanup; new uploads use S3 exclusively. GitHub Release APKs/checksums are unaffected.
+
+The run summary contains a download link valid for 24 hours. Anyone who can read that link can use it until expiry; no public bucket policy is required. After expiry, generate a new link using an S3 client, or fetch the permanent `s3://` URI shown beside it. These downloads do not appear in GitHub's built-in **Artifacts** tab.
+
+Manually run **Retain latest APK artifacts** to test HTTPS upload, read-back and deletion with a tiny temporary object under `<owner>/<repo>/.checks/`, followed by cleanup. S3 setup installs pinned, hash-verified Python dependencies into runner temporary storage without root privileges. Credentials are injected only into S3 operations, never tests or pull-request builds. For a quick authenticated download with AWS CLI configured for the same endpoint/key:
+
+```sh
+aws --endpoint-url https://s3.jczr.dev --region us-east-1 s3 cp \
+  s3://gh-artifact-store/jc-tanedo/mockareel/debug/RUN_ID-ATTEMPT/artifact.zip .
+```
 
 ## Release signing: one-time configuration
 
@@ -50,7 +63,7 @@ Code or workflow fixes require a new version and tag: rerunning an old tag still
 
 Only the publish job has `contents: write`; it checks out the exact validated build commit to install missing publishing tools, then downloads the build artifact. Release secrets are restricted to the signing-configuration check and signing step; tests and publishing do not receive them. Both APKs are checked for signature validity, ZIP integrity, 16 KB ZIP alignment, expected package ID and version before upload. `.sha256` files can be verified with `sha256sum -c *.sha256` from the download directory.
 
-These workflows publish GitHub Release assets and Actions artifacts. They do not upload to Google Play or modify the legacy `apk-preview` branch.
+These workflows publish GitHub Release assets and SeaweedFS build bundles. They do not upload to Google Play or modify the legacy `apk-preview` branch.
 
 The APK build explicitly enables Flutter's pub step so Flutter regenerates plugin registration for the selected build mode. Dependency setup and tests include the dev-only `integration_test` plugin; release registration excludes it. Do not add `--no-pub` to the APK build: it also skips this regeneration and can leave a Java reference to a test plugin that is absent from the release build. The setup step enforces `pubspec.lock`, and the build uses the existing locked dependency versions.
 
