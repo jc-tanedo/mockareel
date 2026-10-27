@@ -1,0 +1,43 @@
+name: Set up self-hosted runner
+description: Install missing Linux tools on an Ubuntu or Debian x64 runner.
+inputs:
+  github-cli:
+    description: Install GitHub CLI for release publishing.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Install missing system dependencies
+      shell: bash
+      env:
+        INSTALL_GITHUB_CLI: ${{ inputs.github-cli }}
+      run: |
+        set -euo pipefail
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != X64 ]]; then
+          echo '::error::These workflows require an Ubuntu/Debian Linux x64 self-hosted runner.'
+          exit 1
+        fi
+        packages=()
+        for dependency in curl:curl git:git unzip:unzip xz:xz-utils zip:zip python3:python3 tar:tar sha256sum:coreutils; do
+          command -v "${dependency%%:*}" >/dev/null 2>&1 || packages+=("${dependency#*:}")
+        done
+        [[ -s /etc/ssl/certs/ca-certificates.crt ]] || packages+=(ca-certificates)
+        if [[ "$INSTALL_GITHUB_CLI" == true ]] && ! command -v gh >/dev/null 2>&1; then
+          packages+=(gh)
+        fi
+        if (( ${#packages[@]} )); then
+          command -v apt-get >/dev/null 2>&1 || {
+            echo '::error::Install the missing dependencies manually or use Ubuntu/Debian.'
+            exit 1
+          }
+          elevate=()
+          if (( EUID != 0 )); then
+            if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true; then
+              echo '::error::Installing missing dependencies requires root or passwordless sudo.'
+              exit 1
+            fi
+            elevate=(sudo -n)
+          fi
+          "${elevate[@]}" apt-get update
+          "${elevate[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+        fi

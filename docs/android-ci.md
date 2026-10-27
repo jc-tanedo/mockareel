@@ -2,11 +2,17 @@
 
 Both workflows use Flutter **3.47.7**, Temurin **21**, Android SDK/build tools **36**, NDK **28.2.13676358**, CMake **3.22.1** and the checked-in Gradle **9.3.1** wrapper. External Actions are pinned to commit SHAs. The wrapper distribution has a pinned SHA-256 checksum.
 
+## Self-hosted runners
+
+All jobs use `runs-on: self-hosted`. Register an Ubuntu/Debian Linux **x64** runner with Bash and Git available for checkout. The runner account needs root or passwordless `sudo` when system dependencies are missing, plus writable home and tool-cache directories. Missing command-line tools (including Python and the release job's GitHub CLI) are installed through `apt`; existing tools are reused. Android jobs install/cache the pinned Java, Flutter and Android SDK components, and fetch locked Dart dependencies. The secret scan reuses Gitleaks 8.24.3 if present, otherwise downloads and verifies that version.
+
+Persistent runners reuse installed toolchains. Gradle configuration is updated without duplicate settings, and the publish job clears its previous `dist/` before downloading this run's artifacts.
+
 ## Debug APKs
 
 **Android debug APK** runs on pushes and pull requests targeting `main` or `work` (push builds also cover `poc/**` branches), and can be run manually. It checks release-version validation, Dart analysis, Flutter tests and native Android unit tests, then builds a universal debug APK. Download the APK and `.sha256` file from the run's **Artifacts** section (retained for 14 days).
 
-Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel Debug**, so they can coexist with release/preview APKs and keep separate project data. A fresh GitHub runner normally generates a fresh debug signing certificate. Optionally add repository secret `ANDROID_DEBUG_KEYSTORE_BASE64` with a standard Android debug keystore (alias `androiddebugkey`, store/key passwords `android`) to keep push/manual debug builds update-compatible. Pull request builds never restore signing secrets, including for same-repository branches; those APKs use a fresh runner key and may require uninstalling an older **debug** installation before installing. Release projects are unaffected.
+Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel Debug**, so they can coexist with release/preview APKs and keep separate project data. A fresh GitHub runner normally generates a fresh debug signing certificate. Optionally add repository secret `ANDROID_DEBUG_KEYSTORE_BASE64` with a standard Android debug keystore (alias `androiddebugkey`, store/key passwords `android`) to keep push/manual debug builds update-compatible. Pull request builds never restore signing secrets, including for same-repository branches; debug certificates may be reused on a persistent runner, so use isolated runner accounts if separate certificates are required. Release projects are unaffected.
 
 Debug jobs never receive release signing keys or the Maps key. Configure Maps in the debug app's on-device Settings.
 
@@ -38,7 +44,7 @@ For a retry after fixing signing secrets or a transient failure, rerun the faile
 
 Code or workflow fixes require a new version and tag: rerunning an old tag still checks out its original code. For example, the release-build fix after `v0.12.1` is included in `v0.12.2`.
 
-Only the publish job has `contents: write`; it downloads the build artifact without checking out or executing repository code. Release secrets are restricted to the signing-configuration check and signing step; tests and publishing do not receive them. Both APKs are checked for signature validity, ZIP integrity, 16 KB ZIP alignment, expected package ID and version before upload. `.sha256` files can be verified with `sha256sum -c *.sha256` from the download directory.
+Only the publish job has `contents: write`; it checks out the exact validated build commit to install missing publishing tools, then downloads the build artifact. Release secrets are restricted to the signing-configuration check and signing step; tests and publishing do not receive them. Both APKs are checked for signature validity, ZIP integrity, 16 KB ZIP alignment, expected package ID and version before upload. `.sha256` files can be verified with `sha256sum -c *.sha256` from the download directory.
 
 These workflows publish GitHub Release assets and Actions artifacts. They do not upload to Google Play or modify the legacy `apk-preview` branch.
 
@@ -56,4 +62,4 @@ bash tool/ci/build_apk.sh debug
 MOCKAREEL_REQUIRE_RELEASE_SIGNING=true bash tool/ci/build_apk.sh release
 ```
 
-Packaged APKs/checksums go to ignored `dist/`. Tests and builds run sequentially to avoid generated plugin-registration conflicts. Keep `dist/` empty between modes when preparing assets manually; each Actions job starts with a fresh checkout.
+Packaged APKs/checksums go to ignored `dist/`. Tests and builds run sequentially to avoid generated plugin-registration conflicts. Keep `dist/` empty between modes when preparing assets manually; Actions checkouts clean the workspace, and publishing explicitly clears previous artifacts before downloading.

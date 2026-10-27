@@ -3,6 +3,7 @@ description: Install the pinned Flutter, Java and Android toolchains.
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/setup-runner
     - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
       with:
         distribution: temurin
@@ -22,6 +23,9 @@ runs:
       shell: bash
       run: |
         mkdir -p "$HOME/.gradle"
+        # Replace only our settings; persistent runners must not accumulate them.
+        touch "$HOME/.gradle/gradle.properties"
+        sed -i '/^org\.gradle\.jvmargs=/d; /^org\.gradle\.workers\.max=/d' "$HOME/.gradle/gradle.properties"
         cat >> "$HOME/.gradle/gradle.properties" <<'PROPERTIES'
         org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -XX:ReservedCodeCacheSize=256m
         org.gradle.workers.max=2

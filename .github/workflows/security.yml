@@ -11,19 +11,25 @@ permissions:
   contents: read
 jobs:
   scan:
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: ./.github/actions/setup-runner
       - name: Install pinned Gitleaks
         run: |
+          if command -v gitleaks >/dev/null 2>&1 && [[ "$(gitleaks version)" == '8.24.3' ]]; then
+            echo "GITLEAKS_BINARY=$(command -v gitleaks)" >> "$GITHUB_ENV"
+            exit 0
+          fi
           curl --fail --silent --show-error --location --retry 3 \
             https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
             --output "$RUNNER_TEMP/gitleaks.tar.gz"
           printf '%s  %s\n' 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          echo "GITLEAKS_BINARY=$RUNNER_TEMP/gitleaks" >> "$GITHUB_ENV"
       - name: Scan reachable history without logging credentials
-        run: '"$RUNNER_TEMP/gitleaks" git --redact=100 --log-opts=--all'
+        run: '"$GITLEAKS_BINARY" git --redact=100 --log-opts=--all'
