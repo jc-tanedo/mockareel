@@ -69,58 +69,68 @@ void main() {
     },
   );
 
-  testWidgets(
-    'map framing fits phone and landscape and returns a captured header',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final driver = HeaderFixture(Uint8List.fromList([1, 2, 3]));
-      Uint8List? result;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildAppTheme(),
-          home: Builder(
-            builder: (context) => TextButton(
-              onPressed: () async {
-                result = await Navigator.push<Uint8List>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MapsWebHeaderPage(
-                      place: PlaceDetails(name: 'Fixture Cafe'),
-                      driver: driver,
-                      browserOverride: const ColoredBox(color: Colors.blue),
+  for (final streetview in [false, true]) {
+    testWidgets(
+      '${streetview ? 'Streetview map' : 'Map header'} framing fits phone and landscape and returns a capture',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final driver = HeaderFixture(Uint8List.fromList([1, 2, 3]));
+        Uint8List? result;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildAppTheme(),
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await Navigator.push<Uint8List>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapsWebHeaderPage(
+                        place: PlaceDetails(name: 'Fixture Cafe'),
+                        aspectRatio: streetview ? 360 / 370 : 1.6,
+                        showHeaderGuide: !streetview,
+                        driver: driver,
+                        browserOverride: const ColoredBox(color: Colors.blue),
+                      ),
                     ),
-                  ),
-                );
-              },
-              child: const Text('Open map'),
+                  );
+                },
+                child: const Text('Open map'),
+              ),
             ),
           ),
-        ),
-      );
-      await tester.tap(find.text('Open map'));
-      await tester.pumpAndSettle();
-      for (final size in [
-        const Size(360, 640),
-        const Size(844, 390),
-        const Size(390, 844),
-      ]) {
-        tester.view.physicalSize = size;
+        );
+        await tester.tap(find.text('Open map'));
         await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        expect(find.text('Use map header').hitTestable(), findsOneWidget);
-      }
-      await tester.tap(find.text('Use map header'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
-      await tester.pumpAndSettle();
-      expect(result, orderedEquals([1, 2, 3]));
-      expect(driver.bounds!.width / driver.bounds!.height, closeTo(1.6, .01));
-      expect(driver.disposed, isTrue);
-    },
-  );
+        for (final size in [
+          const Size(360, 640),
+          const Size(844, 390),
+          const Size(390, 844),
+        ]) {
+          tester.view.physicalSize = size;
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(
+            find.text(streetview ? 'Use map' : 'Use map header').hitTestable(),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(find.text(streetview ? 'Use map' : 'Use map header'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
+        await tester.pumpAndSettle();
+        expect(result, orderedEquals([1, 2, 3]));
+        expect(
+          driver.bounds!.width / driver.bounds!.height,
+          closeTo(streetview ? 360 / 370 : 1.6, .01),
+        );
+        expect(driver.disposed, isTrue);
+      },
+    );
+  }
 
   testWidgets(
     'advanced settings list required APIs and a cleared key disables API headers',

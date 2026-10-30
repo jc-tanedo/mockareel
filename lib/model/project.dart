@@ -1,4 +1,7 @@
 import 'feed.dart';
+import 'streetview.dart';
+import 'streetview_timeline.dart';
+export 'streetview.dart';
 import 'ids.dart';
 import 'reel_clip.dart';
 export 'ids.dart';
@@ -238,6 +241,8 @@ class ReelProject {
   String title, storyBadge;
   final String template;
   FeedSettings feed;
+  StreetviewSettings streetview;
+  bool get isStreetview => template == 'streetview';
   bool get isFeed => template == 'tiktok-feed';
   String? heroClipId;
   bool storyChrome, darkOutput;
@@ -257,6 +262,7 @@ class ReelProject {
     this.title = 'Untitled reel',
     this.template = 'maps-place',
     FeedSettings? feed,
+    StreetviewSettings? streetview,
     this.storyBadge = '',
     this.storyChrome = false,
     this.darkOutput = false,
@@ -273,7 +279,8 @@ class ReelProject {
     List<StoryTag>? tags,
     this.music,
     DateTime? updatedAt,
-  }) : feed = feed ?? FeedSettings(),
+  }) : streetview = streetview ?? StreetviewSettings(),
+       feed = feed ?? FeedSettings(),
        sheetIntroSeconds = sheetIntroSeconds.isFinite
            ? sheetIntroSeconds.clamp(0, 2).toDouble()
            : .9,
@@ -298,8 +305,15 @@ class ReelProject {
     return clips.isEmpty ? null : clips.first;
   }
 
-  double get duration => clips.fold(0, (sum, clip) => sum + clip.duration);
+  double get duration => isStreetview
+      ? StreetviewTimeline.duration(this)
+      : clips.fold(0, (sum, clip) => sum + clip.duration);
   int clipAt(double seconds) {
+    if (isStreetview) {
+      return clips.isEmpty
+          ? -1
+          : StreetviewTimeline.at(this, seconds).mediaIndex;
+    }
     var end = 0.0;
     for (var i = 0; i < clips.length; i++) {
       end += clips[i].duration;
@@ -308,12 +322,18 @@ class ReelProject {
     return clips.isEmpty ? -1 : clips.length - 1;
   }
 
-  double startOf(int index) =>
-      clips.take(index).fold(0, (sum, c) => sum + c.duration);
+  double startOf(int index) => isStreetview
+      ? StreetviewTimeline.mediaStart(this, index)
+      : clips.take(index).fold(0, (sum, c) => sum + c.duration);
   factory ReelProject.fromJson(Map<String, dynamic> json) => ReelProject(
     id: json['id'] as String?,
     title: json['title'] as String? ?? 'My place reel',
-    template: json['template'] == 'tiktok-feed' ? 'tiktok-feed' : 'maps-place',
+    template: const {'tiktok-feed', 'streetview'}.contains(json['template'])
+        ? json['template'] as String
+        : 'maps-place',
+    streetview: StreetviewSettings.fromJson(
+      Map<String, dynamic>.from(json['streetview'] as Map? ?? {}),
+    ),
     feed: FeedSettings.fromJson(
       Map<String, dynamic>.from(json['feed'] as Map? ?? {}),
     ),
@@ -373,6 +393,7 @@ class ReelProject {
     'slideSeconds': slideSeconds,
     'template': template,
     'feed': feed.toJson(),
+    'streetview': streetview.toJson(),
     'place': place.toJson(),
     'clips': clips.map((e) => e.toJson()).toList(),
     'updatedAt': updatedAt.toIso8601String(),

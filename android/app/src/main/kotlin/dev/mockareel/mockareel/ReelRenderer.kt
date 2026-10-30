@@ -167,7 +167,14 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                     MatrixTransformation { timeUs ->
                         clock.begin(timeUs)
                         val entry = FeedMotion.entry(sceneOffset + clock.elapsed(timeUs), transition)
-                        Matrix().apply { postTranslate(0f, -2 * entry / 640f) }
+                        Matrix().apply {
+                            if (clip["slowPanZoom"] == true) {
+                                val t = ((sceneOffset + clock.elapsed(timeUs)) / total).coerceIn(0.0, 1.0).toFloat()
+                                postScale(1 + t * .06f, 1 + t * .06f)
+                                postTranslate(-2 * t * 8 / 360f, 0f)
+                            }
+                            postTranslate(0f, -2 * entry / 640f)
+                        }
                     },
                     OverlayEffect(listOf(FeedFrameOverlay(overlays[index], frames[index], clock, sceneOffset, if (transition > 0) transition else total)))
                 )

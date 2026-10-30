@@ -148,6 +148,19 @@ class ProjectStore {
         (clips[i]['post'] as Map)['avatarPath'] = relative;
         await encoder.addFile(File(avatar), relative);
       }
+      final maps = <String, String>{};
+      for (var i = 0; i < project.clips.length; i++) {
+        final path = project.clips[i].streetview.mapPath;
+        if (path == null) continue;
+        var relative = maps[path];
+        if (relative == null) {
+          relative =
+              'media/streetview-map-${maps.length}.${path.split('.').last}';
+          maps[path] = relative;
+          await encoder.addFile(File(path), relative);
+        }
+        (clips[i]['streetview'] as Map)['mapPath'] = relative;
+      }
       if (project.feed.homeMedia != null) {
         final home = project.feed.homeMedia!;
         final relative = 'media/home.${home.path.split('.').last}';
@@ -213,7 +226,15 @@ class ProjectStore {
           return file.path;
         }
 
+        final restoredMaps = <String, String>{};
         for (final clip in clips) {
+          final streetview = clip['streetview'] as Map?;
+          final source = streetview?['mapPath'] as String?;
+          if (source != null) {
+            final restored = restoredMaps[source] ?? await restoreExtra(source);
+            restoredMaps[source] = restored;
+            streetview!['mapPath'] = restored;
+          }
           final post = clip['post'] as Map?;
           if (post?['avatarPath'] != null) {
             post!['avatarPath'] = await restoreExtra(

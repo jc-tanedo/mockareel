@@ -1,3 +1,5 @@
+import '../widgets/streetview_inspector.dart';
+import '../model/streetview_timeline.dart';
 import '../services/gif_media.dart';
 import 'maps_web_search_page.dart';
 import 'maps_web_header_page.dart';
@@ -438,7 +440,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         ? _project.mapHeaderPath
         : null;
     if (heroPath != null) await _precache(heroPath);
-    if (_project.headerMode == 'map' && heroPath == null) {
+    if (!_project.isStreetview &&
+        _project.headerMode == 'map' &&
+        heroPath == null) {
       throw const FormatException(
         'Load a Google map or upload a map image in Place before exporting.',
       );
@@ -455,6 +459,16 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         }
         paths[c.id] = await _renderer.poster(c);
         await _precache(paths[c.id]!);
+        if (_project.isStreetview) {
+          paths['${c.id}:end'] = await _renderer.poster(
+            c,
+            position: c.duration - .001,
+          );
+          await _precache(paths['${c.id}:end']!);
+          if (c.streetview.mapPath != null) {
+            await _precache(c.streetview.mapPath!);
+          }
+        }
       }
     }
     if (!mounted) return;
@@ -574,6 +588,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         throw const FormatException('Export cancelled');
       }
       setState(() => _captureSnapshot = false);
+      if (_project.isStreetview) {
+        await _exportStreetview(temp);
+        return;
+      }
       final overlays = <String>[];
       for (var i = 0; i < _project.clips.length; i++) {
         if (!mounted) return;
@@ -669,6 +687,89 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         });
       }
     }
+  }
+
+  Future<void> _exportStreetview(Directory temp) async {
+    final scenes = StreetviewTimeline.scenes(_project);
+    final clips = <Map<String, dynamic>>[];
+    final overlays = <String>[];
+    final frames = <List<String>>[];
+    for (var i = 0; i < scenes.length; i++) {
+      final scene = scenes[i];
+      final clip = _project.clips[scene.mediaIndex];
+      if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+          clip.streetview.mapPath == null) {
+        throw FormatException(
+          'Capture a map for “${clip.name}” before exporting.',
+        );
+      }
+      final media = scene.kind == 'media';
+      final count = media ? 1 : (scene.duration * 30).ceil();
+      final paths = <String>[];
+      for (var f = 0; f < count; f++) {
+        if (_cancelled || !mounted) {
+          throw const FormatException('Export cancelled');
+        }
+        setState(() {
+          _captureSnapshot = false;
+          _capturePosition = scene.start + f / 30;
+          _exportPosition = _capturePosition!;
+          _progress = .35 * (i + f / count) / scenes.length;
+          _status = 'Preparing journey scene ${i + 1} of ${scenes.length}…';
+        });
+        final file = File('${temp.path}/streetview-$i-$f.png');
+        await file.writeAsBytes(await _capturePng());
+        paths.add(file.path);
+      }
+      overlays.add(paths.last);
+      frames.add(media ? [] : paths);
+      clips.add(
+        media
+            ? {...clip.toJson(), 'slowPanZoom': clip.streetview.panZoom}
+            : {
+                ...clip.toJson(),
+                'path': paths.first,
+                'isVideo': false,
+                'isGif': false,
+                'duration': scene.duration,
+                'trimStart': 0.0,
+                'zoom': 1.0,
+                'panX': 0.0,
+              },
+      );
+    }
+    if (_cancelled || !mounted) throw const FormatException('Export cancelled');
+    setState(() {
+      _exportPhase = ExportPhase.encoding;
+      _status = 'Encoding video…';
+      _exportPosition = 0;
+      _capturePosition = null;
+    });
+    _progressSubscription = _renderer.progress.listen((v) {
+      if (mounted) {
+        setState(() {
+          _progress = .35 + .65 * v;
+          _exportPosition = _project.duration * v;
+        });
+      }
+    });
+    final path = await _renderer.exportFeed(
+      clips: clips,
+      overlays: overlays,
+      frames: frames,
+      transitions: List.filled(clips.length, 0),
+      music: _project.music,
+    );
+    if (_cancelled || !mounted) return;
+    setState(() {
+      _exportPhase = ExportPhase.finishing;
+      _progress = 1;
+    });
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
+      ),
+    );
   }
 
   @override
@@ -916,6 +1017,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           key: ValueKey(_previewRevision),
           project: _project,
           selected: _selected,
+          startAtBeginning: _project.isStreetview && _selected == 0,
           maxHeight: maxHeight,
         );
   void _goToStep(int step) => setState(() {
@@ -923,7 +1025,29 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     _previewRevision = newId();
   });
 
-  Widget _editTab() => Column(
+  Widget _editTab() =>
+      _project.isStreetview ? _streetviewTab() : _mapsEditTab();
+
+  Widget _streetviewTab() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      OutputThemePicker(project: _project, onChanged: _change),
+      if (_project.clips.isEmpty)
+        _addMedia()
+      else ...[
+        _clipStrip(),
+        StreetviewInspector(
+          key: ValueKey(_project.clips[_selected].id),
+          project: _project,
+          clip: _project.clips[_selected],
+          store: _store,
+          onChanged: _change,
+        ),
+      ],
+    ],
+  );
+
+  Widget _mapsEditTab() => Column(
     children: [
       InspectorTabs(
         labels: const ['Details', 'Look', 'Header', 'Buttons', 'Review'],
@@ -1109,7 +1233,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                           },
                         )
                       : Text(
-                          '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                          '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.white60,
@@ -1161,7 +1285,15 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 key: ValueKey('timeline-inspector-$_timelineTool'),
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                 children: [
-                  if (_timelineTool == 2)
+                  if (_timelineTool == 2 && _project.isStreetview)
+                    StreetviewInspector(
+                      key: ValueKey(_project.clips[_selected].id),
+                      project: _project,
+                      clip: _project.clips[_selected],
+                      store: _store,
+                      onChanged: _change,
+                    )
+                  else if (_timelineTool == 2)
                     _motionInspector()
                   else
                     _clipCard(_selected.clamp(0, _project.clips.length - 1)),
@@ -1427,28 +1559,30 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             if (_timelineTool == 1)
               Column(
                 children: [
-                  _framingControl(
-                    'Card width',
-                    clip.cardWidth,
-                    .45,
-                    1,
-                    '${(clip.cardWidth * 328).round()} px',
-                    (v) {
-                      clip.cardWidth = v;
-                      _change();
-                    },
-                  ),
-                  _framingControl(
-                    'Card height',
-                    clip.cardHeight,
-                    .55,
-                    1,
-                    '${(clip.cardHeight * 250).round()} px',
-                    (v) {
-                      clip.cardHeight = v;
-                      _change();
-                    },
-                  ),
+                  if (!_project.isStreetview)
+                    _framingControl(
+                      'Card width',
+                      clip.cardWidth,
+                      .45,
+                      1,
+                      '${(clip.cardWidth * 328).round()} px',
+                      (v) {
+                        clip.cardWidth = v;
+                        _change();
+                      },
+                    ),
+                  if (!_project.isStreetview)
+                    _framingControl(
+                      'Card height',
+                      clip.cardHeight,
+                      .55,
+                      1,
+                      '${(clip.cardHeight * 250).round()} px',
+                      (v) {
+                        clip.cardHeight = v;
+                        _change();
+                      },
+                    ),
                   _framingControl(
                     'Zoom',
                     clip.zoom,
@@ -1488,8 +1622,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Widget _exportTab() {
-    final needsMap =
-        _project.headerMode == 'map' && _project.mapHeaderPath == null;
+    final needsMap = _project.isStreetview
+        ? StreetviewTimeline.scenes(_project)
+              .where((s) => s.kind == 'map' || s.kind == 'ending-map')
+              .any(
+                (s) => _project.clips[s.mediaIndex].streetview.mapPath == null,
+              )
+        : _project.headerMode == 'map' && _project.mapHeaderPath == null;
     return Column(
       children: [
         Expanded(
@@ -1522,7 +1661,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
                       style: const TextStyle(color: mint, fontSize: 12),
                     ),
                   ],
@@ -1542,10 +1681,15 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Your map header needs an image.',
-                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                          _project.isStreetview
+                              ? 'Capture the journey’s map screens in Place.'
+                              : 'Your map header needs an image.',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       TextButton(

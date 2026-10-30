@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'ids.dart';
 import 'feed_post.dart';
+import 'streetview.dart';
 
 class ReelClip {
   final String id, path, name;
@@ -10,6 +11,7 @@ class ReelClip {
   double duration, trimStart, cardWidth, cardHeight, zoom, panX;
   String caption;
   FeedPost post;
+  StreetviewMedia streetview;
   ReelClip({
     required this.id,
     required this.path,
@@ -22,11 +24,13 @@ class ReelClip {
     this.trimStart = 0,
     this.caption = '',
     FeedPost? post,
+    StreetviewMedia? streetview,
     this.cardWidth = .78,
     this.cardHeight = 1,
     this.zoom = 1,
     this.panX = 0,
-  }) : post = post ?? FeedPost() {
+  }) : streetview = streetview ?? StreetviewMedia(),
+       post = post ?? FeedPost() {
     normalize();
   }
   bool get isTimed => isVideo || isGif;
@@ -72,6 +76,9 @@ class ReelClip {
     duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
     trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
     caption: json['caption'] as String? ?? '',
+    streetview: StreetviewMedia.fromJson(
+      Map<String, dynamic>.from(json['streetview'] as Map? ?? {}),
+    ),
     post: FeedPost.fromJson(
       Map<String, dynamic>.from(json['post'] as Map? ?? {}),
     ),
@@ -92,6 +99,7 @@ class ReelClip {
     'trimStart': trimStart,
     'caption': caption,
     'post': post.toJson(),
+    'streetview': streetview.toJson(),
     'cardWidth': cardWidth,
     'cardHeight': cardHeight,
     'zoom': zoom,

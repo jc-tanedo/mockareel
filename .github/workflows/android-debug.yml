@@ -1,7 +1,7 @@
 name: Android debug APK
 on:
   push:
-    branches: [main, work, 'poc/**']
+    branches: [main, work, 'poc/**', feature/streetview-template]
   pull_request:
     branches: [main, work]
   workflow_dispatch:

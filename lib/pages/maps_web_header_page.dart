@@ -13,12 +13,17 @@ class MapsWebHeaderPage extends StatefulWidget {
   final PlaceDetails place;
   final MapsHeaderDriver? driver;
   final Widget? browserOverride;
+  final double aspectRatio;
+  final bool showHeaderGuide;
   const MapsWebHeaderPage({
     super.key,
     required this.place,
     this.driver,
     this.browserOverride,
-  }) : assert(driver == null || browserOverride != null);
+    this.aspectRatio = 1000 / 625,
+    this.showHeaderGuide = true,
+  }) : assert(driver == null || browserOverride != null),
+       assert(aspectRatio > 0 && aspectRatio < 10);
   @override
   State<MapsWebHeaderPage> createState() => _MapsWebHeaderPageState();
 }
@@ -154,7 +159,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   }
 
   Widget _mapFrame() => AspectRatio(
-    aspectRatio: 1000 / 625,
+    aspectRatio: widget.aspectRatio,
     child: ClipRect(
       key: _frame,
       child: Stack(
@@ -168,7 +173,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
                     fit: BoxFit.fill,
                     child: SizedBox(
                       width: 1000,
-                      height: 625,
+                      height: 1000 / widget.aspectRatio,
                       child:
                           widget.browserOverride ??
                           WebViewWidget.fromPlatformCreationParams(
@@ -180,7 +185,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
                     ),
                   ),
                 ),
-          if (!_busy)
+          if (!_busy && widget.showHeaderGuide)
             Positioned(
               left: 0,
               right: 0,
@@ -236,9 +241,11 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         child: Text(_error!, style: const TextStyle(color: Colors.white70)),
       ),
     const SizedBox(height: 12),
-    const Text(
-      'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.',
-      style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+    Text(
+      widget.showHeaderGuide
+          ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.'
+          : 'Frame the place and keep Google branding and attribution visible. The map is saved with your project for preview, export and backups. No API key needed.',
+      style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
     ),
   ];
 
@@ -247,14 +254,20 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     child: FilledButton.icon(
       onPressed: _ready && !_busy ? _capture : null,
       icon: Icon(_busy ? Icons.hourglass_top : Icons.check),
-      label: Text(_busy ? 'Capturing map…' : 'Use map header'),
+      label: Text(
+        _busy
+            ? 'Capturing map…'
+            : widget.showHeaderGuide
+            ? 'Use map header'
+            : 'Use map',
+      ),
     ),
   );
 
   List<Widget> _heading() => [
-    const Text(
-      'KEY-FREE MAP HEADER',
-      style: TextStyle(color: mint, fontSize: 10, letterSpacing: 1.4),
+    Text(
+      widget.showHeaderGuide ? 'KEY-FREE MAP HEADER' : 'KEY-FREE MAP',
+      style: const TextStyle(color: mint, fontSize: 10, letterSpacing: 1.4),
     ),
     const SizedBox(height: 10),
     Text(widget.place.name, style: Theme.of(context).textTheme.titleLarge),
@@ -265,7 +278,9 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Frame map header')),
+    appBar: AppBar(
+      title: Text(widget.showHeaderGuide ? 'Frame map header' : 'Frame map'),
+    ),
     body: SafeArea(
       top: false,
       child: LayoutBuilder(

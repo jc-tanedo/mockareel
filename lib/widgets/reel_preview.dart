@@ -1,3 +1,5 @@
+import '../model/streetview_timeline.dart';
+import 'streetview_canvas.dart';
 import '../model/feed_timeline.dart';
 import 'package:flutter/scheduler.dart';
 import 'dart:math';
@@ -42,6 +44,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
             (widget.project.clips.isEmpty
                 ? 0
                 : FeedTimeline.transition(widget.project, widget.selected))
+      : widget.project.isStreetview
+      ? StreetviewTimeline.mediaStart(widget.project, widget.selected)
       : widget.project.startOf(widget.selected) +
             TemplateLayout.transitionDuration(widget.project, widget.selected);
   void _pause() {
@@ -160,7 +164,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
               ),
             ),
             Text(
-              '${_position.toStringAsFixed(1)} / ${_duration.toStringAsFixed(1)}s',
+              '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / ${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
               style: const TextStyle(fontSize: 11),
             ),
           ],
@@ -196,6 +200,16 @@ class ReelCanvas extends StatelessWidget {
             (project.isFeed
                 ? FeedTimeline.duration(project)
                 : project.duration);
+    if (project.isStreetview) {
+      return StreetviewCanvas(
+        project: project,
+        position: position,
+        playing: playbackActive,
+        overlayOnly: overlayOnly,
+        posterOnly: posterOnly,
+        posters: posters,
+      );
+    }
     if (project.isFeed) {
       return FeedCanvas(
         project: project,

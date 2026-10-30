@@ -26,8 +26,9 @@ Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfa
 | --- | --- |
 | **Maps place story** | A map or photo header, editable place details and buttons, horizontal media cards, movable text, optional featured review, and light/dark output. |
 | **TikTok FYP scroll** | Typed search or a home-screen opening, editable posts and engagement counts, timed vertical swipes, and an optional app-close ending. |
+| **[Streetview journey](docs/streetview.md)** | A captured Maps opening, per-media locations and Street View overlays, directional movement or return-to-Maps transitions, and an optional map ending. |
 
-Both templates support photos, trimmed video, animated GIFs with timing/loop controls, framing controls and optional background music. The FYP home screen includes iPhone, Android, Pixel and Samsung One UI presets, plus controls for using a supplied screenshot without duplicate overlays. Each preset uses its own layout and editable app artwork based on home-screen references.
+All templates support photos, trimmed video, animated GIFs with timing/loop controls, framing controls and optional background music. The FYP home screen includes iPhone, Android, Pixel and Samsung One UI presets, plus controls for using a supplied screenshot without duplicate overlays. Each preset uses its own layout and editable app artwork based on home-screen references.
 
 ## Get started
 
