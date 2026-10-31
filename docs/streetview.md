@@ -44,7 +44,7 @@ transition. Each ripple is included in its containing scene exactly once.
 The optional ending adds a back-control transition and a final map hold, with
 no thumbnail tap to reenter Street View. By default the output ends on media.
 
-Expand **Camera motion** to enable slow zoom, horizontal pan and a simulated
+Use the **Camera motion** card to enable slow zoom, horizontal pan and a simulated
 turntable independently for each item. Adjust zoom amount, signed pan distance
 and signed turn angle (up to 15°). Turntable applies a gentle perspective yaw to
 ordinary media. All three motions carry the navigation arrows with the scene;
@@ -64,7 +64,7 @@ come from the selected map; output theme changes the interface, not map pixels.
 
 ## Media effects
 
-Expand **Media effects** for the selected media in Place or Timeline → Motion.
+Use the **Media effects** card for the selected media in Place or Timeline → Motion.
 Enable **Lens effect**, choose **Fisheye** or **Pincushion**, and adjust its
 strength from 0–100%. For photos, use **Add blur spot** to
 create up to eight feathered circular spots. Drag a circle on the source preview,
