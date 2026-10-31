@@ -4,7 +4,7 @@
 
 ## Project library
 
-The app opens to a grid of saved projects with previews of their output. **New project** opens the template gallery: choose **Maps place story** or **TikTok FYP scroll**. The editor’s back arrow returns to the library and saves your changes. Import portable backups with the file icon in the library. Existing Maps projects remain available after upgrading.
+The app opens to a grid of saved projects with previews of their output. **New project** opens the template gallery: choose **Maps place story**, **TikTok FYP scroll**, or **[Streetview journey](streetview.md)**. The library labels their project types **Maps Story**, **FYP Scroll**, and **Street View**. The editor’s back arrow returns to the library and saves your changes. Import portable backups with the file icon in the library. Existing Maps projects remain available after upgrading.
 
 ## TikTok FYP scroll
 
@@ -34,7 +34,11 @@ When using an existing screenshot/recording, **Use media without overlays** hide
 Autosave and `.mockareel` backups include all per-post fields, avatars, home media, sequence settings and music. No account or network connection is needed for this template. These are editable visual mockups; the buttons do not navigate to live social profiles.
 
 
-## First template: Maps place story
+## Streetview journey
+
+Create a simulated Street View journey from ordinary photos, videos and supported GIFs. Each media item keeps its own location, captured map, overlays, camera motion and transition. Start on a Maps screen, then use directional arrow movement or return through Maps between items. Settings are grouped into visible cards; **Camera motion**, **Street View overlays**, and **Journey timing and ending** are separate sections. See the [Streetview guide](streetview.md) for timing, lens effects and photo blur controls.
+
+## Maps place story
 
 The template follows the supplied screen recording: a map header (or optional photo), a white place sheet with editable details and teal action chips, and a horizontal gallery of rounded cards that scrolls left, snaps a card fully into view, then holds. Tabs, a place-specific footer button and hours stay fixed beneath the gallery. Movable text layers and decorative story controls can be added. The editor uses charcoal panels, violet selection highlights and a thumbnail timeline with a selected-clip inspector.
 
