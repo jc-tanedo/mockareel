@@ -18,7 +18,7 @@ class FeedSequenceEditor extends StatelessWidget {
     required this.onChanged,
   });
 
-  ReelFeed get feed => project.feed;
+  FeedSettings get feed => project.feed;
 
   TextStyle? _mutedStyle(BuildContext context) {
     final theme = Theme.of(context);

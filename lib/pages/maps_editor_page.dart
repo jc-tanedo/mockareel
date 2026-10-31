@@ -20,7 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/project.dart';
 import '../services/native_renderer.dart';
@@ -486,22 +486,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       }
     }
   }
-
-  Widget _framingControl(
-    String label,
-    double value,
-    double min,
-    double max,
-    String display,
-    ValueChanged<double> onChanged,
-  ) => EditorSlider(
-    label: label,
-    valueLabel: display,
-    value: value,
-    min: min,
-    max: max,
-    onChanged: onChanged,
-  );
 
   Future<void> _export() async {
     if (_project.clips.isEmpty || _exporting) return;
@@ -992,7 +976,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                               importing: _importing,
                               store: _store,
                               onPickMedia: _pickMedia,
-                              onAddMedia: _addMedia(),
+                              addMediaButton: _addMedia(),
                               onSelectClip: (i) => setState(() {
                                 _selected = i;
                                 _previewRevision = newId();

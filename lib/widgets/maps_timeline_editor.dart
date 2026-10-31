@@ -3,7 +3,7 @@ import '../model/project.dart';
 import '../services/project_store.dart';
 import 'editor_section_card.dart';
 import 'editor_workspace.dart';
-import 'reel_preview.dart';
+import 'media_frame.dart';
 import 'streetview_inspector.dart';
 
 class MapsTimelineEditor extends StatelessWidget {
@@ -13,7 +13,7 @@ class MapsTimelineEditor extends StatelessWidget {
   final bool importing;
   final ProjectStore store;
   final VoidCallback onPickMedia;
-  final VoidCallback onAddMedia;
+  final Widget addMediaButton;
   final ValueChanged<int> onSelectClip;
   final ValueChanged<int> onSelectTool;
   final ValueChanged<int> onRemoveClip;
@@ -29,7 +29,7 @@ class MapsTimelineEditor extends StatelessWidget {
     required this.importing,
     required this.store,
     required this.onPickMedia,
-    required this.onAddMedia,
+    required this.addMediaButton,
     required this.onSelectClip,
     required this.onSelectTool,
     required this.onRemoveClip,
@@ -513,7 +513,7 @@ class MapsTimelineEditor extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    onAddMedia,
+                    addMediaButton,
                   ],
                 ),
               ),

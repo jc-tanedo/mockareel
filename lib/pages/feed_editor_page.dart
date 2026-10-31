@@ -1,4 +1,3 @@
-import '../services/gif_media.dart';
 import '../services/media_importer.dart';
 import '../widgets/export_monitor.dart';
 import '../services/feed_capture_plan.dart';
