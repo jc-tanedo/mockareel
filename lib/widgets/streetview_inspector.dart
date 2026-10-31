@@ -1,3 +1,4 @@
+import 'editor_section_card.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -79,17 +80,14 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
   }
 
   Widget _field(String label, String value, ValueChanged<String> change) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: TextFormField(
-          key: ValueKey('${widget.clip.id}-$label-$_revision'),
-          initialValue: value,
-          decoration: InputDecoration(labelText: label),
-          onChanged: (v) {
-            change(v);
-            widget.onChanged();
-          },
-        ),
+      TextFormField(
+        key: ValueKey('${widget.clip.id}-$label-$_revision'),
+        initialValue: value,
+        decoration: InputDecoration(labelText: label),
+        onChanged: (v) {
+          change(v);
+          widget.onChanged();
+        },
       );
   Widget _slider(
     String label,
@@ -97,20 +95,16 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     double min,
     double max,
     ValueChanged<double> change,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('$label · ${value.toStringAsFixed(2)}s'),
-      Slider(
-        value: value.clamp(min, max),
-        min: min,
-        max: max,
-        onChanged: (v) {
-          change(v);
-          widget.onChanged();
-        },
-      ),
-    ],
+  ) => EditorSlider(
+    label: label,
+    valueLabel: '${value.toStringAsFixed(2)}s',
+    value: value,
+    min: min,
+    max: max,
+    onChanged: (v) {
+      change(v);
+      widget.onChanged();
+    },
   );
   Widget _amount(
     String label,
@@ -119,22 +113,17 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     double max,
     ValueChanged<double> change, {
     bool percent = false,
-  }) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        '$label · ${(percent ? value * 100 : value).toStringAsFixed(1)}${percent ? '%' : '°'}',
-      ),
-      Slider(
-        value: value,
-        min: min,
-        max: max,
-        onChanged: (v) {
-          change(v);
-          widget.onChanged();
-        },
-      ),
-    ],
+  }) => EditorSlider(
+    label: label,
+    valueLabel:
+        '${(percent ? value * 100 : value).toStringAsFixed(1)}${percent ? '%' : '°'}',
+    value: value,
+    min: min,
+    max: max,
+    onChanged: (v) {
+      change(v);
+      widget.onChanged();
+    },
   );
   Widget _switch(String label, bool value, ValueChanged<bool> change) =>
       SwitchListTile(
@@ -150,82 +139,97 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      FilledButton.icon(
-        onPressed: _busy ? null : _location,
-        icon: const Icon(Icons.search),
-        label: const Text('Select this media’s location'),
-      ),
-      if (_s.canCaptureMap)
-        TextButton.icon(
-          onPressed: _busy ? null : _capture,
-          icon: const Icon(Icons.map_outlined),
-          label: Text(
-            _busy
-                ? 'Capturing…'
-                : _s.mapPath == null
-                ? 'Capture map'
-                : 'Replace captured map',
+      EditorSectionCard(
+        title: const Text('Media location'),
+        subtitle: const Text('Location and captured map for this media'),
+        children: [
+          FilledButton.icon(
+            onPressed: _busy ? null : _location,
+            icon: const Icon(Icons.search),
+            label: const Text('Select this media’s location'),
           ),
-        ),
-      _field('Place name', _s.place.name, (v) => _s.place.name = v),
-      _field('Address', _s.place.address, (v) => _s.place.address = v),
-      MediaEditsEditor(
-        key: ValueKey('effects-${widget.clip.id}'),
-        clip: widget.clip,
-        onChanged: widget.onChanged,
+          if (_s.canCaptureMap)
+            TextButton.icon(
+              onPressed: _busy ? null : _capture,
+              icon: const Icon(Icons.map_outlined),
+              label: Text(
+                _busy
+                    ? 'Capturing…'
+                    : _s.mapPath == null
+                    ? 'Capture map'
+                    : 'Replace captured map',
+              ),
+            ),
+          _field('Place name', _s.place.name, (v) => _s.place.name = v),
+          _field('Address', _s.place.address, (v) => _s.place.address = v),
+        ],
       ),
-      ExpansionTile(
+      EditorSectionCard(
         title: const Text('Map place details and buttons'),
+        subtitle: const Text('Place information and rendered actions'),
         children: [
           _field('Category', _s.place.category, (v) => _s.place.category = v),
           _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
           PlaceActionsEditor(
             key: ValueKey(_revision),
             place: _s.place,
+            embedded: true,
             suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
             onChanged: widget.onChanged,
           ),
         ],
       ),
-      const Divider(),
-      const Text('Transition to next media'),
-      DropdownButtonFormField<String>(
-        initialValue: _s.transition,
-        items: const [
-          DropdownMenuItem(value: 'arrow', child: Text('Arrow movement')),
-          DropdownMenuItem(value: 'map', child: Text('Return to Maps')),
-        ],
-        onChanged: (v) {
-          _s.transition = v!;
-          widget.onChanged();
-        },
+      MediaEditsEditor(
+        key: ValueKey('effects-${widget.clip.id}'),
+        clip: widget.clip,
+        onChanged: widget.onChanged,
       ),
-      if (_s.transition == 'arrow') ...[
-        DropdownButtonFormField<String>(
-          initialValue: _s.arrow,
-          decoration: const InputDecoration(labelText: 'Navigation arrow'),
-          items: const [
-            DropdownMenuItem(value: 'left', child: Text('Left')),
-            DropdownMenuItem(value: 'right', child: Text('Right')),
+      EditorSectionCard(
+        title: const Text('Transition to next media'),
+        subtitle: const Text('How this media leads into the next'),
+        children: [
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: _s.transition,
+            decoration: const InputDecoration(labelText: 'Transition type'),
+            items: const [
+              DropdownMenuItem(value: 'arrow', child: Text('Arrow movement')),
+              DropdownMenuItem(value: 'map', child: Text('Return to Maps')),
+            ],
+            onChanged: (v) {
+              _s.transition = v!;
+              widget.onChanged();
+            },
+          ),
+          if (_s.transition == 'arrow') ...[
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _s.arrow,
+              decoration: const InputDecoration(labelText: 'Navigation arrow'),
+              items: const [
+                DropdownMenuItem(value: 'left', child: Text('Left')),
+                DropdownMenuItem(value: 'right', child: Text('Right')),
+              ],
+              onChanged: (v) {
+                _s.arrow = v!;
+                widget.onChanged();
+              },
+            ),
           ],
-          onChanged: (v) {
-            _s.arrow = v!;
-            widget.onChanged();
-          },
-        ),
-      ],
-      _slider(
-        _s.transition == 'arrow'
-            ? 'Movement including tap'
-            : 'Back control including tap',
-        _s.transitionSeconds,
-        .2,
-        2,
-        (v) => _s.transitionSeconds = v,
+          _slider(
+            _s.transition == 'arrow'
+                ? 'Movement including tap'
+                : 'Back control including tap',
+            _s.transitionSeconds,
+            .2,
+            2,
+            (v) => _s.transitionSeconds = v,
+          ),
+        ],
       ),
-      ExpansionTile(
+      EditorSectionCard(
         title: const Text('Camera motion'),
-        tilePadding: EdgeInsets.zero,
+        subtitle: const Text('Movement for this media'),
         children: [
           _switch('Slow zoom', _s.slowZoom, (v) => _s.slowZoom = v),
           if (_s.slowZoom)
@@ -264,8 +268,9 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ),
         ],
       ),
-      ExpansionTile(
+      EditorSectionCard(
         title: const Text('Street View overlays'),
+        subtitle: const Text('Labels and visibility for this media'),
         children: [
           _field('Capture date / age', _s.date, (v) => _s.date = v),
           _field(
@@ -283,15 +288,12 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ),
           _switch('Top controls', _s.showControls, (v) => _s.showControls = v),
           _switch('Navigation arrows', _s.showArrows, (v) => _s.showArrows = v),
-          _switch(
-            'Location and date card',
-            _s.showLocation,
-            (v) => _s.showLocation = v,
-          ),
+          _switch('Place sheet', _s.showLocation, (v) => _s.showLocation = v),
         ],
       ),
-      ExpansionTile(
+      EditorSectionCard(
         title: const Text('Journey timing and ending'),
+        subtitle: const Text('Applies to the whole journey'),
         children: [
           _slider(
             'Opening map',

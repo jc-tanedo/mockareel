@@ -2,6 +2,7 @@ import '../model/feed_timeline.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
+import 'editor_section_card.dart';
 
 class AudioEditor extends StatelessWidget {
   final ReelProject project;
@@ -23,62 +24,76 @@ class AudioEditor extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (preview != null) preview!,
-        const SizedBox(height: 12),
-        const Text(
-          'SOUNDTRACK',
-          style: TextStyle(
-            fontSize: 11,
-            letterSpacing: 2,
-            color: Colors.white54,
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: importing ? null : onPick,
-          icon: const Icon(Icons.library_music_outlined),
-          label: Text(
-            importing
-                ? 'Importing audio…'
-                : m == null
-                ? 'Choose background music'
-                : 'Replace music',
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (m != null) ...[
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.music_note, color: Color(0xff9c93ff)),
-              title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(
-                '${m.sourceDuration.toStringAsFixed(1)}s source · ${(project.isFeed ? FeedTimeline.duration(project) : project.duration).toStringAsFixed(1)}s reel',
+        EditorSectionCard(
+          title: const Text('Soundtrack'),
+          children: [
+            FilledButton.icon(
+              onPressed: importing ? null : onPick,
+              icon: const Icon(Icons.library_music_outlined),
+              label: Text(
+                importing
+                    ? 'Importing audio…'
+                    : m == null
+                    ? 'Choose background music'
+                    : 'Replace music',
               ),
-              trailing: IconButton(
-                tooltip: 'Remove music',
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  project.music = null;
+            ),
+            if (m != null) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.music_note),
+                title: Text(
+                  m.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${m.sourceDuration.toStringAsFixed(1)}s source · ${(project.isFeed ? FeedTimeline.duration(project) : project.duration).toStringAsFixed(1)}s reel',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Remove music',
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    project.music = null;
+                    onChanged();
+                  },
+                ),
+              ),
+              EditorSlider(
+                label: 'Volume',
+                valueLabel: '${(m.volume * 100).round()}%',
+                value: m.volume,
+                min: 0,
+                max: 1,
+                onChanged: (v) {
+                  m.volume = v;
                   onChanged();
                 },
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Volume · ${(m.volume * 100).round()}%'),
-          Slider(
-            value: m.volume,
-            onChanged: (v) {
-              m.volume = v;
-              onChanged();
-            },
-          ),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
+              const Text(
+                'Press play above to hear the soundtrack with your reel. Original clip audio is muted.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white60,
+                  height: 1.5,
+                ),
+              ),
+            ] else
+              const Text(
+                'Add music from your device, or continue to Export for a silent reel.',
+                style: TextStyle(color: Colors.white60, height: 1.5),
+              ),
+          ],
+        ),
+        if (m != null)
+          EditorSectionCard(
             title: const Text('Timing & loop'),
             children: [
-              Text('Start music at · ${m.trimStart.toStringAsFixed(1)}s'),
-              Slider(
+              EditorSlider(
+                label: 'Start music at',
+                valueLabel: '${m.trimStart.toStringAsFixed(1)}s',
                 value: m.trimStart,
+                min: 0,
                 max: max(.001, m.sourceDuration - .1),
                 onChanged: (v) {
                   m.trimStart = v;
@@ -97,19 +112,6 @@ class AudioEditor extends StatelessWidget {
                 },
               ),
             ],
-          ),
-          const Text(
-            'Press play above to hear the soundtrack with your reel. Original clip audio is muted.',
-            style: TextStyle(color: Colors.white54, height: 1.5),
-          ),
-        ] else
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              'Add music from your device, or continue to Export for a silent reel.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, height: 1.6),
-            ),
           ),
       ],
     );

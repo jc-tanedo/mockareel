@@ -1,3 +1,4 @@
+import '../widgets/editor_section_card.dart';
 import '../model/streetview_motion.dart';
 import '../widgets/streetview_inspector.dart';
 import '../model/streetview_timeline.dart';
@@ -547,16 +548,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     double max,
     String display,
     ValueChanged<double> onChanged,
-  ) => Column(
-    children: [
-      Row(
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-          Text(display, style: const TextStyle(color: mint, fontSize: 12)),
-        ],
-      ),
-      Slider(value: value, min: min, max: max, onChanged: onChanged),
-    ],
+  ) => EditorSlider(
+    label: label,
+    valueLabel: display,
+    value: value,
+    min: min,
+    max: max,
+    onChanged: onChanged,
   );
 
   Future<void> _export() async {
@@ -871,9 +869,11 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const Text(
-                      'MAPS PLACE STORY · 9:16',
-                      style: TextStyle(
+                    Text(
+                      _project.isStreetview
+                          ? 'STREET VIEW JOURNEY · 9:16'
+                          : 'MAPS PLACE STORY · 9:16',
+                      style: const TextStyle(
                         fontSize: 9,
                         color: mint,
                         letterSpacing: 1,
@@ -1068,18 +1068,23 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
           children: switch (_placeTool) {
             0 => [
-              FilledButton.icon(
-                onPressed: _findPlace,
-                icon: const Icon(Icons.search, size: 18),
-                label: const Text('Find a place on Google Maps'),
+              EditorSectionCard(
+                title: const Text('Place details'),
+                spacing: 0,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _findPlace,
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('Find a place on Google Maps'),
+                  ),
+                  const SizedBox(height: 16),
+                  _field('Place name', _name),
+                  _field('Category & description', _category),
+                  _field('Address', _address),
+                ],
               ),
-              const SizedBox(height: 16),
-              _field('Place name', _name),
-              _field('Category & description', _category),
-              _field('Address', _address),
-              ExpansionTile(
+              EditorSectionCard(
                 title: const Text('More place details'),
-                tilePadding: EdgeInsets.zero,
                 children: [
                   _field(
                     'Rating',
@@ -1101,16 +1106,22 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             ],
             1 => [
               OutputThemePicker(project: _project, onChanged: _change),
-              const Divider(height: 28),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Story controls overlay'),
-                subtitle: const Text('Decorative controls from the reference'),
-                value: _project.storyChrome,
-                onChanged: (v) {
-                  _project.storyChrome = v;
-                  _change();
-                },
+              EditorSectionCard(
+                title: const Text('Story controls'),
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Story controls overlay'),
+                    subtitle: const Text(
+                      'Decorative controls from the reference',
+                    ),
+                    value: _project.storyChrome,
+                    onChanged: (v) {
+                      _project.storyChrome = v;
+                      _change();
+                    },
+                  ),
+                ],
               ),
             ],
             2 => [
@@ -1138,7 +1149,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   'actions-${_project.id}-${_project.place.placeId}',
                 ),
                 place: _project.place,
-                expanded: true,
                 onChanged: _change,
               ),
             ],
@@ -1147,7 +1157,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 project: _project,
                 loading: _importing,
                 showHeader: false,
-                expanded: true,
                 onChanged: _change,
                 onLoadMap: _loadMap,
                 useApiHeaders: _useApiHeaders && _key.isNotEmpty,
@@ -1343,59 +1352,58 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Widget _motionInspector() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
-        'Opening scroll reveal',
-        style: TextStyle(fontWeight: FontWeight.w600),
+      EditorSectionCard(
+        title: const Text('Opening scroll reveal'),
+        children: [
+          _framingControl(
+            'Reveal duration',
+            _project.sheetIntroSeconds,
+            0,
+            2,
+            '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
+            (v) {
+              _project.sheetIntroSeconds = v < .1 ? 0 : v;
+              _previewRevision = newId();
+              _change();
+            },
+          ),
+          const Text(
+            'Set to zero to start with the sheet already in position.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+        ],
       ),
-      const SizedBox(height: 12),
-      _framingControl(
-        'Reveal duration',
-        _project.sheetIntroSeconds,
-        0,
-        2,
-        '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
-        (v) {
-          _project.sheetIntroSeconds = v < .1 ? 0 : v;
-          _previewRevision = newId();
-          _change();
-        },
-      ),
-      const Text(
-        'Set to zero to start with the sheet already in position.',
-        style: TextStyle(fontSize: 11, color: Colors.white54),
-      ),
-      const Divider(height: 28),
-      const Text(
-        'Left-scroll snap',
-        style: TextStyle(fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 12),
-      _framingControl(
-        'Slide speed',
-        _project.slideSeconds,
-        .15,
-        .8,
-        '${_project.slideSeconds.toStringAsFixed(2)}s',
-        (v) {
-          _project.slideSeconds = v;
-          _change();
-        },
-      ),
-      const Text(
-        'Slide time is included in each clip’s duration.',
-        style: TextStyle(fontSize: 11, color: Colors.white54),
-      ),
-      TextButton(
-        onPressed: () {
-          for (final c in _project.clips) {
-            c.duration = 1.56;
-            c.normalize();
-          }
-          _project.slideSeconds = .35;
-          _previewRevision = newId();
-          _change();
-        },
-        child: const Text('Use reference pace · 1.56s per card'),
+      EditorSectionCard(
+        title: const Text('Left-scroll snap'),
+        children: [
+          _framingControl(
+            'Slide speed',
+            _project.slideSeconds,
+            .15,
+            .8,
+            '${_project.slideSeconds.toStringAsFixed(2)}s',
+            (v) {
+              _project.slideSeconds = v;
+              _change();
+            },
+          ),
+          const Text(
+            'Slide time is included in each clip’s duration.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+          TextButton(
+            onPressed: () {
+              for (final c in _project.clips) {
+                c.duration = 1.56;
+                c.normalize();
+              }
+              _project.slideSeconds = .35;
+              _previewRevision = newId();
+              _change();
+            },
+            child: const Text('Use reference pace · 1.56s per card'),
+          ),
+        ],
       ),
     ],
   );
@@ -1479,145 +1487,138 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Widget _clipCard(int index) {
     final clip = _project.clips[index];
-    return Card(
+    return EditorSectionCard(
       key: ValueKey(clip.id),
-      margin: const EdgeInsets.only(bottom: 12),
-      color: panel,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_timelineTool == 0) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Move clip earlier',
-                    onPressed: index == 0 ? null : () => _move(index, -1),
-                    icon: const Icon(Icons.chevron_left, size: 18),
-                  ),
-                  IconButton(
-                    tooltip: 'Move clip later',
-                    onPressed: index == _project.clips.length - 1
-                        ? null
-                        : () => _move(index, 1),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                  ),
-                ],
+      title: Text(_timelineTool == 0 ? 'Media timing' : 'Media framing'),
+      children: [
+        if (_timelineTool == 0) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              Slider(
-                value: clip.duration,
-                min: clip.minDuration,
-                max: clip.maxDuration,
-                onChanged: (v) {
-                  clip.duration = v;
-                  clip.normalize();
+              IconButton(
+                tooltip: 'Move clip earlier',
+                onPressed: index == 0 ? null : () => _move(index, -1),
+                icon: const Icon(Icons.chevron_left, size: 18),
+              ),
+              IconButton(
+                tooltip: 'Move clip later',
+                onPressed: index == _project.clips.length - 1
+                    ? null
+                    : () => _move(index, 1),
+                icon: const Icon(Icons.chevron_right, size: 18),
+              ),
+            ],
+          ),
+          Slider(
+            value: clip.duration,
+            min: clip.minDuration,
+            max: clip.maxDuration,
+            onChanged: (v) {
+              clip.duration = v;
+              clip.normalize();
+              _change();
+            },
+          ),
+          if (clip.isGif)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Loop GIF'),
+              subtitle: const Text(
+                'Repeat the animation to fill the clip duration',
+              ),
+              value: clip.loopGif,
+              onChanged: (v) {
+                clip.setGifLoop(v);
+                _change();
+              },
+            ),
+          if (clip.isTimed && clip.maxTrimStart > .001) ...[
+            Text(
+              'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            Slider(
+              value: clip.trimStart,
+              max: clip.maxTrimStart,
+              onChanged: (v) {
+                clip.trimStart = v;
+                clip.normalize();
+                _change();
+              },
+            ),
+          ],
+          TextFormField(
+            key: ValueKey('caption-${clip.id}'),
+            initialValue: clip.caption,
+            maxLength: 120,
+            decoration: const InputDecoration(
+              labelText: 'Caption (optional)',
+              counterText: '',
+            ),
+            onChanged: (v) {
+              clip.caption = v;
+              _change();
+            },
+          ),
+        ],
+        if (_timelineTool == 1)
+          Column(
+            children: [
+              if (!_project.isStreetview)
+                _framingControl(
+                  'Card width',
+                  clip.cardWidth,
+                  .45,
+                  1,
+                  '${(clip.cardWidth * 328).round()} px',
+                  (v) {
+                    clip.cardWidth = v;
+                    _change();
+                  },
+                ),
+              if (!_project.isStreetview)
+                _framingControl(
+                  'Card height',
+                  clip.cardHeight,
+                  .55,
+                  1,
+                  '${(clip.cardHeight * 250).round()} px',
+                  (v) {
+                    clip.cardHeight = v;
+                    _change();
+                  },
+                ),
+              _framingControl(
+                'Zoom',
+                clip.zoom,
+                1,
+                3,
+                '${clip.zoom.toStringAsFixed(2)}×',
+                (v) {
+                  clip.zoom = v;
                   _change();
                 },
               ),
-              if (clip.isGif)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Loop GIF'),
-                  subtitle: const Text(
-                    'Repeat the animation to fill the clip duration',
-                  ),
-                  value: clip.loopGif,
-                  onChanged: (v) {
-                    clip.setGifLoop(v);
-                    _change();
-                  },
-                ),
-              if (clip.isTimed && clip.maxTrimStart > .001) ...[
-                Text(
-                  'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                ),
-                Slider(
-                  value: clip.trimStart,
-                  max: clip.maxTrimStart,
-                  onChanged: (v) {
-                    clip.trimStart = v;
-                    clip.normalize();
-                    _change();
-                  },
-                ),
-              ],
-              TextFormField(
-                key: ValueKey('caption-${clip.id}'),
-                initialValue: clip.caption,
-                maxLength: 120,
-                decoration: const InputDecoration(
-                  labelText: 'Caption (optional)',
-                  counterText: '',
-                ),
-                onChanged: (v) {
-                  clip.caption = v;
+              _framingControl(
+                'Horizontal crop',
+                clip.panX,
+                -1,
+                1,
+                '${(clip.panX * 100).round()}%',
+                (v) {
+                  clip.panX = v;
                   _change();
                 },
               ),
             ],
-            if (_timelineTool == 1)
-              Column(
-                children: [
-                  if (!_project.isStreetview)
-                    _framingControl(
-                      'Card width',
-                      clip.cardWidth,
-                      .45,
-                      1,
-                      '${(clip.cardWidth * 328).round()} px',
-                      (v) {
-                        clip.cardWidth = v;
-                        _change();
-                      },
-                    ),
-                  if (!_project.isStreetview)
-                    _framingControl(
-                      'Card height',
-                      clip.cardHeight,
-                      .55,
-                      1,
-                      '${(clip.cardHeight * 250).round()} px',
-                      (v) {
-                        clip.cardHeight = v;
-                        _change();
-                      },
-                    ),
-                  _framingControl(
-                    'Zoom',
-                    clip.zoom,
-                    1,
-                    3,
-                    '${clip.zoom.toStringAsFixed(2)}×',
-                    (v) {
-                      clip.zoom = v;
-                      _change();
-                    },
-                  ),
-                  _framingControl(
-                    'Horizontal crop',
-                    clip.panX,
-                    -1,
-                    1,
-                    '${(clip.panX * 100).round()}%',
-                    (v) {
-                      clip.panX = v;
-                      _change();
-                    },
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -1711,8 +1712,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   ),
                 ),
               const SizedBox(height: 12),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
+              EditorSectionCard(
                 title: const Text('Still images'),
                 subtitle: const Text('Transparent template or full snapshot'),
                 children: [

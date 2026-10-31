@@ -110,7 +110,6 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Media effects'));
       for (var i = 0; i < 20; i++) {
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 10)),
@@ -126,9 +125,10 @@ void main() {
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Pincushion').last);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(clip.edits.lens, 'pincushion');
       await tester.ensureVisible(find.text('Add blur spot (0/8)'));
+      await tester.pump();
       await tester.tap(find.text('Add blur spot (0/8)'));
       await tester.pump();
       expect(clip.edits.spots.length, 1);

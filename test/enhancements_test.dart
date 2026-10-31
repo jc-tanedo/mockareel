@@ -124,8 +124,6 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Template buttons'));
-      await tester.pumpAndSettle();
       final field = find.widgetWithText(TextFormField, 'Button 1 label');
       await tester.enterText(field, 'Navigate');
       await tester.pumpAndSettle();

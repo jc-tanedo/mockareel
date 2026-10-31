@@ -1,3 +1,4 @@
+import 'editor_section_card.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'story_tags.dart';
@@ -5,13 +6,13 @@ import 'story_tags.dart';
 class PlaceActionsEditor extends StatefulWidget {
   final PlaceDetails place;
   final List<PlaceAction>? suggestedActions;
-  final bool expanded;
+  final bool embedded;
   final VoidCallback onChanged;
   const PlaceActionsEditor({
     super.key,
     required this.place,
     this.suggestedActions,
-    this.expanded = false,
+    this.embedded = false,
     required this.onChanged,
   });
   @override
@@ -35,9 +36,8 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
       .map((a) => PlaceAction(kind: a.kind, label: a.label))
       .toList();
   @override
-  Widget build(BuildContext context) => ExpansionTile(
-    initiallyExpanded: widget.expanded,
-    tilePadding: EdgeInsets.zero,
+  Widget build(BuildContext context) => EditorSectionCard(
+    embedded: widget.embedded,
     title: const Text('Template buttons'),
     subtitle: const Text('Suggested from this place · fully editable'),
     children: [
@@ -110,7 +110,9 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
             ],
           ),
         ),
-      Row(
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
         children: [
           TextButton.icon(
             onPressed: actions.length >= 4

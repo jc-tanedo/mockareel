@@ -1,3 +1,4 @@
+import '../widgets/editor_section_card.dart';
 import '../services/gif_media.dart';
 import '../widgets/export_monitor.dart';
 import '../services/feed_capture_plan.dart';
@@ -275,23 +276,17 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     double hi,
     ValueChanged<double> change, {
     int precision = 1,
-  }) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        '$label · ${value.toStringAsFixed(precision)}${label == 'Zoom' ? '×' : 's'}',
-        style: const TextStyle(fontSize: 12),
-      ),
-      Slider(
-        value: value.clamp(lo, hi),
-        min: lo,
-        max: max(lo + .001, hi),
-        onChanged: (v) {
-          change(v);
-          _change();
-        },
-      ),
-    ],
+  }) => EditorSlider(
+    label: label,
+    valueLabel:
+        '${value.toStringAsFixed(precision)}${label == 'Zoom' ? '×' : 's'}',
+    value: value.clamp(lo, hi),
+    min: lo,
+    max: max(lo + .001, hi),
+    onChanged: (v) {
+      change(v);
+      _change();
+    },
   );
   Widget _tools(List<String> labels, int selected, ValueChanged<int> tap) =>
       SingleChildScrollView(
@@ -314,93 +309,102 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   Widget _sequence() => ListView(
     padding: const EdgeInsets.all(16),
     children: [
-      const Text(
-        'OPENING',
-        style: TextStyle(
-          fontSize: 10,
-          color: Colors.white54,
-          letterSpacing: 1.5,
-        ),
-      ),
-      const SizedBox(height: 12),
-      SegmentedButton<String>(
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(value: 'search', label: Text('Search')),
-          ButtonSegment(value: 'home', label: Text('Home screen')),
-          ButtonSegment(value: 'feed', label: Text('Feed')),
-        ],
-        selected: {p.feed.opening},
-        onSelectionChanged: (s) {
-          p.feed.opening = s.first;
-          _change();
-        },
-      ),
-      const SizedBox(height: 18),
-      if (p.feed.opening == 'search') ...[
-        _field(
-          'Search query',
-          p.feed.search,
-          (v) => p.feed.search = v,
-          max: 100,
-        ),
-        const Text(
-          'Leave empty to start directly in the feed.',
-          style: TextStyle(fontSize: 11, color: Colors.white54),
-        ),
-        const SizedBox(height: 16),
-        _slider(
-          'Typing',
-          p.feed.typingSeconds,
-          .5,
-          6,
-          (v) => p.feed.typingSeconds = v,
-        ),
-        _slider(
-          'Loading',
-          p.feed.loadingSeconds,
-          .2,
-          3,
-          (v) => p.feed.loadingSeconds = v,
-        ),
-      ],
-      if (p.feed.opening == 'home')
-        const Padding(
-          padding: EdgeInsets.only(bottom: 16),
-          child: Text(
-            'The home screen holds, then the app opens into your first post.',
-            style: TextStyle(fontSize: 12, color: Colors.white60),
+      EditorSectionCard(
+        title: const Text('Opening scene'),
+        children: [
+          SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'search', label: Text('Search')),
+              ButtonSegment(value: 'home', label: Text('Home screen')),
+              ButtonSegment(value: 'feed', label: Text('Feed')),
+            ],
+            selected: {p.feed.opening},
+            onSelectionChanged: (s) {
+              p.feed.opening = s.first;
+              _change();
+            },
           ),
-        ),
-      _slider(
-        'Swipe duration',
-        p.slideSeconds,
-        .15,
-        .8,
-        (v) => p.slideSeconds = v,
+          const SizedBox(height: 18),
+          if (p.feed.opening == 'search') ...[
+            _field(
+              'Search query',
+              p.feed.search,
+              (v) => p.feed.search = v,
+              max: 100,
+            ),
+            const Text(
+              'Leave empty to start directly in the feed.',
+              style: TextStyle(fontSize: 11, color: Colors.white54),
+            ),
+            const SizedBox(height: 16),
+            _slider(
+              'Typing',
+              p.feed.typingSeconds,
+              .5,
+              6,
+              (v) => p.feed.typingSeconds = v,
+            ),
+            _slider(
+              'Loading',
+              p.feed.loadingSeconds,
+              .2,
+              3,
+              (v) => p.feed.loadingSeconds = v,
+            ),
+          ],
+          if (p.feed.opening == 'home')
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Text(
+                'The home screen holds, then the app opens into your first post.',
+                style: TextStyle(fontSize: 12, color: Colors.white60),
+              ),
+            ),
+        ],
       ),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Close app to home screen'),
-        subtitle: const Text('Shrink the last post back into the app icon.'),
-        value: p.feed.closeToHome,
-        onChanged: (v) {
-          p.feed.closeToHome = v;
-          _change();
-        },
+      EditorSectionCard(
+        title: const Text('Feed transitions'),
+        children: [
+          _slider(
+            'Swipe duration',
+            p.slideSeconds,
+            .15,
+            .8,
+            (v) => p.slideSeconds = v,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Close app to home screen'),
+            subtitle: const Text(
+              'Shrink the last post back into the app icon.',
+            ),
+            value: p.feed.closeToHome,
+            onChanged: (v) {
+              p.feed.closeToHome = v;
+              _change();
+            },
+          ),
+        ],
       ),
-      ExpansionTile(
-        tilePadding: EdgeInsets.zero,
+      EditorSectionCard(
         title: const Text('Home screen & status bar'),
-        initiallyExpanded: p.feed.opening == 'home',
         children: [
           const SizedBox(height: 12),
           DropdownButtonFormField<HomeOs>(
+            isExpanded: true,
             initialValue: p.feed.homeOs,
             decoration: const InputDecoration(labelText: 'Home screen OS'),
             items: [
               for (final os in HomeOs.values)
-                DropdownMenuItem(value: os, child: Text(os.label)),
+                DropdownMenuItem(
+                  value: os,
+                  child: Text(
+                    os.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             ],
             onChanged: (os) {
               if (os != null) {
@@ -468,6 +472,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
           _field('Date', p.feed.date, (v) => p.feed.date = v, max: 50),
           if (p.feed.homeOs == HomeOs.iphone) ...[
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: p.feed.iphonePeriod,
               decoration: const InputDecoration(
                 labelText: 'Status bar time period',
@@ -591,8 +596,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
               onChanged: _change,
             )
           else
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
+            EditorControlGroup(
               title: const Text('App labels'),
               subtitle: const Text(
                 'Eight generic tiles; the fourth opens the feed.',
@@ -614,6 +618,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: DropdownButtonFormField<int>(
+                      isExpanded: true,
                       key: ValueKey('app-icon-$i'),
                       initialValue: i < p.feed.appIcons.length
                           ? p.feed.appIcons[i]

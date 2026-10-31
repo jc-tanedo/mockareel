@@ -1,3 +1,4 @@
+import 'editor_section_card.dart';
 import 'package:flutter/material.dart';
 import '../model/feed.dart';
 import 'home_app_icon.dart';
@@ -23,8 +24,7 @@ class _HomeAppsEditorState extends State<HomeAppsEditor> {
     final apps = _dock ? s.homeDock : s.homeApps;
     _selected = _selected.clamp(0, apps.length - 1);
     final app = apps[_selected];
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
+    return EditorControlGroup(
       title: const Text('Home apps & dock'),
       subtitle: Text(
         '${s.homeApps.length} grid slots · ${s.homeDock.length} dock apps',
@@ -124,6 +124,7 @@ class _HomeAppsEditorState extends State<HomeAppsEditor> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<HomeGlyph>(
+          isExpanded: true,
           key: ValueKey(
             'glyph-${s.homeOs.name}-$_dock-$_selected-${s.launchSlot}',
           ),

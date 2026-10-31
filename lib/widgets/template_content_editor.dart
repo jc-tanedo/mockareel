@@ -1,9 +1,10 @@
+import 'editor_section_card.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 
 class TemplateContentEditor extends StatelessWidget {
   final ReelProject project;
-  final bool loading, showHeader, showReview, expanded, useApiHeaders;
+  final bool loading, showHeader, showReview, useApiHeaders;
   final VoidCallback onChanged, onLoadMap, onUploadMap;
   const TemplateContentEditor({
     super.key,
@@ -12,7 +13,6 @@ class TemplateContentEditor extends StatelessWidget {
     this.showHeader = true,
     this.useApiHeaders = false,
     this.showReview = true,
-    this.expanded = false,
     required this.onChanged,
     required this.onLoadMap,
     required this.onUploadMap,
@@ -21,9 +21,7 @@ class TemplateContentEditor extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       if (showHeader)
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          initiallyExpanded: true,
+        EditorSectionCard(
           title: const Text('Header image'),
           subtitle: const Text('Google map or your own map image'),
           children: [
@@ -109,9 +107,7 @@ class TemplateContentEditor extends StatelessWidget {
           ],
         ),
       if (showReview)
-        ExpansionTile(
-          initiallyExpanded: expanded,
-          tilePadding: EdgeInsets.zero,
+        EditorSectionCard(
           title: const Text('Featured review (optional)'),
           subtitle: Text(
             project.review.visible
