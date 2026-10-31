@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/wavy_slider_track.dart';
 
-const ink = Color(0xff121216),
-    panel = Color(0xff1e1e24),
-    mint = Color(0xffb8aeff);
+const ink = Color(0xff111015),
+    panel = Color(0xff1d1b24),
+    mint = Color(0xffb29eff),
+    vividMint = Color(0xff00e5a3),
+    vividRose = Color(0xffff6584);
 
 ThemeData buildAppTheme() {
   final baseScheme = ColorScheme.fromSeed(
@@ -11,14 +14,16 @@ ThemeData buildAppTheme() {
   );
   final colorScheme = baseScheme.copyWith(
     primary: mint,
+    secondary: vividMint,
+    tertiary: vividRose,
     surface: ink,
-    surfaceDim: const Color(0xff0e0e12),
-    surfaceBright: const Color(0xff35343c),
-    surfaceContainerLowest: const Color(0xff0b0b0e),
-    surfaceContainerLow: const Color(0xff19191f),
+    surfaceDim: const Color(0xff0d0c11),
+    surfaceBright: const Color(0xff363442),
+    surfaceContainerLowest: const Color(0xff08070b),
+    surfaceContainerLow: const Color(0xff17151e),
     surfaceContainer: panel,
-    surfaceContainerHigh: const Color(0xff27272f),
-    surfaceContainerHighest: const Color(0xff32323c),
+    surfaceContainerHigh: const Color(0xff24222d),
+    surfaceContainerHighest: const Color(0xff2e2c3a),
   );
 
   return ThemeData(
@@ -65,6 +70,7 @@ ThemeData buildAppTheme() {
     ),
     sliderTheme: SliderThemeData(
       trackHeight: 4,
+      trackShape: const WavySliderTrackShape(),
       activeTrackColor: colorScheme.primary,
       inactiveTrackColor: colorScheme.surfaceContainerHighest,
       thumbColor: colorScheme.primary,

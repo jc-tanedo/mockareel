@@ -290,7 +290,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       }
       if (failures > 0) {
         _toast(
-          '$failures files could not be opened. Try JPG/PNG/GIF images or MP4 video.',
+          '$failures files could not be opened. '
+          'Try JPG/PNG/GIF images or MP4 video.',
         );
       }
     } catch (e) {
@@ -463,16 +464,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (!mounted) return;
       setState(() => _captureIndex = _selected);
       final bytes = await _capturePng();
+      final kind = snapshot ? 'snapshot' : 'template';
       final file = File(
-        '${_store.root!.path}/exports/${snapshot ? 'snapshot' : 'template'}-${newId()}.png',
+        '${_store.root!.path}/exports/$kind-${newId()}.png',
       );
       await file.writeAsBytes(bytes);
       if (_cancelled || !mounted) return;
+      final subjectLabel =
+          snapshot ? 'snapshot' : 'transparent template';
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
-          subject:
-              '${_project.title} — ${snapshot ? 'snapshot' : 'transparent template'}',
+          subject: '${_project.title} — $subjectLabel',
         ),
       );
     } catch (e) {
@@ -757,8 +760,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       },
       child: Stack(
         children: [
-          // The capture surface is painted behind the opaque editor. It stays exactly
-          // 360×640 logical pixels regardless of the phone screen or accessibility scale.
+          // The capture surface is painted behind the opaque editor.
+          // It stays exactly 360×640 logical pixels regardless of the phone
+          // screen or accessibility scale.
           Positioned(
             left: 0,
             top: 0,

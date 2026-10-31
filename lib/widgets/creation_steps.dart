@@ -81,7 +81,11 @@ class CreationSteps extends StatelessWidget {
                           excludeSemantics: true,
                           onTap: () => onSelected(i),
                           label:
-                              'Step ${i + 1} of $count, ${customLabels[i]}${optionalSteps.contains(i) ? ', optional' : ''}',
+                              'Step ${i + 1} of $count, '
+                              '${customLabels[i]}' +
+                              (optionalSteps.contains(i)
+                                  ? ', optional'
+                                  : ''),
                           selected: selected == i,
                           button: true,
                           child: InkWell(
@@ -109,8 +113,9 @@ class CreationSteps extends StatelessWidget {
                                       ),
                                       AnimatedContainer(
                                         duration: const Duration(
-                                          milliseconds: 180,
+                                          milliseconds: 240,
                                         ),
+                                        curve: Curves.easeOutBack,
                                         width: selected == i ? 34 : 24,
                                         height: 24,
                                         margin: const EdgeInsets.symmetric(

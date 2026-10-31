@@ -11,6 +11,7 @@ import 'media_frame.dart';
 import 'place_overlay.dart';
 import 'music_playback.dart';
 import 'output_palette.dart';
+import 'wavy_slider_track.dart';
 export 'place_overlay.dart';
 
 class TimelinePreview extends StatefulWidget {
@@ -166,17 +167,25 @@ class _TimelinePreviewState extends State<TimelinePreview>
               ),
             ),
             Expanded(
-              child: Slider(
-                value: min(_position, _duration),
-                max: max(.01, _duration),
-                onChangeStart: (_) => _pause(),
-                onChanged: p.clips.isEmpty
-                    ? null
-                    : (v) => setState(() => _position = v),
+              child: SliderTheme(
+                data: theme.sliderTheme.copyWith(
+                  trackShape: WavySliderTrackShape(
+                    phase: _playing ? (_position * 3.5 * pi) : 0.0,
+                  ),
+                ),
+                child: Slider(
+                  value: min(_position, _duration),
+                  max: max(.01, _duration),
+                  onChangeStart: (_) => _pause(),
+                  onChanged: p.clips.isEmpty
+                      ? null
+                      : (v) => setState(() => _position = v),
+                ),
               ),
             ),
             Text(
-              '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / ${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
+              '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / '
+              '${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
               style: theme.textTheme.labelSmall?.copyWith(
                 fontSize: 11,
                 color: colors.onSurfaceVariant,
@@ -264,8 +273,9 @@ class ReelCanvas extends StatelessWidget {
             height: height,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(TemplateLayout.radius),
-              // Live cards keep one stable player as they move from upcoming
-              // to active to outgoing. Capture/poster mode retains still images.
+              // Live cards keep one stable player as they move from
+              // upcoming to active to outgoing. Capture/poster mode retains
+              // still images.
               child: !posterOnly
                   ? MediaFrame(
                       key: ValueKey(clip.id),

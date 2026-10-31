@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'editor_section_card.dart';
+import 'editor_workspace.dart';
 
 class FeedPostsEditor extends StatelessWidget {
   final ReelProject project;
@@ -152,7 +153,8 @@ class FeedPostsEditor extends StatelessWidget {
         ),
         _field('Sound label', post.sound, (v) => post.sound = v, max: 80),
         Text(
-          'The sound label is decorative. Choose actual background music in Audio.',
+          'The sound label is decorative. '
+          'Choose actual background music in Audio.',
           style: _mutedStyle(context),
         ),
       ],
@@ -328,7 +330,8 @@ class FeedPostsEditor extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Add your media, then edit the poster, caption and counts for each post.',
+                        'Add your media, then edit the poster, '
+                        'caption and counts for each post.',
                         textAlign: TextAlign.center,
                         style: textTheme.bodySmall?.copyWith(
                           color: colors.onSurfaceVariant,

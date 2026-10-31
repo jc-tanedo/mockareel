@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'editor_section_card.dart';
+import 'editor_workspace.dart';
 import 'reel_preview.dart';
 import 'streetview_inspector.dart';
 
@@ -275,7 +276,9 @@ class MapsTimelineEditor extends StatelessWidget {
             ),
           if (clip.isTimed && clip.maxTrimStart > .001) ...[
             Text(
-              'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
+              'Start at '
+              '${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of '
+              '${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

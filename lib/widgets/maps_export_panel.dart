@@ -35,6 +35,7 @@ class MapsExportPanel extends StatelessWidget {
     final durationLabel = project.duration.toStringAsFixed(
       project.isStreetview ? 2 : 1,
     );
+    final musicLabel = project.music == null ? 'Silent' : 'With music';
 
     return Column(
       children: [
@@ -72,8 +73,6 @@ class MapsExportPanel extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            final musicLabel =
-                                project.music == null ? 'Silent' : 'With music';
                             Text(
                               'Vertical MP4 · H.264 · $musicLabel',
                               style: textTheme.bodySmall?.copyWith(
@@ -116,7 +115,8 @@ class MapsExportPanel extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Add at least one photo or video in Timeline to export.',
+                          'Add at least one photo or video in Timeline '
+                          'to export.',
                           style: textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),

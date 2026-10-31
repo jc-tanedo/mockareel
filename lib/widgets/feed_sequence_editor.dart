@@ -122,7 +122,8 @@ class FeedSequenceEditor extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Text(
-                  'The home screen holds, then the app opens into your first post.',
+                  'The home screen holds, then the app opens into your '
+                  'first post.',
                   style: muted,
                 ),
               ),
@@ -183,7 +184,8 @@ class FeedSequenceEditor extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               title: const Text('Show mock app icons'),
               subtitle: const Text(
-                'Includes the dock and launcher navigation. Turn off for screenshots that already have icons.',
+                'Includes the dock and launcher navigation. '
+                'Turn off for screenshots that already have icons.',
               ),
               value: feed.showIcons,
               onChanged: (v) {
@@ -260,7 +262,8 @@ class FeedSequenceEditor extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
-                  'Classic iOS uses a full app grid and the status-bar clock, with no large clock or dashboard widgets.',
+                  'Classic iOS uses a full app grid and the status-bar '
+                  'clock, with no large clock or dashboard widgets.',
                   style: muted,
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// A stable preview stage and a separate scrolling inspector, like a media editor.
+/// A stable preview stage and a separate scrolling inspector,
+/// like a media editor.
 class EditorWorkspace extends StatefulWidget {
   final Widget Function(double maxHeight) previewBuilder;
   final Widget inspector;
@@ -117,8 +118,9 @@ class _EditorWorkspaceState extends State<EditorWorkspace> {
           ),
         );
         final sideBySide = wide && !keyboard;
-        // Keep one Flex and a stable inspector element while the keyboard changes
-        // orientation. Replacing Row with Column recreates focused text fields.
+        // Keep one Flex and a stable inspector element while the
+        // keyboard changes orientation. Replacing Row with Column
+        // recreates focused text fields.
         return Flex(
           direction: sideBySide ? Axis.horizontal : Axis.vertical,
           children: [
@@ -167,28 +169,33 @@ class InspectorTabs extends StatelessWidget {
             for (var i = 0; i < labels.length; i++)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(
-                    labels[i],
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: selected == i
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: selected == i
-                          ? colors.onSecondaryContainer
-                          : colors.onSurfaceVariant,
+                child: AnimatedScale(
+                  scale: selected == i ? 1.02 : 1.0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: ChoiceChip(
+                    label: Text(
+                      labels[i],
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: selected == i
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: selected == i
+                            ? colors.onSecondaryContainer
+                            : colors.onSurfaceVariant,
+                      ),
                     ),
+                    selected: selected == i,
+                    showCheckmark: false,
+                    selectedColor: colors.secondaryContainer,
+                    backgroundColor: colors.surfaceContainerLow,
+                    side: BorderSide(
+                      color: selected == i
+                          ? colors.primary.withValues(alpha: 0.5)
+                          : colors.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                    onSelected: (_) => onSelected(i),
                   ),
-                  selected: selected == i,
-                  showCheckmark: false,
-                  selectedColor: colors.secondaryContainer,
-                  backgroundColor: colors.surfaceContainerLow,
-                  side: BorderSide(
-                    color: selected == i
-                        ? colors.primary.withValues(alpha: 0.5)
-                        : colors.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                  onSelected: (_) => onSelected(i),
                 ),
               ),
           ],
