@@ -81,11 +81,7 @@ class CreationSteps extends StatelessWidget {
                           excludeSemantics: true,
                           onTap: () => onSelected(i),
                           label:
-                              'Step ${i + 1} of $count, '
-                              '${customLabels[i]}' +
-                              (optionalSteps.contains(i)
-                                  ? ', optional'
-                                  : ''),
+                              'Step ${i + 1} of $count, ${customLabels[i]}${optionalSteps.contains(i) ? ', optional' : ''}',
                           selected: selected == i,
                           button: true,
                           child: InkWell(

@@ -395,9 +395,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                       : EditorWorkspace(
                           keyboardVisible: keyboard,
                           previewFraction: .5,
-                          hint: _tab == 1
-                              ? 'LIVE PREVIEW · POST ${_selected + 1}'
-                              : 'LIVE PREVIEW · FULL SEQUENCE',
+                          hint:
+                              'LIVE PREVIEW · ${_tab == 1 ? 'POST ${_selected + 1}' : 'FULL SEQUENCE'}',
                           previewBuilder: (height) => TimelinePreview(
                             key: ValueKey(
                               '${p.id}-${_tab == 1 ? _selected : -1}',
@@ -640,8 +639,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
             ).toJson(),
           );
         } else {
-          // Split a short video wallpaper into repeats; each copy reuses
-          // the same UI scene clock.
+          // Split a short video wallpaper into repeats; each copy reuses the same UI scene clock.
           clips.add({
             ...source.toJson(),
             'duration': s.duration,

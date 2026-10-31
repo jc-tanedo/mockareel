@@ -35,8 +35,9 @@ class MediaImporter {
     double? cardWidth,
   }) async {
     final video = isVideo(file);
-    final info =
-        video ? await renderer.inspect(file.path) : <String, dynamic>{};
+    final info = video
+        ? await renderer.inspect(file.path)
+        : <String, dynamic>{};
     final length = (info['duration'] as num?)?.toDouble() ?? 0;
     if (video && length <= 0) {
       throw const FormatException('Video duration is unavailable');
