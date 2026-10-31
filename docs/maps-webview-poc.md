@@ -10,13 +10,14 @@ Branch: `poc/maps-webview-search`. This branch uses application ID `dev.mockaree
 2. Search for a place and city, such as `coffee shops Subic Bay Freeport Zone`, or paste a Google Maps HTTPS share link.
 3. Choose a native result card. Wait for its place details, optionally select a featured review, then tap **Use this place**.
 4. The editor receives editable name, category, rating, review count, address, phone, website and opening-hours text when Google exposes them. Selected review text, author and rating populate the optional featured review. Unknown values stay blank. Exact target coordinates and an official Places ID are retained when present; a map viewport is never treated as the business location.
-5. Under **Place → Header**, tap **Load Google map**. The saved listing opens in a framing screen without an API key. Pan/zoom, wait for visible tiles, then choose **Use map header**. An oversized WebView crops out edge controls; the visible frame matches the saved crop. Google's original footer is positioned inside that crop, retaining branding and legal attribution along with the map's labels and pins. The PNG is stored in project media and used by preview, PNG/MP4 export and portable backups. Reload and capture again to replace older PNGs containing browser controls. You can still upload a map image or choose a photo header.
+5. Under **Place → Header**, tap **Load Google map**. The saved listing opens in a framing screen without an API key. Pan/zoom, wait for visible tiles, enter **Map / imagery credits**, then choose **Use map header**. An oversized WebView always crops out edge controls; the visible frame matches the saved crop. Attribution is added to the PNG after capture, using a Google Maps label and your entered text. The saved asset is reused by preview, PNG/MP4 export and portable backups. Recapture older images to remove baked-in browser controls. You can still upload a map image or choose a photo header.
 
-Map readiness depends on the visible canvas or loaded raster tiles, independently
-of footer CSS. When Google's footer cannot be retained inside the crop, framing
-and capture use the full map with its original credits. The footer layout does
-not cause a tile-loading timeout. Crop mode is checked again before capture,
-and its final viewport is painted before PixelCopy reads the native window.
+Map readiness depends on the visible canvas or loaded raster tiles. Attribution
+is handled independently after PixelCopy; no footer selectors, layout checks or
+uncropped fallback are involved. The framing view previews the same caption
+that is stamped into the final image, and keyboard focus is dismissed before
+capturing the final viewport.
+
 6. **More project options → Advanced · Google Maps** keeps an optional API key and **Use API map headers** switch. Browser mode remains the default even when a key is saved. The settings enumerate the required APIs; see [API setup](google-maps.md).
 
 If Google shows a consent/interstitial page, use **Show browser**, complete the interaction yourself and select **Read page**. This does not implement Google sign-in. **Use API lookup** remains available in the search page's menu, and manual editing is always available in the editor. **Refresh place details** can pick up fields that arrived after the initial snapshot.
@@ -33,11 +34,11 @@ Results and review visibility vary with Google layout, locale and browser condit
 
 ## Header capture
 
-The header uses a visible, hybrid-composited Android WebView with a fixed 1000×625 desktop viewport, fitted to the framing area. The shared `assets/maps_header.js` collapses the listing panel and removes search/account chrome while retaining Google branding, map labels and attribution. It waits for a visible map canvas and footer over several samples, with a 35-second timeout. Check that tiles have loaded before saving; DOM readiness is not proof that every tile has finished.
+The header uses a visible, hybrid-composited Android WebView with a 1440-pixel-wide content viewport plus 240 CSS pixels of overscan on each side. The shared `assets/maps_header.js` collapses the listing panel and removes search/account chrome. It waits for a visible map canvas or loaded raster tiles over several samples, with a 35-second timeout. Attribution is previewed in Flutter and stamped into the cropped PNG afterward. Check that tiles have loaded before saving; DOM readiness is not proof that every tile has finished.
 
 Android `PixelCopy` copies just this viewport from the window, including GPU map layers. The Flutter framing page brings it fully into view, locks interaction for capture, and sends bounded physical-pixel coordinates to a Flutter-only method channel. PNG encoding runs off the UI thread; there is no JavaScript-to-native capture bridge. This path requires Android 8/API 26 or newer. The map URL is retained in the place model so reloading opens the same listing. Older projects fall back to their place name/address or exact coordinates.
 
-The story header reveals a single continuous map behind the moving place sheet, aligned to the bottom so original branding and attribution remain visible. The framing screen outlines the lower area that remains visible after the intro; keep the place inside it. The guide is hidden before capture. Existing headers can be reframed if their marker lies outside that final area. The saved PNG remains unchanged. Browser framing zoom/pan are captured in this image; re-opening the framing screen returns to the original listing rather than restoring the previous pan. The numeric map-zoom slider applies to optional API headers only.
+The story header reveals a single continuous map behind the moving place sheet, aligned to the bottom so the added attribution remains visible. The framing screen outlines the lower area that remains visible after the intro; keep the place inside it. The guide is hidden before capture. Existing headers can be reframed if their marker lies outside that final area. The saved PNG remains unchanged during playback. Browser framing zoom/pan are captured in this image; re-opening the framing screen returns to the original listing rather than restoring the previous pan. The numeric map-zoom slider applies to optional API headers only.
 
 Physical Android capture still needs device verification; browser rendering and native compilation do not validate `PixelCopy` on a phone. Upload/API alternatives remain available if a device cannot capture the map.
 

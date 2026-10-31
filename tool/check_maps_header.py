@@ -5,53 +5,39 @@ import tempfile
 
 
 def check_crops(page, script):
+    import json
+    from PIL import Image
+    from io import BytesIO
     for height in [900, 2208]:
         page.set_viewport_size({'width': 1920, 'height': height + 480})
         page.set_content('''<style>
           body {margin:0;background:#9dd9ac}
           canvas {position:absolute;inset:0;width:100%;height:100%}
           .edge {position:fixed;width:160px;height:160px;background:red;z-index:4}
-          .scene-footer-container {position:fixed;bottom:0;left:0;right:0;height:24px;background:white;display:flex;justify-content:space-between;z-index:5}
+          .scene-footer-container {position:fixed;bottom:0;left:0;right:0;height:24px;background:blue;z-index:5}
           #pin {position:absolute;left:950px;top:500px;color:black}
-          #watermark {position:fixed;bottom:0;left:0;font-size:14px}
         </style><canvas></canvas><div id="pin">Selected location</div>
-        <div class="edge" id="unknown-top" style="top:20px;left:20px">Unrecognized control</div>
-        <div class="edge" id="unknown-bottom" style="bottom:40px;right:20px">Unrecognized control</div>
-        <div id="watermark">Google Maps</div>
-        <div class="scene-footer-container"><span></span><span>Map data ©2026 Google</span><a>Terms</a></div>''')
-        crop = {'left': 240, 'top': 240, 'width': 1440, 'height': height}
-        page.evaluate('(crop) => window.__mockareelHeaderCrop = crop', crop)
-        result = page.evaluate(script)
-        import json
-        assert json.loads(result)['state'] == 'ready', 'cropped map not ready'
-        footer = page.locator('.scene-footer-container').bounding_box()
-        assert footer['x'] >= 240 and footer['x'] + footer['width'] <= 1680
-        assert footer['y'] >= 240 and footer['y'] + footer['height'] <= height + 240
-        for name in ['unknown-top', 'unknown-bottom']:
-            edge = page.locator('#' + name).bounding_box()
-            assert edge['x'] + edge['width'] <= 240 or edge['x'] >= 1680 or edge['y'] + edge['height'] <= 240 or edge['y'] >= height + 240
-        logo = page.locator('#watermark').bounding_box()
-        assert logo['x'] >= 240 and logo['y'] + logo['height'] <= height + 240
-        page.locator('.scene-footer-container').evaluate('''(node) => {
-            node.style.height = '0'; node.style.padding = '0 18px';
-            for (const child of node.children) { child.style.position = 'absolute'; child.style.bottom = '0'; }
-        }''')
-        collapsed = json.loads(page.evaluate(script))
-        assert collapsed['state'] == 'ready' and collapsed['attributionReady'], 'zero-height footer wrapper must not block a loaded map'
-        page.locator('.scene-footer-container').evaluate('''(node) => {
-            node.className = 'new-google-footer'; node.id = 'modern-footer';
-            node.style.cssText = 'position:fixed;bottom:0;left:0;width:100%;height:24px;background:white';
-        }''')
-        changed = json.loads(page.evaluate(script))
-        assert changed['state'] == 'ready' and not changed['attributionReady'], 'a footer change must not become a tile-loading timeout'
-        page.evaluate('window.__mockareelHeaderCrop = null')
-        full = json.loads(page.evaluate(script))
-        assert full['state'] == 'ready' and full['attributionReady'], 'full-map fallback must remain capturable'
-        original_credits = page.locator('#modern-footer').bounding_box()
-        assert original_credits['y'] + original_credits['height'] == height + 480
-        assert 'Map data' in page.locator('#modern-footer').inner_text(), 'fallback must retain the original provider credits'
+        <div class="edge" style="top:20px;left:20px">Unknown control</div>
+        <div class="edge" style="top:20px;right:20px">Unknown control</div>
+        <div class="edge" style="bottom:40px;left:20px">Unknown control</div>
+        <div class="edge" style="bottom:40px;right:20px">Unknown control</div>
+        <div class="scene-footer-container">Map data ©2026 Google</div>''')
+        crop = {'x': 240, 'y': 240, 'width': 1440, 'height': height}
+        for footer in ['known', 'renamed', 'missing']:
+            if footer == 'renamed':
+                page.locator('.scene-footer-container').evaluate('(node) => node.className = "changed-footer"')
+            elif footer == 'missing':
+                page.locator('.changed-footer').evaluate('(node) => node.remove()')
+            state = json.loads(page.evaluate(script))
+            assert state['state'] == 'ready', 'footer must not affect readiness'
+            assert 'attributionReady' not in state, 'attribution must not control capture'
+            image = Image.open(BytesIO(page.screenshot(clip=crop))).convert('RGB')
+            colors = {color for _, color in image.getcolors(maxcolors=image.width * image.height)}
+            assert (255, 0, 0) not in colors, 'native edge control leaked into crop'
+            assert (0, 0, 255) not in colors, 'native footer leaked into crop'
+            assert image.size == (1440, height)
         page.locator('canvas').evaluate('(node) => node.remove()')
-        assert json.loads(page.evaluate(script))['state'] == 'loading', 'empty viewport must not be marked ready'
+        assert json.loads(page.evaluate(script))['state'] == 'loading'
 
 
 def main():
@@ -126,7 +112,7 @@ def main():
                 assert json.loads(page.evaluate(script))['state'] == 'loading'
             finally:
                 browser.close()
-        print('Production Maps checks passed: controls hidden/cropped, both aspect ratios retain attribution, footer changes use full-map fallback instead of blocking tile readiness, and external zoom remains usable.')
+        print('Production Maps checks passed: controls hidden/cropped, actual pixels of both aspect ratios exclude native controls and native footers regardless of footer layout, and external zoom remains usable.')
 
 
 if __name__ == '__main__':

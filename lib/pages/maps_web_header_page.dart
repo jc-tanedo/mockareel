@@ -7,6 +7,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../model/project.dart';
 import '../services/maps_web_header_session.dart';
 import '../model/map_capture_viewport.dart';
+import '../widgets/map_attribution.dart';
 import '../theme/app_theme.dart';
 
 /// A visible, hardware-composited map viewport: PixelCopy includes GPU map
@@ -34,7 +35,8 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   final _frame = GlobalKey();
   WebViewController? _controller;
   MapsHeaderDriver? _driver;
-  bool _ready = false, _busy = false, _cropped = true;
+  bool _ready = false, _busy = false;
+  String _credits = "";
   String _status = 'Loading Google Maps…';
   String? _error;
   int _generation = 0;
@@ -58,10 +60,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         _driver = widget.driver;
       } else {
         _controller = WebViewController();
-        _driver = MapsWebHeaderSession(
-          _controller!,
-          viewport: MapCaptureViewport(widget.aspectRatio),
-        );
+        _driver = MapsWebHeaderSession(_controller!);
       }
       await _driver!.initialize();
       if (!mounted) return;
@@ -82,21 +81,17 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     final generation = ++_generation;
     setState(() {
       _ready = false;
-      _cropped = true;
       _error = null;
       _status = 'Loading Google Maps…';
     });
     try {
       await _driver!.load(widget.place);
       if (!mounted || generation != _generation) return;
-      final cropped = await _driver!.prepareCapture();
       if (mounted && generation == _generation) {
         setState(() {
           _ready = true;
-          _cropped = cropped;
-          _status = cropped
-              ? 'Pan or zoom to frame your map. Check that tiles have loaded.'
-              : 'Map loaded. The full map is retained to keep Google branding and attribution visible. Pan or zoom to frame it.';
+          _status =
+              'Pan or zoom to frame your map. Check that tiles have loaded.';
         });
       }
     } catch (e) {
@@ -125,21 +120,19 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
 
   Future<void> _capture() async {
     if (!_ready || _busy) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final cropped = await _driver!.prepareCapture();
       if (!mounted) return;
-      setState(() => _cropped = cropped);
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
-      // Keep the entire viewport visible, including on shorter phones.
-      await Scrollable.ensureVisible(_frame.currentContext!, alignment: .5);
       // Let the last pan/zoom frame settle before copying the native window.
       await Future<void>.delayed(const Duration(milliseconds: 700));
       if (!mounted) return;
+      await Scrollable.ensureVisible(_frame.currentContext!, alignment: .5);
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       final box = _frame.currentContext!.findRenderObject()! as RenderBox;
@@ -153,7 +146,11 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
           box.size.height * dpr,
         ),
       );
-      if (mounted) Navigator.pop(context, bytes);
+      final attributed = await MapAttributionPainter.apply(
+        bytes,
+        credits: _credits,
+      );
+      if (mounted) Navigator.pop(context, attributed);
     } catch (e) {
       if (mounted) {
         setState(
@@ -187,9 +184,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
               : LayoutBuilder(
                   builder: (context, bounds) {
                     final viewport = MapCaptureViewport(widget.aspectRatio);
-                    final browser = _cropped
-                        ? viewport.browser
-                        : viewport.content;
+                    final browser = viewport.browser;
                     final scale = bounds.maxWidth / viewport.content.width;
                     return OverflowBox(
                       minWidth: browser.width * scale,
@@ -217,6 +212,14 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
                     );
                   },
                 ),
+          if (!_busy)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: MapAttributionPainter(credits: _credits),
+                ),
+              ),
+            ),
           if (!_busy && widget.showHeaderGuide)
             Positioned(
               left: 0,
@@ -266,6 +269,18 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         ),
       ],
     ),
+    TextFormField(
+      enabled: !_busy,
+      decoration: const InputDecoration(
+        labelText: 'Map / imagery credits',
+        hintText: 'Add source attribution text',
+        helperText: 'Added beside Google Maps after the image is cropped.',
+      ),
+      maxLength: 300,
+      minLines: 1,
+      maxLines: 3,
+      onChanged: (value) => setState(() => _credits = value),
+    ),
     if (!_ready && _error == null) const LinearProgressIndicator(minHeight: 2),
     if (_error != null)
       Padding(
@@ -275,8 +290,8 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     const SizedBox(height: 12),
     Text(
       widget.showHeaderGuide
-          ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.'
-          : 'Frame the place and keep Google branding and attribution visible. The map is saved with your project for preview, export and backups. No API key needed.',
+          ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google Maps and your entered credits are added after cropping. No API key needed.'
+          : 'Frame the place inside the visible crop. Google Maps and your entered credits are added after capture. The image is saved for preview, export and backups. No API key needed.',
       style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
     ),
   ];

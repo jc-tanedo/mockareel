@@ -6,16 +6,15 @@ using the existing key-free Maps browser, and capture the map. Place name,
 address, category, rating and suggested action buttons remain editable.
 The capture button appears only after a Maps search result has been selected for that media.
 Map captures are project assets; preview and export use the saved image offline.
-The captured image is fitted in full to preserve its source attribution.
-Map capture uses a 1440-pixel-wide inner map with 240 extra CSS pixels on every
-edge. The editor and capture show only the centre, cropping out native browser
-controls even when their labels change. Google's original attribution footer is
-kept inside the crop. Tile readiness is independent of Google's footer layout.
-If the credits cannot be kept inside the crop, the framing screen uses the full
-map instead, preserving the original attribution without a loading timeout.
-Pins and map labels remain visible. Use **Replace captured map**
-once for older captures that already contain duplicate controls; those controls
-are baked into the saved PNG.
+Saved map images are fitted in full, including their added attribution footer.
+Map capture always uses a 1440-pixel-wide inner map with 240 extra CSS pixels on
+every edge. The editor and capture show only the centre, cropping out native
+browser controls. Footer layout never disables cropping or blocks tile readiness.
+Enter attribution in **Map / imagery credits** below the framing view. The app
+stamps **Google Maps** and your entered credits onto the PNG after capture;
+preview, export and backups use that same saved asset. Credits are not extracted
+from the WebView. Use **Replace captured map** once for older images containing
+native controls, since those controls are already baked into their PNGs.
 
 The opening map uses the first media's location and thumbnail. Choose
 **Transition to next media** independently for each media item:
@@ -115,7 +114,7 @@ production GLSL and checks zero-strength identity, opposite lens distortion, iso
 spot blur and the editor’s top-left coordinate convention. This complements the
 native tests; it does not replace hardware codec testing on Android.
 
-With Python Playwright and system Chromium installed, run
+With Python Playwright, Pillow and system Chromium installed, run
 `python3 tool/check_maps_header.py` for the offline browser fixture. It checks
 that initial and late-added map controls are hidden, external zoom still works,
-and map labels, pins and source attribution remain visible.
+and map labels and pins remain visible. Separate PNG tests verify the manually added attribution.

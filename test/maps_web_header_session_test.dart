@@ -36,7 +36,7 @@ class CaptureController implements WebViewController {
 void main() {
   const channel = MethodChannel('dev.mockareel/map-snapshot');
   testWidgets(
-    'loaded map with an unknown footer completes and captures the full viewport',
+    'loaded map with an unknown footer completes without changing the crop',
     (tester) async {
       final controller = CaptureController()..attributionReady = false;
       final session = MapsWebHeaderSession(controller);
@@ -49,7 +49,7 @@ void main() {
           controller.scripts.lastWhere(
             (s) => s.contains('mockareel-header-style'),
           ),
-          startsWith('window.__mockareelHeaderCrop = null;'),
+          isNot(contains('__mockareelHeaderCrop')),
         );
         return Uint8List.fromList([7]);
       });
@@ -63,7 +63,6 @@ void main() {
         await session
             .load(PlaceDetails(name: 'Fixture'))
             .timeout(const Duration(seconds: 8));
-        expect(await session.prepareCapture(), false);
         expect(await session.capture(const Rect.fromLTWH(0, 0, 100, 100)), [7]);
       });
       expect(copies, 1);

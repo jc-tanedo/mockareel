@@ -10,10 +10,4 @@ class MapCaptureViewport {
   Size get browser =>
       Size(content.width + padding * 2, content.height + padding * 2);
   Rect get crop => const Offset(padding, padding) & content;
-  Map<String, double> toJson() => {
-    'left': crop.left,
-    'top': crop.top,
-    'width': crop.width,
-    'height': crop.height,
-  };
 }

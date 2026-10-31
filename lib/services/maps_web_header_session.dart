@@ -4,14 +4,11 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../model/maps_web_result.dart';
 import '../model/project.dart';
 import 'maps_web_session.dart';
-import '../model/map_capture_viewport.dart';
 
 abstract interface class MapsHeaderDriver {
   Future<void> initialize();
   Future<void> load(PlaceDetails place);
 
-  /// Returns whether the cropped viewport can retain Google's attribution.
-  Future<bool> prepareCapture();
   Future<void> zoom(bool inward);
   Future<Uint8List> capture(Rect physicalBounds);
   void dispose();
@@ -19,26 +16,18 @@ abstract interface class MapsHeaderDriver {
 
 class MapsWebHeaderSession implements MapsHeaderDriver {
   final WebViewController controller;
-  final MapCaptureViewport viewport;
   late final _session = MapsWebSession(controller, onStatus: (_) {});
   static const _channel = MethodChannel('dev.mockareel/map-snapshot');
-  late final Future<String> _asset = rootBundle.loadString(
+  late final Future<String> _script = rootBundle.loadString(
     'assets/maps_header.js',
   );
-  bool _cropped = true;
-  Future<String> get _script async =>
-      'window.__mockareelHeaderCrop = ${_cropped ? jsonEncode(viewport.toJson()) : 'null'};\n${await _asset}';
   int _generation = 0;
   bool _closed = false;
-  MapsWebHeaderSession(
-    this.controller, {
-    this.viewport = const MapCaptureViewport(1.6),
-  });
+  MapsWebHeaderSession(this.controller);
   @override
   Future<void> initialize() => _session.initialize();
   @override
   Future<void> load(PlaceDetails place) async {
-    _cropped = true;
     final generation = ++_generation;
     await controller.loadRequest(MapsWebUrls.header(place));
     final script = await _script;
@@ -75,7 +64,7 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
   Future<void> zoom(bool inward) => controller.runJavaScript(
     'document.querySelector(\'button[aria-label="Zoom ${inward ? 'in' : 'out'}"]\')?.click()',
   );
-  Future<Map> _snapshot() async {
+  Future<void> _ensureMapReady() async {
     Object state = await controller.runJavaScriptReturningResult(await _script);
     for (var i = 0; i < 2 && state is String; i++) {
       state = jsonDecode(state);
@@ -86,19 +75,6 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
         'Map is not ready to capture. Retry loading it.',
       );
     }
-    return state;
-  }
-
-  @override
-  Future<bool> prepareCapture() async {
-    final state = await _snapshot();
-    if (_cropped && state['attributionReady'] == false) {
-      // Reset the footer CSS, then let the page show the complete WebView.
-      // Its original credits remain visible even if Google's DOM has changed.
-      _cropped = false;
-      await controller.runJavaScript(await _script);
-    }
-    return _cropped;
   }
 
   @override
@@ -106,12 +82,7 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
     final generation = _generation;
     // Reapply cleanup and let the WebView paint it before native PixelCopy.
     // This also covers controls inserted since the last load/zoom poll.
-    final state = await _snapshot();
-    if (_cropped && state['attributionReady'] == false) {
-      throw const FormatException(
-        'Map attribution moved. Tap Use map again to refresh the capture area.',
-      );
-    }
+    await _ensureMapReady();
     await controller.runJavaScript('''
 window.__mockareelHeaderCaptureReady = false;
 requestAnimationFrame(() => requestAnimationFrame(() => {
