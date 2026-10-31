@@ -1,3 +1,4 @@
+import 'media_preparation_queue.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -50,7 +51,7 @@ class GifVideos {
       // Cache maintenance is confined to this directory; scratch frames never
       // become project assets. Recently used clips remain available to players.
       await _prune(directory, target.path);
-      return _encode(request, target, token);
+      return MediaPreparationQueue.run(() => _encode(request, target, token));
     });
     _pending[pendingKey] = task;
     _queue = task.then<void>((_) {}, onError: (Object _, StackTrace __) {});

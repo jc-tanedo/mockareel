@@ -64,6 +64,12 @@ void main() {
           ],
         );
       });
+      p.clips[1].edits = MediaEdits(
+        fisheye: true,
+        strength: .5,
+        spots: [BlurSpot()],
+      );
+      final effectInputs = <Map>[];
       Map? request;
       final checks = <String, bool>{};
       Object? captureError;
@@ -102,6 +108,12 @@ void main() {
         (call) async {
           if (call.method == 'cancel') return null;
           if (call.method == 'thumbnail') return p.clips.first.path;
+          if (call.method == 'processMedia') {
+            final args = call.arguments as Map;
+            effectInputs.add(args);
+            await File(args['output'] as String).writeAsBytes([1, 2, 3]);
+            return args['output'];
+          }
           if (call.method != 'export') {
             throw PlatformException(code: 'UNEXPECTED', message: call.method);
           }
@@ -117,6 +129,11 @@ void main() {
             checks['ending map animated'] = (frames[5] as List).length == 15;
             final clips = args['clips'] as List;
             checks['video retained'] = clips[3]['isVideo'] == true;
+            checks['edited source retained'] = (clips[3]['path'] as String)
+                .contains('source-edits-v1');
+            checks['UI is never source-processed'] =
+                effectInputs.length == 1 &&
+                effectInputs.single['path'] == p.clips[1].path;
             checks['pan zoom retained'] = clips[3]['slowPanZoom'] == true;
             checks['timeline duration'] =
                 ((clips.fold<double>(
@@ -153,9 +170,19 @@ void main() {
         );
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
-      await tester.pumpAndSettle();
+      Future<void> settleMedia() async {
+        for (var i = 0; i < 40; i++) {
+          await tester.pump(const Duration(milliseconds: 30));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
+        await tester.pumpAndSettle();
+      }
+
+      await settleMedia();
       await tester.tap(find.text('Export').last);
-      await tester.pumpAndSettle();
+      await settleMedia();
       expect(find.byType(TimelinePreview), findsOneWidget);
       await tester.tap(find.text('Render MP4'));
       await tester.pump();
@@ -189,7 +216,7 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 10)),
         );
       }
-      await tester.pumpAndSettle();
+      await settleMedia();
       expect(find.text('Cancel export'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

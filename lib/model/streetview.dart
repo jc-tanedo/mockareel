@@ -30,7 +30,12 @@ class StreetviewSettings {
 class StreetviewMedia {
   PlaceDetails place;
   String? mapPath;
-  String date, attribution;
+  String date, attribution, copyright, moreDatesLabel;
+  bool locationSelected;
+  bool get canCaptureMap =>
+      locationSelected ||
+      (place.mapsUrl?.isNotEmpty ?? false) ||
+      (place.placeId?.isNotEmpty ?? false);
   bool showControls, showArrows, showLocation, panZoom;
   String transition, arrow;
   double transitionSeconds;
@@ -39,6 +44,9 @@ class StreetviewMedia {
     this.mapPath,
     this.date = '',
     this.attribution = 'Google',
+    this.copyright = '© 2025 Google',
+    this.moreDatesLabel = 'See more dates',
+    this.locationSelected = false,
     this.showControls = true,
     this.showArrows = true,
     this.showLocation = true,
@@ -54,6 +62,9 @@ class StreetviewMedia {
     mapPath: j['mapPath'] as String?,
     date: j['date'] as String? ?? '',
     attribution: j['attribution'] as String? ?? 'Google',
+    copyright: j['copyright'] as String? ?? '© 2025 Google',
+    moreDatesLabel: j['moreDatesLabel'] as String? ?? 'See more dates',
+    locationSelected: j['locationSelected'] == true,
     showControls: j['showControls'] != false,
     showArrows: j['showArrows'] != false,
     showLocation: j['showLocation'] != false,
@@ -67,6 +78,9 @@ class StreetviewMedia {
     'mapPath': mapPath,
     'date': date,
     'attribution': attribution,
+    'copyright': copyright,
+    'moreDatesLabel': moreDatesLabel,
+    'locationSelected': locationSelected,
     'showControls': showControls,
     'showArrows': showArrows,
     'showLocation': showLocation,

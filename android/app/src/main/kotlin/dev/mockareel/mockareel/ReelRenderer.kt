@@ -36,6 +36,7 @@ import java.util.concurrent.Executors
 
 @UnstableApi
 class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
+    private val mediaEdits = MediaEditsProcessor(context)
     private val handler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private var events: EventChannel.EventSink? = null
@@ -58,6 +59,8 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
     override fun onCancel(arguments: Any?) { events = null }
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "processMedia" -> mediaEdits.process(call, result)
+            "cancelMediaEdits" -> { mediaEdits.cancel(); result.success(null) }
             "thumbnail" -> worker.execute {
                 try {
                     val path = thumbnail(requireNotNull(call.argument<String>("path")), call.argument<Number>("seconds")?.toDouble() ?: 0.0)
@@ -316,8 +319,8 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         if (deleteOutput) output?.delete()
         output = null
     }
-    fun cancel() { if (pending != null) finishError("CANCELLED", "Export cancelled") }
-    fun close() { cancel(); worker.shutdown() }
+    fun cancel() { mediaEdits.cancel(); if (pending != null) finishError("CANCELLED", "Export cancelled") }
+    fun close() { cancel(); mediaEdits.close(); worker.shutdown() }
 
     private fun saveToGallery(path: String): String {
         // Android 10+ scoped storage needs no broad storage permission.

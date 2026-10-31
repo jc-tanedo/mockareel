@@ -729,6 +729,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             : {
                 ...clip.toJson(),
                 'path': paths.first,
+                'edits': <String, dynamic>{},
                 'isVideo': false,
                 'isGif': false,
                 'duration': scene.duration,

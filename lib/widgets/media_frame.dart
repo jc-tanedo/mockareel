@@ -1,3 +1,4 @@
+import '../services/media_edits.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -24,11 +25,12 @@ class MediaFrame extends StatefulWidget {
 class _MediaFrameState extends State<MediaFrame> {
   VideoPlayerController? _video;
   String? _error;
+  ReelClip? _prepared;
+  bool _preparing = false;
   int _generation = 0;
   String _loadedStamp = '';
   bool _syncing = false, _syncAgain = false, _forceSync = false;
-  String get _gifStamp =>
-      '${widget.clip.path}:${widget.clip.isGif}:${widget.clip.trimStart}:${widget.clip.duration}:${widget.clip.loopGif}';
+  String get _gifStamp => EditedMedia.stamp(widget.clip);
   @override
   void initState() {
     super.initState();
@@ -40,19 +42,30 @@ class _MediaFrameState extends State<MediaFrame> {
     _loadedStamp = _gifStamp;
     final previous = _video;
     _video = null;
-    await previous?.dispose();
     _error = null;
-    if (!widget.clip.isTimed) return;
+    _prepared = null;
+    _preparing = widget.clip.edits.active;
+    await previous?.dispose();
+    if (!mounted || generation != _generation) return;
+    if (!widget.clip.isTimed && !_preparing) return;
     VideoPlayerController? controller;
     try {
-      if (widget.clip.isGif && generation > 1) {
+      final clip = await EditedMedia.instance.prepare(widget.clip);
+      if (!mounted || generation != _generation) return;
+      _prepared = clip;
+      _preparing = false;
+      if (!clip.isTimed) {
+        setState(() {});
+        return;
+      }
+      if (clip.isGif && generation > 1) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         if (!mounted || generation != _generation) return;
       }
-      final source = widget.clip.isGif
-          ? await (widget.gifVideoBuilder?.call(widget.clip) ??
-                GifVideos.instance.video(widget.clip))
-          : widget.clip.path;
+      final source = clip.isGif
+          ? await (widget.gifVideoBuilder?.call(clip) ??
+                GifVideos.instance.video(clip))
+          : clip.path;
       if (!mounted || generation != _generation) return;
       controller = VideoPlayerController.file(
         File(source),
@@ -70,10 +83,11 @@ class _MediaFrameState extends State<MediaFrame> {
     } catch (_) {
       await controller?.dispose();
       if (mounted && generation == _generation) {
-        setState(
-          () => _error =
-              'This animation could not be opened. Try a shorter duration or replace it.',
-        );
+        setState(() {
+          _preparing = false;
+          _error =
+              'Media could not be prepared. Retry the edit or replace this media.';
+        });
       }
     }
   }
@@ -95,7 +109,7 @@ class _MediaFrameState extends State<MediaFrame> {
         final generation = _generation;
         final forced = _forceSync;
         _forceSync = false;
-        final clip = widget.clip;
+        final clip = _prepared ?? widget.clip;
         final play = widget.playing && widget.position < clip.duration;
         final last = clip.isGif
             ? ((clip.duration * 30).ceil() - 1) / 30
@@ -156,7 +170,10 @@ class _MediaFrameState extends State<MediaFrame> {
   void didUpdateWidget(MediaFrame oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.clip.id != widget.clip.id ||
-        (widget.clip.isGif && _loadedStamp != _gifStamp)) {
+        ((widget.clip.isGif ||
+                widget.clip.edits.active ||
+                _prepared?.path != widget.clip.path) &&
+            _loadedStamp != _gifStamp)) {
       _load();
     } else {
       _sync(force: oldWidget.playing != widget.playing);
@@ -183,13 +200,16 @@ class _MediaFrameState extends State<MediaFrame> {
       ),
     );
     if (_error != null) return error;
+    if (_preparing || (widget.clip.edits.active && _prepared == null)) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (!widget.clip.isTimed) {
       return ClipRect(
         child: Transform.scale(
           scale: widget.clip.zoom,
           alignment: Alignment(widget.clip.panX, 0),
           child: Image.file(
-            File(widget.clip.path),
+            File((_prepared ?? widget.clip).path),
             fit: BoxFit.cover,
             alignment: Alignment(widget.clip.panX, 0),
             width: double.infinity,
@@ -243,7 +263,7 @@ class _ClipPosterState extends State<ClipPoster> {
   late Future<String> _path;
   String _stamp = '';
   String get _currentStamp =>
-      '${widget.clip.path}:${widget.clip.trimStart}:${widget.position}:${widget.resolvedPath}:${widget.clip.isGif}:${widget.clip.duration}:${widget.clip.loopGif}';
+      '${EditedMedia.stamp(widget.clip)}:${widget.position}:${widget.resolvedPath}';
   @override
   void initState() {
     super.initState();
@@ -259,7 +279,7 @@ class _ClipPosterState extends State<ClipPoster> {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         if (!mounted || stamp != _stamp) return widget.clip.path;
       }
-      return widget.clip.isTimed
+      return widget.clip.isTimed || widget.clip.edits.active
           ? await NativeRenderer().poster(
               widget.clip,
               position: widget.position,
@@ -291,7 +311,11 @@ class _ClipPosterState extends State<ClipPoster> {
           ),
         ),
       );
-      if (!snapshot.hasData) return fallback;
+      if (!snapshot.hasData ||
+          (widget.clip.edits.active &&
+              snapshot.connectionState != ConnectionState.done)) {
+        return fallback;
+      }
       final pan = widget.applyCrop ? widget.clip.panX : 0.0;
       return ClipRect(
         child: Transform.scale(

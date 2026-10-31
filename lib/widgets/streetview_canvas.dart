@@ -6,6 +6,7 @@ import '../model/project.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'story_tags.dart';
+import 'streetview_chrome.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -330,96 +331,36 @@ class StreetviewCanvas extends StatelessWidget {
       ] else ...[
         if ((movement && overlayOnly) || (overlayOnly && scene.kind == 'back'))
           Positioned.fill(child: media()),
-        if (settings.showControls) ...[
-          Positioned(left: 12, top: 28, child: _control(Icons.arrow_back)),
-          Positioned(right: 12, top: 28, child: _control(Icons.more_vert)),
-          Positioned(
-            right: 12,
-            top: 80,
-            child: _control(Icons.explore_outlined),
-          ),
-        ],
-        if (settings.showArrows) ...[
-          Positioned(
-            left: 100,
-            top: 430,
-            child: _control(Icons.chevron_left, size: 44),
-          ),
-          Positioned(
-            right: 100,
-            top: 430,
-            child: _control(Icons.chevron_right, size: 44),
-          ),
-        ],
-        if (settings.showLocation)
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 30,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      settings.place.address.isEmpty
-                          ? settings.place.name
-                          : settings.place.address,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: ink,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (settings.date.isNotEmpty)
-                      Text(
-                        settings.date,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: ink, fontSize: 11),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        Positioned.fill(
+          child: StreetviewChrome(settings: settings, dark: dark),
+        ),
       ],
-      Positioned(
-        left: 12,
-        bottom: 8,
-        right: 12,
-        child: Text(
-          settings.attribution,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: map ? ink : Colors.white,
-            fontSize: 10,
-            shadows: const [Shadow(blurRadius: 2, color: Colors.black54)],
+      if (map)
+        Positioned(
+          left: 12,
+          bottom: 8,
+          right: 12,
+          child: Text(
+            settings.attribution,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ink, fontSize: 10),
           ),
         ),
-      ),
       if (ripple >= 0 && ripple < 1)
         Positioned(
           left: map
               ? 66
               : scene.kind == 'back'
-              ? 32
+              ? 26
               : settings.arrow == 'left'
-              ? 130
-              : 230,
+              ? 56
+              : 304,
           top: map
               ? 290
               : scene.kind == 'back'
-              ? 48
-              : 460,
+              ? 108
+              : 491,
           child: _Ripple(progress: ripple),
         ),
     ];
@@ -434,17 +375,6 @@ class StreetviewCanvas extends StatelessWidget {
       ),
     );
   }
-
-  Widget _control(IconData icon, {double size = 24}) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: Colors.black45,
-      shape: BoxShape.circle,
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: Icon(icon, color: Colors.white, size: size),
-    ),
-  );
 }
 
 class _Ripple extends StatelessWidget {

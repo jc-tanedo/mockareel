@@ -7,6 +7,7 @@ import '../pages/maps_web_search_page.dart';
 import '../pages/maps_web_header_page.dart';
 import '../services/project_store.dart';
 import 'place_actions_editor.dart';
+import 'media_edits_editor.dart';
 
 class StreetviewInspector extends StatefulWidget {
   final ReelProject project;
@@ -37,13 +38,14 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     if (value == null || !mounted) return;
     _revision++;
     _s.place = value.place;
+    _s.locationSelected = true;
     _s.mapPath = null;
     widget.onChanged();
     await _capture();
   }
 
   Future<void> _capture() async {
-    if (_busy) return;
+    if (_busy || !_s.canCaptureMap) return;
     setState(() => _busy = true);
     try {
       final bytes = await Navigator.of(context).push<Uint8List>(
@@ -127,19 +129,25 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         icon: const Icon(Icons.search),
         label: const Text('Select this media’s location'),
       ),
-      TextButton.icon(
-        onPressed: _busy ? null : _capture,
-        icon: const Icon(Icons.map_outlined),
-        label: Text(
-          _busy
-              ? 'Capturing…'
-              : _s.mapPath == null
-              ? 'Capture map'
-              : 'Replace captured map',
+      if (_s.canCaptureMap)
+        TextButton.icon(
+          onPressed: _busy ? null : _capture,
+          icon: const Icon(Icons.map_outlined),
+          label: Text(
+            _busy
+                ? 'Capturing…'
+                : _s.mapPath == null
+                ? 'Capture map'
+                : 'Replace captured map',
+          ),
         ),
-      ),
       _field('Place name', _s.place.name, (v) => _s.place.name = v),
       _field('Address', _s.place.address, (v) => _s.place.address = v),
+      MediaEditsEditor(
+        key: ValueKey('effects-${widget.clip.id}'),
+        clip: widget.clip,
+        onChanged: widget.onChanged,
+      ),
       ExpansionTile(
         title: const Text('Map place details and buttons'),
         children: [
@@ -192,7 +200,13 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       ExpansionTile(
         title: const Text('Street View overlays'),
         children: [
-          _field('Capture date', _s.date, (v) => _s.date = v),
+          _field('Capture date / age', _s.date, (v) => _s.date = v),
+          _field('Copyright', _s.copyright, (v) => _s.copyright = v),
+          _field(
+            'More dates label',
+            _s.moreDatesLabel,
+            (v) => _s.moreDatesLabel = v,
+          ),
           _field(
             'Source attribution',
             _s.attribution,
