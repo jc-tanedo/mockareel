@@ -464,9 +464,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       setState(() => _captureIndex = _selected);
       final bytes = await _capturePng();
       final kind = snapshot ? 'snapshot' : 'template';
-      final file = File(
-        '${_store.root!.path}/exports/$kind-${newId()}.png',
-      );
+      final file = File('${_store.root!.path}/exports/$kind-${newId()}.png');
       await file.writeAsBytes(bytes);
       if (_cancelled || !mounted) return;
       final subjectLabel = snapshot ? 'snapshot' : 'transparent template';

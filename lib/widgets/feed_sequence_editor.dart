@@ -98,10 +98,7 @@ class FeedSequenceEditor extends StatelessWidget {
                 (v) => feed.search = v,
                 max: 100,
               ),
-              Text(
-                'Leave empty to start directly in the feed.',
-                style: muted,
-              ),
+              Text('Leave empty to start directly in the feed.', style: muted),
               const SizedBox(height: 16),
               _slider(
                 'Typing',
@@ -228,12 +225,7 @@ class FeedSequenceEditor extends StatelessWidget {
                   onChanged();
                 },
               ),
-            _field(
-              'Status bar time',
-              feed.time,
-              (v) => feed.time = v,
-              max: 8,
-            ),
+            _field('Status bar time', feed.time, (v) => feed.time = v, max: 8),
             _field('Date', feed.date, (v) => feed.date = v, max: 50),
             if (feed.homeOs == HomeOs.iphone) ...[
               DropdownButtonFormField<String>(

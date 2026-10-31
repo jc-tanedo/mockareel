@@ -10,14 +10,7 @@ import 'native_renderer.dart';
 import 'project_store.dart';
 
 class MediaImporter {
-  static const videoExtensions = {
-    'mp4',
-    'mov',
-    'm4v',
-    'webm',
-    'mkv',
-    '3gp',
-  };
+  static const videoExtensions = {'mp4', 'mov', 'm4v', 'webm', 'mkv', '3gp'};
 
   static bool isVideo(XFile file) {
     if (file.mimeType?.startsWith('video/') == true) return true;
@@ -68,11 +61,7 @@ class MediaImporter {
       throw const FormatException('Choose an audio file your device can play.');
     }
     final path = await store.retainMedia(file.path!, file.name);
-    return MusicTrack(
-      path: path,
-      name: file.name,
-      sourceDuration: duration,
-    );
+    return MusicTrack(path: path, name: file.name, sourceDuration: duration);
   }
 
   static Future<void> shareProjectBackup(

@@ -250,7 +250,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
