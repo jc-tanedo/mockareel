@@ -1,6 +1,5 @@
 import '../model/feed_timeline.dart';
 import '../pages/maps_editor_page.dart';
-import '../theme/app_theme.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';

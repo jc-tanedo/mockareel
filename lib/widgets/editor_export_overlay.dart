@@ -8,7 +8,7 @@ class EditorExportOverlay extends StatelessWidget {
   final double? progress;
   final double position;
   final double duration;
-  final String? format;
+  final String format;
   final Widget preview;
   final bool cancelled;
   final VoidCallback? onCancel;
@@ -21,7 +21,7 @@ class EditorExportOverlay extends StatelessWidget {
     required this.progress,
     required this.position,
     required this.duration,
-    this.format,
+    this.format = 'H.264 · 1080 × 1920 · 30 fps',
     required this.preview,
     required this.cancelled,
     this.onCancel,

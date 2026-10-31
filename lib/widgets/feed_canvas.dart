@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'media_frame.dart';
 import 'home_surface.dart';
-import 'phone_status.dart';
 import 'feed_chrome.dart';
 import 'feed_post_surface.dart';
 import 'feed_search_surface.dart';

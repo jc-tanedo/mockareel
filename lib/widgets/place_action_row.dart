@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'output_palette.dart';
+import 'story_tags.dart';
 
 class PlaceActionRow extends StatelessWidget {
   final List<PlaceAction> actions;

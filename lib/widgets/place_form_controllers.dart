@@ -22,7 +22,7 @@ class PlaceFormControllers {
     hours,
   ];
 
-  void populate(ReelPlace place) {
+  void populate(PlaceDetails place) {
     name.text = place.name;
     category.text = place.category;
     rating.text = place.rating;
@@ -33,7 +33,7 @@ class PlaceFormControllers {
     hours.text = place.hours;
   }
 
-  void saveTo(ReelPlace place) {
+  void saveTo(PlaceDetails place) {
     place.name = name.text;
     place.category = category.text;
     place.rating = rating.text;

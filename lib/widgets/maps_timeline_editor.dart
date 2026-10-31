@@ -5,7 +5,6 @@ import 'clip_strip.dart';
 import 'editor_section_card.dart';
 import 'editor_workspace.dart';
 import 'empty_placeholder.dart';
-import 'media_frame.dart';
 import 'streetview_inspector.dart';
 
 export 'clip_strip.dart';

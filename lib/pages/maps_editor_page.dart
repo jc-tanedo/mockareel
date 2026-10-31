@@ -17,7 +17,6 @@ import '../widgets/maps_editor_scaffold.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/offscreen_capture_stage.dart';
 import '../widgets/place_form_controllers.dart';
-import '../widgets/project_name_dialog.dart';
 import '../widgets/reel_preview.dart';
 import 'exported_video_page.dart';
 

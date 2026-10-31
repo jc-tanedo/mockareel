@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'streetview_place_sheet.dart';
 import 'streetview_map_scene.dart';
-import 'streetview_arrows.dart';
 
 export 'streetview_place_sheet.dart';
 export 'streetview_map_scene.dart';

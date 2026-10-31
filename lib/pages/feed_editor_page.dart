@@ -6,6 +6,7 @@ import '../widgets/feed_sequence_editor.dart';
 import '../widgets/project_name_dialog.dart';
 import '../widgets/editor_app_bar.dart';
 import '../widgets/editor_export_overlay.dart';
+import '../widgets/export_monitor.dart';
 import '../widgets/offscreen_capture_stage.dart';
 import '../model/feed_timeline.dart';
 import '../pages/exported_video_page.dart';
@@ -243,8 +244,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     return PopScope(
       canPop: !_exporting,
       onPopInvokedWithResult: (didPop, result) {

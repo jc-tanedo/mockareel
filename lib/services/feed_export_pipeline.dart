@@ -157,7 +157,6 @@ class FeedExportPipeline {
       onProgress(.35);
       onPosition(0);
 
-      final completer = Completer<String>();
       subscription = renderer.progress.listen((value) {
         onStatus('Encoding video…');
         onPosition(FeedTimeline.duration(project) * value.clamp(0, 1));

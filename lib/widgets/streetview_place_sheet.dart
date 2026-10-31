@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
+import 'story_tags.dart';
 
 class StreetviewPlaceSheet extends StatelessWidget {
   final StreetviewMedia settings;
