@@ -12,7 +12,24 @@ Persistent runners reuse installed toolchains. Gradle configuration is updated w
 
 **Android debug APK** runs on pushes and pull requests targeting `main` or `work` (push builds also cover `poc/**` branches and the isolated `feature/streetview-template` development branch), and can be run manually. It checks release-version validation, Dart analysis, Flutter tests and native Android unit tests, then builds a universal debug APK. Push/manual builds upload an APK/checksum ZIP to SeaweedFS. Download it from the run's **Summary** using the 24-hour signed link; S3 objects remain until retention removes them. Pull requests build and test but do not upload artifacts or receive S3 credentials.
 
-Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel Debug**, so they can coexist with release/preview APKs and keep separate project data. A fresh GitHub runner normally generates a fresh debug signing certificate. Optionally add repository secret `ANDROID_DEBUG_KEYSTORE_BASE64` with a standard Android debug keystore (alias `androiddebugkey`, store/key passwords `android`) to keep push/manual debug builds update-compatible. Pull request builds never restore signing secrets, including for same-repository branches; debug certificates may be reused on a persistent runner, so use isolated runner accounts if separate certificates are required. Release projects are unaffected.
+Debug APKs use `dev.mockareel.mockareel.debug` and the launcher name **Mockareel Debug**, so they can coexist with release/preview APKs and keep separate project data. Published push/manual builds require repository secret `ANDROID_DEBUG_KEYSTORE_BASE64`: a standard Android debug keystore with alias `androiddebugkey` and store/key passwords `android`. CI restores it to a private temporary file, selects that exact file in Gradle, verifies the APK's certificate against the restored key, and deletes the file afterward. The certificate SHA-256 is printed in the build log. Missing or invalid signing configuration stops the build instead of silently generating an incompatible key. Signing identity must survive runner replacements and cache eviction; build caches are not a keystore backup.
+
+Set the secret from a trusted machine with GitHub CLI (the keystore contents go directly to the secret, not the terminal):
+
+```sh
+base64 < /path/to/debug.keystore | tr -d '\n' | gh secret set ANDROID_DEBUG_KEYSTORE_BASE64 --repo jc-tanedo/mockareel
+```
+
+Prefer the keystore that signed the currently installed debug APK, if it is still available on its build runner. Android cannot recover that private key from an APK. If it has been lost, create a dedicated debug key once, keep a backup, and configure the secret:
+
+```sh
+keytool -genkeypair -keystore mockareel-debug.keystore -storetype JKS \
+  -alias androiddebugkey -storepass android -keypass android \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname 'CN=Android Debug,O=Android,C=US'
+```
+
+A change of signer requires one final uninstall/reinstall; back up projects first. Later APKs signed with the same configured key can update the app without removing project data. Do not rotate this secret on every build. Pull request builds never restore signing secrets, including for same-repository branches; their disposable debug APKs are not published. Local development still uses Android's default debug key unless `MOCKAREEL_DEBUG_KEYSTORE_PATH` is supplied. Release signing remains separate.
 
 Debug jobs never receive release signing keys or the Maps key. Configure Maps in the debug app's on-device Settings.
 

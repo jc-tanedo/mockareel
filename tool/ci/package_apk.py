@@ -7,6 +7,7 @@ import subprocess
 import sys
 import zipfile
 from release_metadata import version
+from debug_signing import verify_signer
 
 mode = sys.argv[1]
 if mode not in ('debug', 'release'):
@@ -18,7 +19,14 @@ apk = Path(f'build/app/outputs/flutter-apk/app-{mode}.apk')
 with zipfile.ZipFile(apk) as archive:
     if archive.testzip() is not None:
         raise SystemExit('APK archive integrity check failed.')
-subprocess.run([str(build_tools / 'apksigner'), 'verify', str(apk)], check=True)
+signing = subprocess.check_output([str(build_tools / 'apksigner'), 'verify', '--print-certs', str(apk)], text=True)
+if mode == 'debug':
+    expected_signer = os.environ.get('MOCKAREEL_DEBUG_CERT_SHA256')
+    if os.environ.get('MOCKAREEL_REQUIRE_DEBUG_SIGNING') == 'true' and not expected_signer:
+        raise SystemExit('Missing expected stable debug signing certificate.')
+    if expected_signer:
+        verify_signer(signing, expected_signer)
+        print(f'Verified stable debug signer SHA-256: {expected_signer}')
 subprocess.run([str(build_tools / 'zipalign'), '-c', '-P', '16', '4', str(apk)], check=True)
 badging = subprocess.check_output([str(build_tools / 'aapt'), 'dump', 'badging', str(apk)], text=True).splitlines()[0]
 expected_name = name + ('-debug' if mode == 'debug' else '')
