@@ -75,6 +75,7 @@ class StreetviewChrome extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
                     Icons.accessibility_new,
