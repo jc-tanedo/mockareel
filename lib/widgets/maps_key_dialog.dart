@@ -73,41 +73,74 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
                   color: colors.onSurface,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
-                'By default, Mockareel captures map imagery directly using the '
-                'built-in browser engine — no API keys or billing required. '
-                'If you prefer Google Static Maps API imagery, provide a key '
-                'below.',
+                'Browser search and map capture work without a key. Add your '
+                'own Google Cloud key to use API lookup or automatic static '
+                'map headers.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Enable these APIs in your Google Cloud project:',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '1. Places API (New) — API place search and details.\n'
+                '2. Maps Static API — automatic map header images.\n\n'
+                'Enable billing for API requests. Maps SDK for Android, Maps '
+                'JavaScript API and Geocoding API are not required by '
+                'Mockareel.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
+                  height: 1.5,
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Google Maps API key',
-                  hintText: 'AIzaSy…',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: _controller.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => setState(_controller.clear),
-                        )
-                      : null,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  labelText: 'API key (optional)',
+                  prefixIcon: Icon(Icons.key_outlined),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 16),
-              SwitchListTile.adaptive(
+              const SizedBox(height: 8),
+              SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                value: _apiHeaders,
-                onChanged: (v) => setState(() => _apiHeaders = v),
-                title: const Text('Prefer API headers'),
+                title: const Text('Use API map headers'),
                 subtitle: const Text(
-                  'Use Static Maps API for Place headers when a key is set',
+                  'Load Google map uses Maps Static API instead of browser '
+                  'capture.',
+                ),
+                value: _apiHeaders && _controller.text.trim().isNotEmpty,
+                onChanged: _controller.text.trim().isEmpty
+                    ? null
+                    : (v) => setState(() => _apiHeaders = v),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'API lookup is in the Google Maps search menu. Restrict your '
+                'key to the APIs you use and set quotas in Google Cloud. '
+                'Requests go directly to the web APIs; Android package/SHA '
+                'restrictions alone may not work with these HTTP endpoints.\n\n'
+                'The key is stored in app-private preferences on this device, '
+                'not encrypted storage, and is excluded from project backups. '
+                'Clear the field to remove it.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 12,
+                  height: 1.5,
                 ),
               ),
             ],
@@ -123,7 +156,8 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
           onPressed: () => Navigator.of(context).pop(
             MapsAdvancedSettings(
               _controller.text.trim(),
-              useApiHeaders: _apiHeaders,
+              useApiHeaders:
+                  _apiHeaders && _controller.text.trim().isNotEmpty,
             ),
           ),
           child: const Text('Save'),
