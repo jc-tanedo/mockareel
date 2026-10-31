@@ -90,10 +90,13 @@ void main() {
                     MaterialPageRoute(
                       builder: (_) => MapsWebHeaderPage(
                         place: PlaceDetails(name: 'Fixture Cafe'),
-                        aspectRatio: streetview ? 360 / 370 : 1.6,
+                        aspectRatio: streetview ? 360 / 552 : 1.6,
                         showHeaderGuide: !streetview,
                         driver: driver,
-                        browserOverride: const ColoredBox(color: Colors.blue),
+                        browserOverride: const ColoredBox(
+                          key: ValueKey('map-pixels'),
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                   );
@@ -113,6 +116,11 @@ void main() {
           tester.view.physicalSize = size;
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
+          await tester.ensureVisible(find.byKey(const ValueKey('map-pixels')));
+          await tester.pumpAndSettle();
+          final map = tester.getRect(find.byKey(const ValueKey('map-pixels')));
+          expect(map.top, greaterThanOrEqualTo(0));
+          expect(map.bottom, lessThanOrEqualTo(size.height));
           expect(
             find.text(streetview ? 'Use map' : 'Use map header').hitTestable(),
             findsOneWidget,
@@ -125,7 +133,7 @@ void main() {
         expect(result, orderedEquals([1, 2, 3]));
         expect(
           driver.bounds!.width / driver.bounds!.height,
-          closeTo(streetview ? 360 / 370 : 1.6, .01),
+          closeTo(streetview ? 360 / 552 : 1.6, .01),
         );
         expect(driver.disposed, isTrue);
       },

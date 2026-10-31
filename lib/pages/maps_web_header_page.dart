@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -326,7 +327,13 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
                       ..._heading(),
                       Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 680),
+                          constraints: BoxConstraints(
+                            maxWidth: min(
+                              680,
+                              max(1, constraints.maxHeight - 120) *
+                                  widget.aspectRatio,
+                            ),
+                          ),
                           child: _mapFrame(),
                         ),
                       ),

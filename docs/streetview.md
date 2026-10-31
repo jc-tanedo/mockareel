@@ -7,6 +7,11 @@ address, category, rating and suggested action buttons remain editable.
 The capture button appears only after a Maps search result has been selected for that media.
 Map captures are project assets; preview and export use the saved image offline.
 The captured image is fitted in full to preserve its source attribution.
+Map capture hides Google's browser controls (including zoom, location, layers
+and Pegman) because the template draws its own interface. Pins, map labels,
+Google branding and legal attribution remain visible. Use **Replace captured map**
+once for older captures that already contain duplicate controls; those controls
+are baked into the saved PNG.
 
 The opening map uses the first media's location and thumbnail. Choose
 **Transition to next media** independently for each media item:
@@ -102,3 +107,8 @@ packages), run `python3 tool/check_media_shader.py`. It compiles and executes th
 production GLSL and checks zero-strength identity, opposite lens distortion, isolated
 spot blur and the editor’s top-left coordinate convention. This complements the
 native tests; it does not replace hardware codec testing on Android.
+
+With Python Playwright and system Chromium installed, run
+`python3 tool/check_maps_header.py` for the offline browser fixture. It checks
+that initial and late-added map controls are hidden, external zoom still works,
+and map labels, pins and source attribution remain visible.
