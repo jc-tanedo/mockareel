@@ -156,8 +156,7 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
           onPressed: () => Navigator.of(context).pop(
             MapsAdvancedSettings(
               _controller.text.trim(),
-              useApiHeaders:
-                  _apiHeaders && _controller.text.trim().isNotEmpty,
+              useApiHeaders: _apiHeaders && _controller.text.trim().isNotEmpty,
             ),
           ),
           child: const Text('Save'),
