@@ -171,130 +171,145 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     super.dispose();
   }
 
-  Widget _mapFrame() => AspectRatio(
-    aspectRatio: widget.aspectRatio,
-    child: ClipRect(
-      key: _frame,
-      child: Stack(
-        key: const ValueKey('map-capture-viewport'),
-        fit: StackFit.expand,
-        children: [
-          _controller == null && widget.browserOverride == null
-              ? const ColoredBox(color: ink)
-              : LayoutBuilder(
-                  builder: (context, bounds) {
-                    final viewport = MapCaptureViewport(widget.aspectRatio);
-                    final browser = viewport.browser;
-                    final scale = bounds.maxWidth / viewport.content.width;
-                    return OverflowBox(
-                      minWidth: browser.width * scale,
-                      maxWidth: browser.width * scale,
-                      minHeight: browser.height * scale,
-                      maxHeight: browser.height * scale,
-                      child: IgnorePointer(
-                        ignoring: _busy,
-                        child: FittedBox(
-                          fit: BoxFit.fill,
-                          child: SizedBox(
-                            width: browser.width,
-                            height: browser.height,
-                            child:
-                                widget.browserOverride ??
-                                WebViewWidget.fromPlatformCreationParams(
-                                  params: AndroidWebViewWidgetCreationParams(
-                                    controller: _controller!.platform,
-                                    displayWithHybridComposition: true,
+  Widget _mapFrame() {
+    final colors = Theme.of(context).colorScheme;
+    return AspectRatio(
+      aspectRatio: widget.aspectRatio,
+      child: ClipRect(
+        key: _frame,
+        child: Stack(
+          key: const ValueKey('map-capture-viewport'),
+          fit: StackFit.expand,
+          children: [
+            _controller == null && widget.browserOverride == null
+                ? ColoredBox(color: colors.surface)
+                : LayoutBuilder(
+                    builder: (context, bounds) {
+                      final viewport = MapCaptureViewport(widget.aspectRatio);
+                      final browser = viewport.browser;
+                      final scale = bounds.maxWidth / viewport.content.width;
+                      return OverflowBox(
+                        minWidth: browser.width * scale,
+                        maxWidth: browser.width * scale,
+                        minHeight: browser.height * scale,
+                        maxHeight: browser.height * scale,
+                        child: IgnorePointer(
+                          ignoring: _busy,
+                          child: FittedBox(
+                            fit: BoxFit.fill,
+                            child: SizedBox(
+                              width: browser.width,
+                              height: browser.height,
+                              child:
+                                  widget.browserOverride ??
+                                  WebViewWidget.fromPlatformCreationParams(
+                                    params: AndroidWebViewWidgetCreationParams(
+                                      controller: _controller!.platform,
+                                      displayWithHybridComposition: true,
+                                    ),
                                   ),
-                                ),
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-          if (!_busy)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: MapAttributionPainter(credits: _credits),
+                      );
+                    },
+                  ),
+            if (!_busy)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: MapAttributionPainter(credits: _credits),
+                  ),
                 ),
               ),
-            ),
-          if (!_busy && widget.showHeaderGuide)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: null,
-              child: IgnorePointer(
-                child: AspectRatio(
-                  aspectRatio: 360 / 94,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: mint.withValues(alpha: .8),
-                          width: 1.5,
+            if (!_busy && widget.showHeaderGuide)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: null,
+                child: IgnorePointer(
+                  child: AspectRatio(
+                    aspectRatio: 360 / 94,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: mint.withValues(alpha: .8),
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _controls() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return [
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          IconButton.filledTonal(
+            tooltip: 'Zoom out',
+            onPressed: _ready && !_busy ? () => _zoom(false) : null,
+            icon: const Icon(Icons.remove),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            tooltip: 'Zoom in',
+            onPressed: _ready && !_busy ? () => _zoom(true) : null,
+            icon: const Icon(Icons.add),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _busy || _driver == null ? null : _load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
         ],
       ),
-    ),
-  );
-
-  List<Widget> _controls() => [
-    const SizedBox(height: 8),
-    Row(
-      children: [
-        IconButton(
-          tooltip: 'Zoom out',
-          onPressed: _ready && !_busy ? () => _zoom(false) : null,
-          icon: const Icon(Icons.remove),
+      const SizedBox(height: 8),
+      TextFormField(
+        enabled: !_busy,
+        decoration: const InputDecoration(
+          labelText: 'Map / imagery credits',
+          hintText: 'Add source attribution text',
+          helperText: 'Added beside Google Maps after the image is cropped.',
         ),
-        IconButton(
-          tooltip: 'Zoom in',
-          onPressed: _ready && !_busy ? () => _zoom(true) : null,
-          icon: const Icon(Icons.add),
-        ),
-        const Spacer(),
-        TextButton.icon(
-          onPressed: _busy || _driver == null ? null : _load,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Retry'),
-        ),
-      ],
-    ),
-    TextFormField(
-      enabled: !_busy,
-      decoration: const InputDecoration(
-        labelText: 'Map / imagery credits',
-        hintText: 'Add source attribution text',
-        helperText: 'Added beside Google Maps after the image is cropped.',
+        maxLength: 300,
+        minLines: 1,
+        maxLines: 3,
+        onChanged: (value) => setState(() => _credits = value),
       ),
-      maxLength: 300,
-      minLines: 1,
-      maxLines: 3,
-      onChanged: (value) => setState(() => _credits = value),
-    ),
-    if (!_ready && _error == null) const LinearProgressIndicator(minHeight: 2),
-    if (_error != null)
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(_error!, style: const TextStyle(color: Colors.white70)),
+      if (!_ready && _error == null) const LinearProgressIndicator(minHeight: 2),
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            _error!,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
+          ),
+        ),
+      const SizedBox(height: 12),
+      Text(
+        widget.showHeaderGuide
+            ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google Maps and your entered credits are added after cropping. No API key needed.'
+            : 'Frame the place inside the visible crop. Google Maps and your entered credits are added after capture. The image is saved for preview, export and backups. No API key needed.',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: colors.onSurfaceVariant,
+          height: 1.5,
+        ),
       ),
-    const SizedBox(height: 12),
-    Text(
-      widget.showHeaderGuide
-          ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google Maps and your entered credits are added after cropping. No API key needed.'
-          : 'Frame the place inside the visible crop. Google Maps and your entered credits are added after capture. The image is saved for preview, export and backups. No API key needed.',
-      style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
-    ),
-  ];
+    ];
+  }
 
   Widget _captureButton() => SizedBox(
     width: double.infinity,
@@ -311,17 +326,36 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     ),
   );
 
-  List<Widget> _heading() => [
-    Text(
-      widget.showHeaderGuide ? 'KEY-FREE MAP HEADER' : 'KEY-FREE MAP',
-      style: const TextStyle(color: mint, fontSize: 10, letterSpacing: 1.4),
-    ),
-    const SizedBox(height: 10),
-    Text(widget.place.name, style: Theme.of(context).textTheme.titleLarge),
-    const SizedBox(height: 8),
-    Text(_status, style: const TextStyle(color: Colors.white60, fontSize: 12)),
-    const SizedBox(height: 16),
-  ];
+  List<Widget> _heading() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return [
+      Text(
+        widget.showHeaderGuide ? 'KEY-FREE MAP HEADER' : 'KEY-FREE MAP',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: colors.primary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        widget.place.name,
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: colors.onSurface,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        _status,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(

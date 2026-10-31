@@ -43,52 +43,78 @@ class _TextEditorState extends State<TextEditor> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            22,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 22,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    'Aa',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(child: Text('Write your story')),
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.pop(context, controller.text.trim()),
-                    child: const Text('Done'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                maxLength: 160,
-                maxLines: 4,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+        return SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: colors.secondaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Aa',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: colors.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Write your story',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    FilledButton(
+                      onPressed: () =>
+                          Navigator.pop(context, controller.text.trim()),
+                      child: const Text('Done'),
+                    ),
+                  ],
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'Say something…',
-                  border: InputBorder.none,
+                const SizedBox(height: 20),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  maxLength: 160,
+                  maxLines: 4,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: 'Say something…',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     // The route may still be animating out; let its TextField release the controller.
     await Future<void>.delayed(const Duration(milliseconds: 350));
@@ -110,6 +136,8 @@ class _TextEditorState extends State<TextEditor> {
   @override
   Widget build(BuildContext context) {
     final tag = _tag;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return EditorWorkspace(
       keyboardVisible: widget.keyboardVisible,
       hasPlaybackControls: false,
@@ -119,34 +147,45 @@ class _TextEditorState extends State<TextEditor> {
           constraints: BoxConstraints(maxHeight: height),
           child: AspectRatio(
             aspectRatio: 9 / 16,
-            child: FittedBox(
-              child: SizedBox(
-                width: 360,
-                height: 640,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ReelCanvas(
-                        project: widget.project,
-                        position:
-                            widget.project.startOf(widget.selectedClip) +
-                            TemplateLayout.transitionDuration(
-                              widget.project,
-                              widget.selectedClip,
-                            ),
-                        animateIntro: false,
-                        showTags: false,
-                      ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: FittedBox(
+                  child: SizedBox(
+                    width: 360,
+                    height: 640,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ReelCanvas(
+                            project: widget.project,
+                            position:
+                                widget.project.startOf(widget.selectedClip) +
+                                TemplateLayout.transitionDuration(
+                                  widget.project,
+                                  widget.selectedClip,
+                                ),
+                            animateIntro: false,
+                            showTags: false,
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: StoryTagLayer(
+                            tags: widget.project.tags,
+                            selectedId: _selected,
+                            onSelect: (t) => setState(() => _selected = t.id),
+                            onChanged: _change,
+                          ),
+                        ),
+                      ],
                     ),
-                    Positioned.fill(
-                      child: StoryTagLayer(
-                        tags: widget.project.tags,
-                        selectedId: _selected,
-                        onSelect: (t) => setState(() => _selected = t.id),
-                        onChanged: _change,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -158,13 +197,13 @@ class _TextEditorState extends State<TextEditor> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'TEXT & TAGS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 2,
-                    color: Colors.white54,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -175,16 +214,18 @@ class _TextEditorState extends State<TextEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const SizedBox(height: 12),
-          const Text(
+          const SizedBox(height: 16),
+          Text(
             'Drag text to move it. Tap a tag to style it.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54, fontSize: 12),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 6,
+            runSpacing: 6,
             children: [
               for (final t in widget.project.tags)
                 ChoiceChip(
@@ -199,94 +240,103 @@ class _TextEditorState extends State<TextEditor> {
             ],
           ),
           if (tag != null) ...[
-            Row(
+            const SizedBox(height: 12),
+            EditorSectionCard(
+              title: const Text('Style & color'),
               children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () => _write(tag),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit text'),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Duplicate tag',
-                  onPressed: () {
-                    final copy = StoryTag.fromJson({
-                      ...tag.toJson(),
-                      'id': newId(),
-                      'y': min(.95, tag.y + .06),
-                    });
-                    widget.project.tags.add(copy);
-                    _selected = copy.id;
-                    _change();
-                  },
-                  icon: const Icon(Icons.copy),
-                ),
-                IconButton(
-                  tooltip: 'Delete tag',
-                  onPressed: () {
-                    widget.project.tags.remove(tag);
-                    _selected = null;
-                    _change();
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final style in ['badge', 'plain', 'highlight', 'serif'])
-                  ChoiceChip(
-                    label: Text(style),
-                    selected: tag.style == style,
-                    onSelected: (_) {
-                      tag.style = style;
-                      _change();
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              children: [
-                for (final color in [
-                  0xffffffff,
-                  0xff111111,
-                  0xffffe36e,
-                  0xffff8bba,
-                  0xff93c8ff,
-                  0xff8cf0c9,
-                ])
-                  InkWell(
-                    onTap: () {
-                      tag.color = color;
-                      _change();
-                    },
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Color(color),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: tag.color == color
-                              ? const Color(0xff9c93ff)
-                              : Colors.white24,
-                          width: 3,
-                        ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: () => _write(tag),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Edit text'),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      tooltip: 'Duplicate tag',
+                      onPressed: () {
+                        final copy = StoryTag.fromJson({
+                          ...tag.toJson(),
+                          'id': newId(),
+                          'y': min(.95, tag.y + .06),
+                        });
+                        widget.project.tags.add(copy);
+                        _selected = copy.id;
+                        _change();
+                      },
+                      icon: const Icon(Icons.copy),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete tag',
+                      onPressed: () {
+                        widget.project.tags.remove(tag);
+                        _selected = null;
+                        _change();
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (final style in ['badge', 'plain', 'highlight', 'serif'])
+                      ChoiceChip(
+                        label: Text(style),
+                        selected: tag.style == style,
+                        onSelected: (_) {
+                          tag.style = style;
+                          _change();
+                        },
+                      ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    for (final color in [
+                      0xffffffff,
+                      0xff111111,
+                      0xffffe36e,
+                      0xffff8bba,
+                      0xff93c8ff,
+                      0xff8cf0c9,
+                    ])
+                      InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          tag.color = color;
+                          _change();
+                        },
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: Color(color),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: tag.color == color
+                                  ? colors.primary
+                                  : colors.outlineVariant,
+                              width: tag.color == color ? 3 : 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 12),
             EditorSectionCard(
               title: const Text('Transform'),
               children: [
-                Text('Size · ${tag.size.round()}'),
-                Slider(
+                EditorSlider(
+                  label: 'Size',
+                  valueLabel: '${tag.size.round()}',
                   value: tag.size,
                   min: 10,
                   max: 48,
@@ -295,8 +345,9 @@ class _TextEditorState extends State<TextEditor> {
                     _change();
                   },
                 ),
-                Text('Rotation · ${(tag.rotation * 180 / pi).round()}°'),
-                Slider(
+                EditorSlider(
+                  label: 'Rotation',
+                  valueLabel: '${(tag.rotation * 180 / pi).round()}°',
                   value: tag.rotation,
                   min: -pi,
                   max: pi,
@@ -305,24 +356,31 @@ class _TextEditorState extends State<TextEditor> {
                     _change();
                   },
                 ),
-                TextButton(
-                  onPressed: () {
-                    tag.x = .5;
-                    tag.y = .5;
-                    tag.rotation = 0;
-                    _change();
-                  },
-                  child: const Text('Center on canvas'),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      tag.x = .5;
+                      tag.y = .5;
+                      tag.rotation = 0;
+                      _change();
+                    },
+                    icon: const Icon(Icons.filter_center_focus, size: 18),
+                    label: const Text('Center on canvas'),
+                  ),
                 ),
               ],
             ),
           ] else if (widget.project.tags.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
+            Padding(
+              padding: const EdgeInsets.all(20),
               child: Text(
                 'Add a headline, location tag, or a little context. Each text layer can be moved and styled independently.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
             ),
         ],

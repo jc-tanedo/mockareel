@@ -436,6 +436,7 @@ class StreetviewPlaceSheet extends StatelessWidget {
                               action.label,
                               style: TextStyle(
                                 fontSize: 9,
+                                fontWeight: FontWeight.w500,
                                 color: action.kind == 'directions'
                                     ? const Color(0xff00333c)
                                     : dark

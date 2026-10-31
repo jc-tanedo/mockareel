@@ -105,6 +105,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
   @override
   Widget build(BuildContext context) {
     final p = widget.project;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -120,12 +122,20 @@ class _TimelinePreviewState extends State<TimelinePreview>
             constraints: BoxConstraints(maxHeight: widget.maxHeight),
             child: AspectRatio(
               aspectRatio: 9 / 16,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: ReelCanvas(
-                  project: p,
-                  position: _position,
-                  playing: _playing,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: colors.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: ReelCanvas(
+                    project: p,
+                    position: _position,
+                    playing: _playing,
+                  ),
                 ),
               ),
             ),
@@ -136,6 +146,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
             IconButton(
               tooltip: 'Restart preview',
               visualDensity: VisualDensity.compact,
+              color: colors.onSurfaceVariant,
               onPressed: p.clips.isEmpty
                   ? null
                   : () {
@@ -146,6 +157,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
             ),
             IconButton(
               tooltip: _playing ? 'Pause preview' : 'Play preview',
+              color: colors.primary,
               onPressed: p.clips.isEmpty
                   ? null
                   : () => _playing ? _pause() : _play(),
@@ -165,7 +177,11 @@ class _TimelinePreviewState extends State<TimelinePreview>
             ),
             Text(
               '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / ${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
-              style: const TextStyle(fontSize: 11),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: colors.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),

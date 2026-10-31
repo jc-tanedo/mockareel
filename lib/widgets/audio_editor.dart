@@ -20,12 +20,15 @@ class AudioEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = project.music;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (preview != null) preview!,
         EditorSectionCard(
           title: const Text('Soundtrack'),
+          subtitle: const Text('Background audio mixed into your exported reel'),
           children: [
             FilledButton.icon(
               onPressed: importing ? null : onPick,
@@ -39,24 +42,55 @@ class AudioEditor extends StatelessWidget {
               ),
             ),
             if (m != null) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.music_note),
-                title: Text(
-                  m.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Container(
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colors.outlineVariant.withValues(alpha: 0.4),
+                  ),
                 ),
-                subtitle: Text(
-                  '${m.sourceDuration.toStringAsFixed(1)}s source · ${(project.isFeed ? FeedTimeline.duration(project) : project.duration).toStringAsFixed(1)}s reel',
-                ),
-                trailing: IconButton(
-                  tooltip: 'Remove music',
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    project.music = null;
-                    onChanged();
-                  },
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 2,
+                  ),
+                  leading: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: colors.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.music_note,
+                      size: 20,
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ),
+                  title: Text(
+                    m.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${m.sourceDuration.toStringAsFixed(1)}s source · ${(project.isFeed ? FeedTimeline.duration(project) : project.duration).toStringAsFixed(1)}s reel',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Remove music',
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      project.music = null;
+                      onChanged();
+                    },
+                  ),
                 ),
               ),
               EditorSlider(
@@ -70,18 +104,20 @@ class AudioEditor extends StatelessWidget {
                   onChanged();
                 },
               ),
-              const Text(
+              Text(
                 'Press play above to hear the soundtrack with your reel. Original clip audio is muted.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white60,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),
             ] else
-              const Text(
+              Text(
                 'Add music from your device, or continue to Export for a silent reel.',
-                style: TextStyle(color: Colors.white60, height: 1.5),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
           ],
         ),

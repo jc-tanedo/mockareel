@@ -36,17 +36,23 @@ class PlaceOverlay extends StatelessWidget {
               (project.heroClip?.isTimed == false
                   ? project.heroClip?.path
                   : null);
-    Widget line(String text, {double size = 10, Color? color, int lines = 1}) =>
-        Text(
-          text,
-          maxLines: lines,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: size,
-            color: color ?? colors.muted,
-            height: 1.2,
-          ),
-        );
+    Widget line(
+      String text, {
+      double size = 10,
+      Color? color,
+      int lines = 1,
+      FontWeight? weight,
+    }) => Text(
+      text,
+      maxLines: lines,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: size,
+        fontWeight: weight,
+        color: color ?? colors.muted,
+        height: 1.2,
+      ),
+    );
     return MediaQuery.withNoTextScaling(
       child: FittedBox(
         fit: BoxFit.contain,
@@ -136,6 +142,18 @@ class PlaceOverlay extends StatelessWidget {
                                 borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(18),
                                 ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 166,
+                            top: 99,
+                            width: 28,
+                            height: 3,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: colors.inactiveDot.withValues(alpha: .7),
+                                borderRadius: BorderRadius.circular(999),
                               ),
                             ),
                           ),
@@ -303,6 +321,7 @@ class PlaceOverlay extends StatelessWidget {
                                             child: line(
                                               action.label,
                                               size: 8,
+                                              weight: FontWeight.w500,
                                               color: action.kind == 'directions'
                                                   ? colors.primaryText
                                                   : colors.accent,

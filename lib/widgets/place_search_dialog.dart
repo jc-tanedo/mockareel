@@ -1,4 +1,3 @@
-import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../services/places.dart';
@@ -53,57 +52,72 @@ class _PlaceSearchDialogState extends State<PlaceSearchDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Find a place'),
-    content: SizedBox(
-      width: 420,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _query,
-              autofocus: true,
-              onSubmitted: (_) => _search(),
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Place name and city',
-                suffixIcon: IconButton(
-                  onPressed: _loading ? null : _search,
-                  icon: const Icon(Icons.search),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return AlertDialog(
+      icon: const Icon(Icons.travel_explore),
+      title: const Text('Find a place'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _query,
+                autofocus: true,
+                onSubmitted: (_) => _search(),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Place name and city',
+                  suffixIcon: IconButton(
+                    onPressed: _loading ? null : _search,
+                    icon: const Icon(Icons.search),
+                  ),
                 ),
               ),
-            ),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: CircularProgressIndicator(),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              if (_message != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(
+                    _message!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ..._results.map(
+                (p) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.place_outlined, color: colors.primary),
+                  title: Text(p.name),
+                  subtitle: Text(p.address),
+                  onTap: () => Navigator.pop(context, p),
+                ),
               ),
-            if (_message != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(_message!, style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 14),
+              Text(
+                'Google Maps',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-            ..._results.map(
-              (p) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.place_outlined, color: mint),
-                title: Text(p.name),
-                subtitle: Text(p.address),
-                onTap: () => Navigator.pop(context, p),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text('Google Maps', style: TextStyle(color: Colors.white60)),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-    ],
-  );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
 }

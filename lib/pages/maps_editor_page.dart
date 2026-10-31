@@ -36,7 +36,6 @@ import '../widgets/place_actions_editor.dart';
 import '../widgets/text_editor.dart';
 import '../widgets/audio_editor.dart';
 
-import '../theme/app_theme.dart';
 import 'exported_video_page.dart';
 
 class MapsEditorPage extends StatefulWidget {
@@ -856,30 +855,51 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 icon: const Icon(Icons.arrow_back),
               ),
               title: InkWell(
+                borderRadius: BorderRadius.circular(8),
                 onTap: _rename,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _project.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _project.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      _project.isStreetview
-                          ? 'STREET VIEW JOURNEY · 9:16'
-                          : 'MAPS PLACE STORY · 9:16',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: mint,
-                        letterSpacing: 1,
+                      Text(
+                        _project.isStreetview
+                            ? 'STREET VIEW JOURNEY · 9:16'
+                            : 'MAPS PLACE STORY · 9:16',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                          letterSpacing: 1,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -888,12 +908,14 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   onPressed: _save,
                   icon: Icon(
                     _dirty ? Icons.save_outlined : Icons.check_circle_outline,
-                    color: mint,
+                    color: _dirty
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'More project options',
-                  icon: const Icon(Icons.more_horiz),
+                  icon: const Icon(Icons.more_vert),
                   onSelected: (action) {
                     switch (action) {
                       case 'settings':
@@ -909,19 +931,39 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   itemBuilder: (_) => const [
                     PopupMenuItem(
                       value: 'rename',
-                      child: Text('Rename project'),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.drive_file_rename_outline),
+                        title: Text('Rename project'),
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'settings',
-                      child: Text('Advanced · Google Maps'),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.tune_outlined),
+                        title: Text('Advanced · Google Maps'),
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'backup',
-                      child: Text('Share project backup'),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.ios_share_outlined),
+                        title: Text('Share project backup'),
+                      ),
                     ),
                     PopupMenuItem(
                       value: 'projects',
-                      child: Text('Open or import a project'),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.folder_open_outlined),
+                        title: Text('Open or import a project'),
+                      ),
                     ),
                   ],
                 ),
@@ -1214,6 +1256,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   );
   Widget _timelineTab() => LayoutBuilder(
     builder: (context, bounds) {
+      final colors = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
       final compact =
           bounds.maxHeight < 240 || MediaQuery.viewInsetsOf(context).bottom > 0;
       return Column(
@@ -1236,7 +1280,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                                   '${i + 1}. ${_project.clips[i].name}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: textTheme.bodySmall,
                                 ),
                               ),
                           ],
@@ -1251,9 +1295,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                         )
                       : Text(
                           '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white60,
+                          style: textTheme.labelMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                 ),
@@ -1282,7 +1325,11 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 ),
                 IconButton(
                   tooltip: 'Remove clip ${_selected + 1}',
-                  icon: const Icon(Icons.delete_outline, size: 19),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 19,
+                    color: colors.onSurfaceVariant,
+                  ),
                   onPressed: () {
                     _project.clips.removeAt(_selected);
                     _selected = min(
@@ -1322,22 +1369,37 @@ class _MapsEditorPageState extends State<MapsEditorPage>
               child: ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  const Icon(
-                    Icons.video_collection_outlined,
-                    color: Colors.white30,
-                    size: 34,
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colors.secondaryContainer.withValues(alpha: .55),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.video_collection_outlined,
+                        color: colors.onSecondaryContainer,
+                        size: 30,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
+                  const SizedBox(height: 14),
+                  Text(
                     'Start with your photos & videos',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Add media, tap a clip to edit it, then set the pace.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54, height: 1.5),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _addMedia(),
@@ -1349,141 +1411,167 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     },
   );
 
-  Widget _motionInspector() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      EditorSectionCard(
-        title: const Text('Opening scroll reveal'),
-        children: [
-          _framingControl(
-            'Reveal duration',
-            _project.sheetIntroSeconds,
-            0,
-            2,
-            '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
-            (v) {
-              _project.sheetIntroSeconds = v < .1 ? 0 : v;
-              _previewRevision = newId();
-              _change();
-            },
-          ),
-          const Text(
-            'Set to zero to start with the sheet already in position.',
-            style: TextStyle(fontSize: 11, color: Colors.white54),
-          ),
-        ],
-      ),
-      EditorSectionCard(
-        title: const Text('Left-scroll snap'),
-        children: [
-          _framingControl(
-            'Slide speed',
-            _project.slideSeconds,
-            .15,
-            .8,
-            '${_project.slideSeconds.toStringAsFixed(2)}s',
-            (v) {
-              _project.slideSeconds = v;
-              _change();
-            },
-          ),
-          const Text(
-            'Slide time is included in each clip’s duration.',
-            style: TextStyle(fontSize: 11, color: Colors.white54),
-          ),
-          TextButton(
-            onPressed: () {
-              for (final c in _project.clips) {
-                c.duration = 1.56;
-                c.normalize();
-              }
-              _project.slideSeconds = .35;
-              _previewRevision = newId();
-              _change();
-            },
-            child: const Text('Use reference pace · 1.56s per card'),
-          ),
-        ],
-      ),
-    ],
-  );
-  Widget _clipStrip() => SizedBox(
-    height: 72,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      itemCount: _project.clips.length,
-      separatorBuilder: (_, _) => const SizedBox(width: 5),
-      itemBuilder: (_, i) {
-        final c = _project.clips[i];
-        return Semantics(
-          label: 'Clip ${i + 1}: ${c.name}',
-          selected: i == _selected,
-          button: true,
-          child: Tooltip(
-            message: c.name,
-            child: InkWell(
-              onTap: () => setState(() {
-                _selected = i;
+  Widget _motionInspector() {
+    final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        EditorSectionCard(
+          title: const Text('Opening scroll reveal'),
+          children: [
+            _framingControl(
+              'Reveal duration',
+              _project.sheetIntroSeconds,
+              0,
+              2,
+              '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
+              (v) {
+                _project.sheetIntroSeconds = v < .1 ? 0 : v;
                 _previewRevision = newId();
-              }),
-              child: Container(
-                width: (c.duration * 12).clamp(78, 150),
-                decoration: BoxDecoration(
-                  color: panel,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: i == _selected ? mint : Colors.white12,
-                    width: 2,
+                _change();
+              },
+            ),
+            Text(
+              'Set to zero to start with the sheet already in position.',
+              style: mutedStyle,
+            ),
+          ],
+        ),
+        EditorSectionCard(
+          title: const Text('Left-scroll snap'),
+          children: [
+            _framingControl(
+              'Slide speed',
+              _project.slideSeconds,
+              .15,
+              .8,
+              '${_project.slideSeconds.toStringAsFixed(2)}s',
+              (v) {
+                _project.slideSeconds = v;
+                _change();
+              },
+            ),
+            Text(
+              'Slide time is included in each clip’s duration.',
+              style: mutedStyle,
+            ),
+            TextButton(
+              onPressed: () {
+                for (final c in _project.clips) {
+                  c.duration = 1.56;
+                  c.normalize();
+                }
+                _project.slideSeconds = .35;
+                _previewRevision = newId();
+                _change();
+              },
+              child: const Text('Use reference pace · 1.56s per card'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _clipStrip() {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 74,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _project.clips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final c = _project.clips[i];
+          final active = i == _selected;
+          return Semantics(
+            label: 'Clip ${i + 1}: ${c.name}',
+            selected: active,
+            button: true,
+            child: Tooltip(
+              message: c.name,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => setState(() {
+                  _selected = i;
+                  _previewRevision = newId();
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: (c.duration * 12).clamp(78, 150),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: active ? colors.primary : colors.outlineVariant,
+                      width: active ? 2 : 1,
+                    ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipPoster(clip: c),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black87],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipPoster(clip: c),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black87],
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        top: 5,
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
+                        Positioned(
+                          left: 6,
+                          top: 5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: active ? colors.primary : Colors.black54,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${i + 1}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: active
+                                    ? colors.onPrimary
+                                    : Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        right: 4,
-                        bottom: 6,
-                        child: Text(
-                          '${c.duration.toStringAsFixed(1)}s',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white,
+                        Positioned(
+                          left: 6,
+                          right: 4,
+                          bottom: 5,
+                          child: Text(
+                            '${c.duration.toStringAsFixed(1)}s',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
+  }
 
   Widget _clipCard(int index) {
     final clip = _project.clips[index];
@@ -1541,7 +1629,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           if (clip.isTimed && clip.maxTrimStart > .001) ...[
             Text(
               'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             Slider(
               value: clip.trimStart,
@@ -1631,6 +1721,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Widget _exportTab() {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final needsMap = _project.isStreetview
         ? StreetviewTimeline.scenes(_project)
               .where((s) => s.kind == 'map' || s.kind == 'ending-map')
@@ -1644,60 +1736,112 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: panel,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '1080 × 1920',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: colors.secondaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.hd_outlined,
+                          color: colors.onSecondaryContainer,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Vertical MP4 · H.264 · ${_project.music == null ? 'Silent' : 'With music'}',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '1080 × 1920',
+                              style: textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Vertical MP4 · H.264 · ${_project.music == null ? 'Silent' : 'With music'}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
+                              style: textTheme.labelMedium?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
-                      style: const TextStyle(color: mint, fontSize: 12),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               if (_project.clips.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Add at least one photo or video in Timeline to export.',
-                    style: TextStyle(color: Colors.white60),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Add at least one photo or video in Timeline to export.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               if (needsMap)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.secondaryContainer.withValues(alpha: .45),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Row(
                     children: [
+                      Icon(
+                        Icons.map_outlined,
+                        size: 18,
+                        color: colors.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           _project.isStreetview
                               ? 'Capture the journey’s map screens in Place.'
                               : 'Your map header needs an image.',
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 12,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colors.onSecondaryContainer,
                           ),
                         ),
                       ),
@@ -1711,7 +1855,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                     ],
                   ),
                 ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               EditorSectionCard(
                 title: const Text('Still images'),
                 subtitle: const Text('Transparent template or full snapshot'),
@@ -1737,10 +1881,12 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 icon: const Icon(Icons.inventory_2_outlined, size: 18),
                 label: const Text('Share project backup'),
               ),
-              const Text(
+              Text(
                 'Your project and media autosave on this device.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38, fontSize: 11),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
             ],
           ),
