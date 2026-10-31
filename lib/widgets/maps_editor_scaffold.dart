@@ -175,8 +175,8 @@ class MapsEditorScaffold extends StatelessWidget {
                           previewFraction: tab == 1
                               ? .48
                               : tab == 4
-                                  ? .50
-                                  : .56,
+                              ? .50
+                              : .56,
                           previewBuilder: previewBuilder,
                           inspector: MapsEditorInspector(
                             tab: tab,

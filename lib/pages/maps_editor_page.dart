@@ -414,10 +414,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     if (!_ready) {
       return Scaffold(
         body: Center(
-          child:
-              _status.isEmpty
-                  ? const CircularProgressIndicator()
-                  : Text(_status),
+          child: _status.isEmpty
+              ? const CircularProgressIndicator()
+              : Text(_status),
         ),
       );
     }
@@ -473,16 +472,15 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     );
   }
 
-  Widget _preview({double maxHeight = 420}) =>
-      _exporting
-          ? SizedBox(height: maxHeight)
-          : TimelinePreview(
-            key: ValueKey(_previewRevision),
-            project: _project,
-            selected: _selected,
-            startAtBeginning: _project.isStreetview && _selected == 0,
-            maxHeight: maxHeight,
-          );
+  Widget _preview({double maxHeight = 420}) => _exporting
+      ? SizedBox(height: maxHeight)
+      : TimelinePreview(
+          key: ValueKey(_previewRevision),
+          project: _project,
+          selected: _selected,
+          startAtBeginning: _project.isStreetview && _selected == 0,
+          maxHeight: maxHeight,
+        );
 
   void _goToStep(int step) => setState(() {
     _tab = step;
