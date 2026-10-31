@@ -218,21 +218,23 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   }
 
   void _removePost() {
-    if (p.clips.isEmpty) return;
+    if (_busy || p.clips.isEmpty) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final index = _selected;
     final clip = p.clips.removeAt(index);
-    if (_selected >= p.clips.length) {
-      _selected = max(0, p.clips.length - 1);
-    }
+    _selected = max(0, min(index, p.clips.length - 1));
     _change();
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
-        content: Text('Removed ${clip.name}'),
+        content: Text('Removed “${clip.name}”'),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () {
-            p.clips.insert(min(index, p.clips.length), clip);
-            _selected = min(index, p.clips.length - 1);
+            if (!mounted || p.clips.contains(clip)) return;
+            _selected = min(index, p.clips.length);
+            p.clips.insert(_selected, clip);
             _change();
           },
         ),
