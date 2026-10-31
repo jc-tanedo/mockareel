@@ -289,7 +289,8 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         maxLines: 3,
         onChanged: (value) => setState(() => _credits = value),
       ),
-      if (!_ready && _error == null) const LinearProgressIndicator(minHeight: 2),
+      if (!_ready && _error == null)
+        const LinearProgressIndicator(minHeight: 2),
       if (_error != null)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),

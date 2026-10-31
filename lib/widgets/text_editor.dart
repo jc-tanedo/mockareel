@@ -283,7 +283,12 @@ class _TextEditorState extends State<TextEditor> {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    for (final style in ['badge', 'plain', 'highlight', 'serif'])
+                    for (final style in [
+                      'badge',
+                      'plain',
+                      'highlight',
+                      'serif',
+                    ])
                       ChoiceChip(
                         label: Text(style),
                         selected: tag.style == style,

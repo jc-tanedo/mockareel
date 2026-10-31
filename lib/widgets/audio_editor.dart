@@ -28,7 +28,9 @@ class AudioEditor extends StatelessWidget {
         if (preview != null) preview!,
         EditorSectionCard(
           title: const Text('Soundtrack'),
-          subtitle: const Text('Background audio mixed into your exported reel'),
+          subtitle: const Text(
+            'Background audio mixed into your exported reel',
+          ),
           children: [
             FilledButton.icon(
               onPressed: importing ? null : onPick,

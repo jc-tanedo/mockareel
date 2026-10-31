@@ -35,7 +35,6 @@ import '../widgets/media_frame.dart';
 import '../widgets/place_actions_editor.dart';
 import '../widgets/text_editor.dart';
 import '../widgets/audio_editor.dart';
-
 import 'exported_video_page.dart';
 
 class MapsEditorPage extends StatefulWidget {
@@ -800,6 +799,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         ),
       );
     }
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return PopScope(
       canPop: !_exporting,
       onPopInvokedWithResult: (didPop, result) {
@@ -873,17 +874,16 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                               _project.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 4),
                           Icon(
                             Icons.edit_outlined,
                             size: 13,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: colors.onSurfaceVariant,
                           ),
                         ],
                       ),
@@ -894,7 +894,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colors.primary,
                           letterSpacing: 1,
                         ),
                       ),
@@ -908,9 +908,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   onPressed: _save,
                   icon: Icon(
                     _dirty ? Icons.save_outlined : Icons.check_circle_outline,
-                    color: _dirty
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: _dirty ? colors.primary : colors.onSurfaceVariant,
                   ),
                 ),
                 PopupMenuButton<String>(
@@ -1541,9 +1539,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: active
-                                    ? colors.onPrimary
-                                    : Colors.white,
+                                color: active ? colors.onPrimary : Colors.white,
                               ),
                             ),
                           ),

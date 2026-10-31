@@ -291,9 +291,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       InspectorTabs(labels: labels, selected: selected, onSelected: tap);
   Widget _sequence() {
     final colors = Theme.of(context).colorScheme;
-    final mutedStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant);
+    final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -597,9 +597,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                   for (var i = 0; i < 8; i++)
                     _field(
                       'App ${i + 1}',
-                      i < p.feed.appLabels.length
-                          ? p.feed.appLabels[i]
-                          : 'App',
+                      i < p.feed.appLabels.length ? p.feed.appLabels[i] : 'App',
                       (v) {
                         while (p.feed.appLabels.length < 8) {
                           p.feed.appLabels.add('App');
@@ -659,6 +657,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       ],
     );
   }
+
   void _move(int delta) {
     final next = _selected + delta;
     if (next < 0 || next >= p.clips.length) return;
@@ -827,9 +826,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
 
   List<Widget> _postFields(ReelClip c) {
     final colors = Theme.of(context).colorScheme;
-    final mutedStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant);
+    final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     final post = c.post;
     return switch (_postTool) {
       0 => [
@@ -1075,6 +1074,104 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     );
   }
 
+  Widget _bottomSteps(ColorScheme colors) => Container(
+    decoration: BoxDecoration(
+      color: colors.surfaceContainerLow,
+      border: Border(top: BorderSide(color: colors.outlineVariant)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'CREATE YOUR REEL · TAP ANY STEP',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurfaceVariant,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (var i = 0; i < 4; i++)
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: _tab == i,
+                      label: 'Step ${i + 1} of 4, ${_labels[i]}',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _tab = i),
+                        child: Column(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: _tab == i ? 40 : 28,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: _tab == i
+                                    ? colors.primary
+                                    : colors.surfaceContainerHigh,
+                                border: Border.all(
+                                  color: _tab == i
+                                      ? colors.primary
+                                      : colors.outlineVariant,
+                                ),
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _tab == i
+                                      ? colors.onPrimary
+                                      : colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _labels[i],
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: _tab == i
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: _tab == i
+                                    ? colors.onSurface
+                                    : colors.onSurfaceVariant,
+                              ),
+                            ),
+                            Text(
+                              i == 2 ? 'Optional' : ' ',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: colors.onSurfaceVariant.withValues(
+                                  alpha: .75,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
@@ -1280,117 +1377,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                 ),
               ],
             ),
-            bottomNavigationBar: keyboard
-                ? null
-                : Container(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLow,
-                      border: Border(
-                        top: BorderSide(color: colors.outlineVariant),
-                      ),
-                    ),
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'CREATE YOUR REEL · TAP ANY STEP',
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                                color: colors.onSurfaceVariant,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                for (var i = 0; i < 4; i++)
-                                  Expanded(
-                                    child: Semantics(
-                                      button: true,
-                                      selected: _tab == i,
-                                      label:
-                                          'Step ${i + 1} of 4, ${_labels[i]}',
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(12),
-                                        onTap: () => setState(() => _tab = i),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 2,
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              AnimatedContainer(
-                                                duration: const Duration(
-                                                  milliseconds: 180,
-                                                ),
-                                                width: _tab == i ? 40 : 28,
-                                                height: 24,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  color: _tab == i
-                                                      ? colors.primary
-                                                      : colors
-                                                            .surfaceContainerHigh,
-                                                  border: Border.all(
-                                                    color: _tab == i
-                                                        ? colors.primary
-                                                        : colors.outlineVariant,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  '${i + 1}',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: _tab == i
-                                                        ? colors.onPrimary
-                                                        : colors
-                                                              .onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                _labels[i],
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: _tab == i
-                                                      ? FontWeight.w700
-                                                      : FontWeight.w500,
-                                                  color: _tab == i
-                                                      ? colors.onSurface
-                                                      : colors.onSurfaceVariant,
-                                                ),
-                                              ),
-                                              Text(
-                                                i == 2 ? 'Optional' : ' ',
-                                                style: TextStyle(
-                                                  fontSize: 8,
-                                                  color: colors.onSurfaceVariant
-                                                      .withValues(alpha: .75),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+            bottomNavigationBar: keyboard ? null : _bottomSteps(colors),
           ),
           if (_exporting)
             Positioned.fill(
