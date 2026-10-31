@@ -21,6 +21,7 @@ import '../model/feed.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
 import '../widgets/audio_editor.dart';
+import '../widgets/creation_steps.dart';
 import '../widgets/editor_workspace.dart';
 import '../widgets/feed_canvas.dart';
 import '../widgets/reel_preview.dart';
@@ -287,377 +288,373 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       _change();
     },
   );
+  TextStyle? _mutedStyle() {
+    final theme = Theme.of(context);
+    return theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+  }
+
   Widget _tools(List<String> labels, int selected, ValueChanged<int> tap) =>
       InspectorTabs(labels: labels, selected: selected, onSelected: tap);
-  Widget _sequence() {
-    final colors = Theme.of(context).colorScheme;
-    final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: colors.onSurfaceVariant,
-    );
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        EditorSectionCard(
-          title: const Text('Opening scene'),
-          children: [
-            SegmentedButton<String>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 'search', label: Text('Search')),
-                ButtonSegment(value: 'home', label: Text('Home screen')),
-                ButtonSegment(value: 'feed', label: Text('Feed')),
-              ],
-              selected: {p.feed.opening},
-              onSelectionChanged: (s) {
-                p.feed.opening = s.first;
-                _change();
-              },
-            ),
-            const SizedBox(height: 18),
-            if (p.feed.opening == 'search') ...[
-              _field(
-                'Search query',
-                p.feed.search,
-                (v) => p.feed.search = v,
-                max: 100,
-              ),
-              Text(
-                'Leave empty to start directly in the feed.',
-                style: mutedStyle,
-              ),
-              const SizedBox(height: 16),
-              _slider(
-                'Typing',
-                p.feed.typingSeconds,
-                .5,
-                6,
-                (v) => p.feed.typingSeconds = v,
-              ),
-              _slider(
-                'Loading',
-                p.feed.loadingSeconds,
-                .2,
-                3,
-                (v) => p.feed.loadingSeconds = v,
-              ),
+  Widget _sequence() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      EditorSectionCard(
+        title: const Text('Opening scene'),
+        children: [
+          SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'search', label: Text('Search')),
+              ButtonSegment(value: 'home', label: Text('Home screen')),
+              ButtonSegment(value: 'feed', label: Text('Feed')),
             ],
-            if (p.feed.opening == 'home')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'The home screen holds, then the app opens into your first post.',
-                  style: mutedStyle,
-                ),
-              ),
-          ],
-        ),
-        EditorSectionCard(
-          title: const Text('Feed transitions'),
-          children: [
-            _slider(
-              'Swipe duration',
-              p.slideSeconds,
-              .15,
-              .8,
-              (v) => p.slideSeconds = v,
+            selected: {p.feed.opening},
+            onSelectionChanged: (s) {
+              p.feed.opening = s.first;
+              _change();
+            },
+          ),
+          const SizedBox(height: 18),
+          if (p.feed.opening == 'search') ...[
+            _field(
+              'Search query',
+              p.feed.search,
+              (v) => p.feed.search = v,
+              max: 100,
             ),
+            Text(
+              'Leave empty to start directly in the feed.',
+              style: _mutedStyle(),
+            ),
+            const SizedBox(height: 16),
+            _slider(
+              'Typing',
+              p.feed.typingSeconds,
+              .5,
+              6,
+              (v) => p.feed.typingSeconds = v,
+            ),
+            _slider(
+              'Loading',
+              p.feed.loadingSeconds,
+              .2,
+              3,
+              (v) => p.feed.loadingSeconds = v,
+            ),
+          ],
+          if (p.feed.opening == 'home')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'The home screen holds, then the app opens into your first post.',
+                style: _mutedStyle(),
+              ),
+            ),
+        ],
+      ),
+      EditorSectionCard(
+        title: const Text('Feed transitions'),
+        children: [
+          _slider(
+            'Swipe duration',
+            p.slideSeconds,
+            .15,
+            .8,
+            (v) => p.slideSeconds = v,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Close app to home screen'),
+            subtitle: const Text(
+              'Shrink the last post back into the app icon.',
+            ),
+            value: p.feed.closeToHome,
+            onChanged: (v) {
+              p.feed.closeToHome = v;
+              _change();
+            },
+          ),
+        ],
+      ),
+      EditorSectionCard(
+        title: const Text('Home screen & status bar'),
+        children: [
+          const SizedBox(height: 12),
+          DropdownButtonFormField<HomeOs>(
+            isExpanded: true,
+            initialValue: p.feed.homeOs,
+            decoration: const InputDecoration(labelText: 'Home screen OS'),
+            items: [
+              for (final os in HomeOs.values)
+                DropdownMenuItem(
+                  value: os,
+                  child: Text(
+                    os.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (os) {
+              if (os != null) {
+                p.feed.homeOs = os;
+                _change();
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show mock app icons'),
+            subtitle: const Text(
+              'Includes the dock and launcher navigation. Turn off for screenshots that already have icons.',
+            ),
+            value: p.feed.showIcons,
+            onChanged: (v) {
+              p.feed.showIcons = v;
+              _change();
+            },
+          ),
+          if (p.feed.homeOs == HomeOs.android || p.feed.homeOs == HomeOs.pixel)
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Close app to home screen'),
-              subtitle: const Text(
-                'Shrink the last post back into the app icon.',
+              title: Text(
+                p.feed.homeOs == HomeOs.pixel
+                    ? 'Show date'
+                    : 'Show home clock & date',
               ),
-              value: p.feed.closeToHome,
+              value: p.feed.showClock,
               onChanged: (v) {
-                p.feed.closeToHome = v;
+                p.feed.showClock = v;
                 _change();
               },
             ),
-          ],
-        ),
-        EditorSectionCard(
-          title: const Text('Home screen & status bar'),
-          children: [
-            const SizedBox(height: 12),
-            DropdownButtonFormField<HomeOs>(
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show home status bar'),
+            value: p.feed.showStatus,
+            onChanged: (v) {
+              p.feed.showStatus = v;
+              _change();
+            },
+          ),
+          if (p.feed.homeOs != HomeOs.iphone)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                p.feed.homeOs == HomeOs.pixel
+                    ? 'Show weather'
+                    : 'Show home widgets',
+              ),
+              value: p.feed.showWidget,
+              onChanged: (v) {
+                p.feed.showWidget = v;
+                _change();
+              },
+            ),
+          _field(
+            'Status bar time',
+            p.feed.time,
+            (v) => p.feed.time = v,
+            max: 8,
+          ),
+          _field('Date', p.feed.date, (v) => p.feed.date = v, max: 50),
+          if (p.feed.homeOs == HomeOs.iphone) ...[
+            DropdownButtonFormField<String>(
               isExpanded: true,
-              initialValue: p.feed.homeOs,
-              decoration: const InputDecoration(labelText: 'Home screen OS'),
-              items: [
-                for (final os in HomeOs.values)
-                  DropdownMenuItem(
-                    value: os,
-                    child: Text(
-                      os.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+              initialValue: p.feed.iphonePeriod,
+              decoration: const InputDecoration(
+                labelText: 'Status bar time period',
+              ),
+              items: const [
+                DropdownMenuItem(value: 'AM', child: Text('AM')),
+                DropdownMenuItem(value: 'PM', child: Text('PM')),
+                DropdownMenuItem(value: '', child: Text('24-hour / no suffix')),
               ],
-              onChanged: (os) {
-                if (os != null) {
-                  p.feed.homeOs = os;
+              onChanged: (v) {
+                if (v != null) {
+                  p.feed.iphonePeriod = v;
                   _change();
                 }
               },
             ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Show mock app icons'),
-              subtitle: const Text(
-                'Includes the dock and launcher navigation. Turn off for screenshots that already have icons.',
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Classic iOS uses a full app grid and the status-bar clock, with no large clock or dashboard widgets.',
+                style: _mutedStyle(),
               ),
-              value: p.feed.showIcons,
-              onChanged: (v) {
-                p.feed.showIcons = v;
-                _change();
-              },
             ),
-            if (p.feed.homeOs == HomeOs.android ||
-                p.feed.homeOs == HomeOs.pixel)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  p.feed.homeOs == HomeOs.pixel
-                      ? 'Show date'
-                      : 'Show home clock & date',
-                ),
-                value: p.feed.showClock,
-                onChanged: (v) {
-                  p.feed.showClock = v;
-                  _change();
-                },
-              ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Show home status bar'),
-              value: p.feed.showStatus,
-              onChanged: (v) {
-                p.feed.showStatus = v;
-                _change();
-              },
-            ),
-            if (p.feed.homeOs != HomeOs.iphone)
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  p.feed.homeOs == HomeOs.pixel
-                      ? 'Show weather'
-                      : 'Show home widgets',
-                ),
-                value: p.feed.showWidget,
-                onChanged: (v) {
-                  p.feed.showWidget = v;
-                  _change();
-                },
-              ),
+          ],
+          if (p.feed.homeOs == HomeOs.pixel || p.feed.homeOs == HomeOs.oneUi)
             _field(
-              'Status bar time',
-              p.feed.time,
-              (v) => p.feed.time = v,
+              'Weather temperature',
+              p.feed.weatherTemperature,
+              (v) => p.feed.weatherTemperature = v,
               max: 8,
             ),
-            _field('Date', p.feed.date, (v) => p.feed.date = v, max: 50),
-            if (p.feed.homeOs == HomeOs.iphone) ...[
-              DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: p.feed.iphonePeriod,
-                decoration: const InputDecoration(
-                  labelText: 'Status bar time period',
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'AM', child: Text('AM')),
-                  DropdownMenuItem(value: 'PM', child: Text('PM')),
-                  DropdownMenuItem(
-                    value: '',
-                    child: Text('24-hour / no suffix'),
-                  ),
-                ],
-                onChanged: (v) {
-                  if (v != null) {
-                    p.feed.iphonePeriod = v;
-                    _change();
-                  }
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Classic iOS uses a full app grid and the status-bar clock, with no large clock or dashboard widgets.',
-                  style: mutedStyle,
-                ),
-              ),
-            ],
-            if (p.feed.homeOs == HomeOs.pixel || p.feed.homeOs == HomeOs.oneUi)
-              _field(
-                'Weather temperature',
-                p.feed.weatherTemperature,
-                (v) => p.feed.weatherTemperature = v,
-                max: 8,
-              ),
-            if (p.feed.homeOs == HomeOs.oneUi) ...[
-              _field(
-                'Weather location',
-                p.feed.weatherLocation,
-                (v) => p.feed.weatherLocation = v,
-                max: 40,
-              ),
-              _field(
-                'Briefing pill',
-                p.feed.briefTitle,
-                (v) => p.feed.briefTitle = v,
-                max: 30,
-              ),
-              _field(
-                'Health pill',
-                p.feed.healthTitle,
-                (v) => p.feed.healthTitle = v,
-                max: 30,
-              ),
-            ],
+          if (p.feed.homeOs == HomeOs.oneUi) ...[
+            _field(
+              'Weather location',
+              p.feed.weatherLocation,
+              (v) => p.feed.weatherLocation = v,
+              max: 40,
+            ),
+            _field(
+              'Briefing pill',
+              p.feed.briefTitle,
+              (v) => p.feed.briefTitle = v,
+              max: 30,
+            ),
+            _field(
+              'Health pill',
+              p.feed.healthTitle,
+              (v) => p.feed.healthTitle = v,
+              max: 30,
+            ),
+          ],
 
-            if (p.feed.homeOs == HomeOs.android)
-              _field(
-                'Widget title',
-                p.feed.widgetTitle,
-                (v) => p.feed.widgetTitle = v,
-                max: 70,
-              ),
-            if (p.feed.homeOs == HomeOs.android)
-              _field(
-                'Widget note',
-                p.feed.widgetText,
-                (v) => p.feed.widgetText = v,
-                max: 80,
-              ),
-            _slider(
-              'Home screen hold',
-              p.feed.homeSeconds,
-              .5,
-              6,
-              (v) => p.feed.homeSeconds = v,
+          if (p.feed.homeOs == HomeOs.android)
+            _field(
+              'Widget title',
+              p.feed.widgetTitle,
+              (v) => p.feed.widgetTitle = v,
+              max: 70,
             ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _pickHome,
-              icon: const Icon(Icons.wallpaper),
-              label: Text(
-                p.feed.homeMedia == null
-                    ? 'Choose home photo / video'
-                    : 'Replace home photo / video',
-              ),
+          if (p.feed.homeOs == HomeOs.android)
+            _field(
+              'Widget note',
+              p.feed.widgetText,
+              (v) => p.feed.widgetText = v,
+              max: 80,
             ),
-            if (p.feed.homeMedia != null)
-              TextButton.icon(
+          _slider(
+            'Home screen hold',
+            p.feed.homeSeconds,
+            .5,
+            6,
+            (v) => p.feed.homeSeconds = v,
+          ),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _pickHome,
+            icon: const Icon(Icons.wallpaper),
+            label: Text(
+              p.feed.homeMedia == null
+                  ? 'Choose home photo / video'
+                  : 'Replace home photo / video',
+            ),
+          ),
+          if (p.feed.homeMedia != null)
+            TextButton.icon(
+              onPressed: () {
+                p.feed.showIcons = false;
+                p.feed.showClock = false;
+                p.feed.showWidget = false;
+                p.feed.showStatus = false;
+                _change();
+              },
+              icon: const Icon(Icons.layers_clear_outlined),
+              label: const Text('Use media without overlays'),
+            ),
+          if (p.feed.homeMedia != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                p.feed.homeMedia!.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                p.feed.homeMedia!.isTimed
+                    ? 'Animated wallpaper · loops to fit'
+                    : 'Photo wallpaper',
+              ),
+              trailing: IconButton(
+                tooltip: 'Remove home media',
                 onPressed: () {
-                  p.feed.showIcons = false;
-                  p.feed.showClock = false;
-                  p.feed.showWidget = false;
-                  p.feed.showStatus = false;
+                  p.feed.homeMedia = null;
                   _change();
                 },
-                icon: const Icon(Icons.layers_clear_outlined),
-                label: const Text('Use media without overlays'),
+                icon: const Icon(Icons.close),
               ),
-            if (p.feed.homeMedia != null)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  p.feed.homeMedia!.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  p.feed.homeMedia!.isTimed
-                      ? 'Animated wallpaper · loops to fit'
-                      : 'Photo wallpaper',
-                ),
-                trailing: IconButton(
-                  tooltip: 'Remove home media',
-                  onPressed: () {
-                    p.feed.homeMedia = null;
-                    _change();
-                  },
-                  icon: const Icon(Icons.close),
-                ),
+            ),
+          if (p.feed.homeOs != HomeOs.android)
+            HomeAppsEditor(
+              key: ValueKey(p.feed.homeOs),
+              settings: p.feed,
+              onChanged: _change,
+            )
+          else
+            EditorControlGroup(
+              title: const Text('App labels'),
+              subtitle: const Text(
+                'Eight generic tiles; the fourth opens the feed.',
               ),
-            if (p.feed.homeOs != HomeOs.android)
-              HomeAppsEditor(
-                key: ValueKey(p.feed.homeOs),
-                settings: p.feed,
-                onChanged: _change,
-              )
-            else
-              EditorControlGroup(
-                title: const Text('App labels'),
-                subtitle: const Text(
-                  'Eight generic tiles; the fourth opens the feed.',
-                ),
-                children: [
-                  for (var i = 0; i < 8; i++)
-                    _field(
-                      'App ${i + 1}',
-                      i < p.feed.appLabels.length ? p.feed.appLabels[i] : 'App',
-                      (v) {
-                        while (p.feed.appLabels.length < 8) {
-                          p.feed.appLabels.add('App');
-                        }
-                        p.feed.appLabels[i] = v;
-                      },
-                      max: 16,
-                    ),
-                  for (var i = 0; i < 8; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: DropdownButtonFormField<int>(
-                        isExpanded: true,
-                        key: ValueKey('app-icon-$i'),
-                        initialValue: i < p.feed.appIcons.length
-                            ? p.feed.appIcons[i]
-                            : i,
-                        decoration: InputDecoration(
-                          labelText: 'App ${i + 1} icon',
-                        ),
-                        items: [
-                          for (var n = 0; n < 12; n++)
-                            DropdownMenuItem(
-                              value: n,
-                              child: Text(
-                                const [
-                                  'Photos',
-                                  'Camera',
-                                  'Notes',
-                                  'Music note',
-                                  'Weather',
-                                  'Sound',
-                                  'Messages',
-                                  'Settings',
-                                  'Map',
-                                  'Mail',
-                                  'Clock',
-                                  'Video',
-                                ][n],
-                              ),
-                            ),
-                        ],
-                        onChanged: (n) {
-                          if (n == null) return;
-                          while (p.feed.appIcons.length < 8) {
-                            p.feed.appIcons.add(p.feed.appIcons.length);
-                          }
-                          p.feed.appIcons[i] = n;
-                          _change();
-                        },
+              children: [
+                for (var i = 0; i < 8; i++)
+                  _field(
+                    'App ${i + 1}',
+                    i < p.feed.appLabels.length ? p.feed.appLabels[i] : 'App',
+                    (v) {
+                      while (p.feed.appLabels.length < 8) {
+                        p.feed.appLabels.add('App');
+                      }
+                      p.feed.appLabels[i] = v;
+                    },
+                    max: 16,
+                  ),
+                for (var i = 0; i < 8; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: DropdownButtonFormField<int>(
+                      isExpanded: true,
+                      key: ValueKey('app-icon-$i'),
+                      initialValue: i < p.feed.appIcons.length
+                          ? p.feed.appIcons[i]
+                          : i,
+                      decoration: InputDecoration(
+                        labelText: 'App ${i + 1} icon',
                       ),
+                      items: [
+                        for (var n = 0; n < 12; n++)
+                          DropdownMenuItem(
+                            value: n,
+                            child: Text(
+                              const [
+                                'Photos',
+                                'Camera',
+                                'Notes',
+                                'Music note',
+                                'Weather',
+                                'Sound',
+                                'Messages',
+                                'Settings',
+                                'Map',
+                                'Mail',
+                                'Clock',
+                                'Video',
+                              ][n],
+                            ),
+                          ),
+                      ],
+                      onChanged: (n) {
+                        if (n == null) return;
+                        while (p.feed.appIcons.length < 8) {
+                          p.feed.appIcons.add(p.feed.appIcons.length);
+                        }
+                        p.feed.appIcons[i] = n;
+                        _change();
+                      },
                     ),
-                ],
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
+                  ),
+              ],
+            ),
+        ],
+      ),
+    ],
+  );
   void _move(int delta) {
     final next = _selected + delta;
     if (next < 0 || next >= p.clips.length) return;
@@ -781,9 +778,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: colors.secondaryContainer.withValues(
-                            alpha: .55,
-                          ),
+                          color: colors.secondaryContainer,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -825,10 +820,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   }
 
   List<Widget> _postFields(ReelClip c) {
-    final colors = Theme.of(context).colorScheme;
-    final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: colors.onSurfaceVariant,
-    );
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final post = c.post;
     return switch (_postTool) {
       0 => [
@@ -900,7 +893,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         _field('Sound label', post.sound, (v) => post.sound = v, max: 80),
         Text(
           'The sound label is decorative. Choose actual background music in Audio.',
-          style: mutedStyle,
+          style: _mutedStyle(),
         ),
       ],
       2 => [
@@ -933,7 +926,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
             c.normalize();
           }, precision: c.isGif ? 2 : 1),
         _slider('Zoom', c.zoom, 1, 3, (v) => c.zoom = v),
-        Text('Horizontal crop', style: Theme.of(context).textTheme.bodySmall),
+        Text('Horizontal crop', style: theme.textTheme.bodySmall),
         Slider(
           value: c.panX,
           min: -1,
@@ -964,6 +957,14 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   Widget _exportPanel() {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final seconds = FeedTimeline.duration(p).toStringAsFixed(1);
+    final prefix = p.feed.hasSearch
+        ? 'Typed search → '
+        : p.feed.opening == 'home'
+        ? 'Home screen → '
+        : '';
+    final suffix = p.feed.closeToHome ? ' → Home screen' : '';
+    final flowLabel = '${prefix}Vertical feed$suffix';
     return Column(
       children: [
         Expanded(
@@ -988,7 +989,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '${p.clips.length} posts · ${FeedTimeline.duration(p).toStringAsFixed(1)} seconds',
+                        '${p.clips.length} posts · $seconds seconds',
                         style: textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -1007,17 +1008,11 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: colors.secondaryContainer.withValues(
-                            alpha: .6,
-                          ),
+                          color: colors.secondaryContainer,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          '${p.feed.hasSearch
-                              ? 'Typed search → '
-                              : p.feed.opening == 'home'
-                              ? 'Home screen → '
-                              : ''}Vertical feed${p.feed.closeToHome ? ' → Home screen' : ''}',
+                          flowLabel,
                           style: textTheme.labelSmall?.copyWith(
                             color: colors.onSecondaryContainer,
                             fontWeight: FontWeight.w600,
@@ -1034,14 +1029,12 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     'Add at least one photo or video in Posts.',
-                    style: textTheme.bodySmall?.copyWith(color: colors.primary),
+                    style: TextStyle(fontSize: 12, color: colors.primary),
                   ),
                 ),
               Text(
                 'Background music is optional. Source video audio is muted.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+                style: _mutedStyle(),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -1052,9 +1045,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
               const SizedBox(height: 8),
               Text(
                 'Changes save automatically on this device.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+                style: _mutedStyle(),
               ),
             ],
           ),
@@ -1073,104 +1064,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       ],
     );
   }
-
-  Widget _bottomSteps(ColorScheme colors) => Container(
-    decoration: BoxDecoration(
-      color: colors.surfaceContainerLow,
-      border: Border(top: BorderSide(color: colors.outlineVariant)),
-    ),
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'CREATE YOUR REEL · TAP ANY STEP',
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
-                color: colors.onSurfaceVariant,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                for (var i = 0; i < 4; i++)
-                  Expanded(
-                    child: Semantics(
-                      button: true,
-                      selected: _tab == i,
-                      label: 'Step ${i + 1} of 4, ${_labels[i]}',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => setState(() => _tab = i),
-                        child: Column(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: _tab == i ? 40 : 28,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: _tab == i
-                                    ? colors.primary
-                                    : colors.surfaceContainerHigh,
-                                border: Border.all(
-                                  color: _tab == i
-                                      ? colors.primary
-                                      : colors.outlineVariant,
-                                ),
-                              ),
-                              child: Text(
-                                '${i + 1}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: _tab == i
-                                      ? colors.onPrimary
-                                      : colors.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _labels[i],
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: _tab == i
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: _tab == i
-                                    ? colors.onSurface
-                                    : colors.onSurfaceVariant,
-                              ),
-                            ),
-                            Text(
-                              i == 2 ? 'Optional' : ' ',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: colors.onSurfaceVariant.withValues(
-                                  alpha: .75,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -1303,47 +1196,12 @@ class _FeedEditorPageState extends State<FeedEditorPage>
             body: Column(
               children: [
                 if (!keyboard)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLow,
-                      border: Border(
-                        bottom: BorderSide(color: colors.outlineVariant),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'STEP ${_tab + 1} OF 4',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.primary,
-                                  letterSpacing: 1.3,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _titles[_tab],
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_tab < 3)
-                          FilledButton.tonalIcon(
-                            onPressed: () => setState(() => _tab++),
-                            icon: const Icon(Icons.arrow_forward, size: 17),
-                            label: const Text('Next'),
-                          ),
-                      ],
-                    ),
+                  CreationStepHeading(
+                    step: _tab,
+                    onNext: () => setState(() => _tab++),
+                    stepLabels: _labels,
+                    stepTitles: _titles,
+                    stepDescriptions: null,
                   ),
                 Expanded(
                   child: _exporting
@@ -1377,7 +1235,20 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                 ),
               ],
             ),
-            bottomNavigationBar: keyboard ? null : _bottomSteps(colors),
+            bottomNavigationBar: keyboard
+                ? null
+                : CreationSteps(
+                    selected: _tab,
+                    completed: [
+                      true,
+                      p.clips.isNotEmpty,
+                      p.music != null,
+                      false,
+                    ],
+                    customLabels: _labels,
+                    optionalSteps: const {2},
+                    onSelected: (i) => setState(() => _tab = i),
+                  ),
           ),
           if (_exporting)
             Positioned.fill(
