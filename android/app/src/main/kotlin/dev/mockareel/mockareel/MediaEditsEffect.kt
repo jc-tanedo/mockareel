@@ -14,16 +14,16 @@ import androidx.media3.effect.GlShaderProgram
 internal data class SpotSpec(val x: Float, val y: Float, val radius: Float)
 internal data class MediaEditSpec(val strength: Float, val spots: List<SpotSpec>) {
     companion object {
-        fun from(data: Map<String, Any>): MediaEditSpec {
+        fun from(data: Map<String, Any>, video: Boolean = false): MediaEditSpec {
             fun number(value: Any?, default: Float, min: Float, max: Float): Float {
                 val n = (value as? Number)?.toFloat() ?: default
                 require(n.isFinite()) { "Invalid media effect value" }
                 return n.coerceIn(min, max)
             }
-            val strength = if (data["fisheye"] == true) number(data["strength"], .35f, 0f, 1f) else 0f
+            val strength = (if (data["fisheye"] == true) number(data["strength"], .35f, 0f, 1f) else 0f) * (if (data["lens"] == "pincushion") -1 else 1)
             val raw = data["spots"] as? List<*> ?: emptyList<Any>()
             require(raw.size <= 8) { "Too many blur spots" }
-            return MediaEditSpec(strength, raw.map {
+            return MediaEditSpec(strength, (if (video) emptyList<Any>() else raw).map {
                 val spot = it as Map<*, *>
                 SpotSpec(number(spot["x"], .5f, 0f, 1f), number(spot["y"], .5f, 0f, 1f), number(spot["radius"], .1f, .025f, .3f))
             })
@@ -83,7 +83,8 @@ private class SourceShader(private val spec: MediaEditSpec) : BaseGlShaderProgra
             vec4 source(vec2 p) {
                 vec2 q = (p - 0.5) * uSize;
                 float r2 = min(dot(q, q) / dot(uSize * 0.5, uSize * 0.5), 1.0);
-                vec2 warped = 0.5 + (p - 0.5) * (1.0 - uStrength * 0.55 * (1.0 - r2));
+                float crop = uStrength < 0.0 ? 1.0 + abs(uStrength) * 0.55 : 1.0;
+                vec2 warped = 0.5 + (p - 0.5) * (1.0 - uStrength * 0.55 * (1.0 - r2)) / crop;
                 return texture2D(uSource, vec2(warped.x, 1.0 - warped.y));
             }
             vec4 spot(vec4 color, vec2 p, vec3 s) {

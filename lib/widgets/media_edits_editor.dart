@@ -71,7 +71,9 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final selected = edits.spots.where((s) => s.id == _selected).firstOrNull;
+    final selected = widget.clip.supportsBlur
+        ? edits.spots.where((s) => s.id == _selected).firstOrNull
+        : null;
     return ExpansionTile(
       onExpansionChanged: (value) {
         setState(() {
@@ -83,13 +85,17 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
         });
       },
       title: const Text('Media effects'),
-      subtitle: const Text('Fisheye lens and blur spots'),
+      subtitle: Text(
+        widget.clip.supportsBlur
+            ? 'Fisheye, pincushion and blur spots'
+            : 'Fisheye and pincushion',
+      ),
       tilePadding: EdgeInsets.zero,
       children: [
         if (_expanded) ...[
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Fisheye'),
+            title: const Text('Lens effect'),
             value: edits.fisheye,
             onChanged: (v) {
               edits.fisheye = v;
@@ -97,7 +103,24 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
             },
           ),
           if (edits.fisheye) ...[
-            Text('Fisheye strength · ${(edits.strength * 100).round()}%'),
+            DropdownButtonFormField<String>(
+              initialValue: edits.lens,
+              decoration: const InputDecoration(labelText: 'Lens type'),
+              items: const [
+                DropdownMenuItem(value: 'fisheye', child: Text('Fisheye')),
+                DropdownMenuItem(
+                  value: 'pincushion',
+                  child: Text('Pincushion'),
+                ),
+              ],
+              onChanged: (value) {
+                edits.lens = value!;
+                _change();
+              },
+            ),
+            Text(
+              '${edits.lens == 'pincushion' ? 'Pincushion' : 'Fisheye'} strength · ${(edits.strength * 100).round()}%',
+            ),
             Slider(
               value: edits.strength,
               onChanged: (v) {
@@ -156,7 +179,12 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
                                 ],
                               ),
                             ),
-                            for (var i = 0; i < edits.spots.length; i++)
+                            for (
+                              var i = 0;
+                              widget.clip.supportsBlur &&
+                                  i < edits.spots.length;
+                              i++
+                            )
                               _handle(edits.spots[i], i, fitted),
                           ],
                         ),
@@ -167,68 +195,74 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
               },
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: edits.spots.length >= MediaEdits.maxSpots
-                      ? null
-                      : () {
-                          final spot = BlurSpot();
-                          edits.spots.add(spot);
-                          _selected = spot.id;
-                          _change();
-                        },
-                  icon: const Icon(Icons.blur_on),
-                  label: Text(
-                    'Add blur spot (${edits.spots.length}/${MediaEdits.maxSpots})',
+          if (widget.clip.supportsBlur) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: edits.spots.length >= MediaEdits.maxSpots
+                        ? null
+                        : () {
+                            final spot = BlurSpot();
+                            edits.spots.add(spot);
+                            _selected = spot.id;
+                            _change();
+                          },
+                    icon: const Icon(Icons.blur_on),
+                    label: Text(
+                      'Add blur spot (${edits.spots.length}/${MediaEdits.maxSpots})',
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Remove selected blur spot',
-                onPressed: selected == null
-                    ? null
-                    : () {
-                        edits.spots.remove(selected);
-                        _selected = edits.spots.firstOrNull?.id;
-                        _change();
-                      },
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
-          ),
-          if (edits.spots.isNotEmpty)
-            Wrap(
-              spacing: 6,
-              children: [
-                for (var i = 0; i < edits.spots.length; i++)
-                  ChoiceChip(
-                    label: Text('Spot ${i + 1}'),
-                    selected: edits.spots[i].id == _selected,
-                    onSelected: (_) =>
-                        setState(() => _selected = edits.spots[i].id),
-                  ),
+                IconButton(
+                  tooltip: 'Remove selected blur spot',
+                  onPressed: selected == null
+                      ? null
+                      : () {
+                          edits.spots.remove(selected);
+                          _selected = edits.spots.firstOrNull?.id;
+                          _change();
+                        },
+                  icon: const Icon(Icons.delete_outline),
+                ),
               ],
             ),
-          if (selected != null) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Drag the circle to position the blur. Adjust its size below.',
+            if (edits.spots.isNotEmpty)
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (var i = 0; i < edits.spots.length; i++)
+                    ChoiceChip(
+                      label: Text('Spot ${i + 1}'),
+                      selected: edits.spots[i].id == _selected,
+                      onSelected: (_) =>
+                          setState(() => _selected = edits.spots[i].id),
+                    ),
+                ],
+              ),
+            if (selected != null) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Drag the circle to position the blur. Adjust its size below.',
+              ),
+              Slider(
+                value: selected.radius,
+                min: .025,
+                max: .3,
+                semanticFormatterCallback: (v) =>
+                    'Spot size ${(v * 200).round()} percent',
+                onChanged: (v) {
+                  selected.radius = v;
+                  _change();
+                },
+              ),
+            ],
+          ] else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Blur spots are available for photos.'),
             ),
-            Slider(
-              value: selected.radius,
-              min: .025,
-              max: .3,
-              semanticFormatterCallback: (v) =>
-                  'Spot size ${(v * 200).round()} percent',
-              onChanged: (v) {
-                selected.radius = v;
-                _change();
-              },
-            ),
-          ],
           const SizedBox(height: 12),
         ],
       ],

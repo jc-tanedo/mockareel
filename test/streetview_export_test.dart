@@ -58,6 +58,7 @@ void main() {
                   place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
                   mapPath: photo.path,
                   panZoom: i == 1,
+                  turntable: i == 1,
                   transitionSeconds: .25,
                 ),
               ),
@@ -130,11 +131,17 @@ void main() {
             final clips = args['clips'] as List;
             checks['video retained'] = clips[3]['isVideo'] == true;
             checks['edited source retained'] = (clips[3]['path'] as String)
-                .contains('source-edits-v1');
+                .contains('source-edits-v2');
             checks['UI is never source-processed'] =
                 effectInputs.length == 1 &&
                 effectInputs.single['path'] == p.clips[1].path;
             checks['pan zoom retained'] = clips[3]['slowPanZoom'] == true;
+            checks['camera plan retained'] =
+                (clips[3]['cameraMotion'] as Map)['turn'] == 8.0;
+            checks['moving arrows captured'] = (frames[3] as List).length == 15;
+            checks['video blur ignored'] =
+                ((effectInputs.single['edits'] as Map)['spots'] as List)
+                    .isEmpty;
             checks['timeline duration'] =
                 ((clips.fold<double>(
                           0,

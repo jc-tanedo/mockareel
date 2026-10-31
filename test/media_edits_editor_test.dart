@@ -117,12 +117,17 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 30));
       }
-      await tester.tap(find.text('Fisheye'));
+      await tester.tap(find.text('Lens effect'));
       await tester.pump();
       expect(clip.edits.fisheye, true);
       tester.widget<Slider>(find.byType(Slider).first).onChanged!(.7);
       await tester.pump();
       expect(clip.edits.strength, .7);
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Pincushion').last);
+      await tester.pump();
+      expect(clip.edits.lens, 'pincushion');
       await tester.ensureVisible(find.text('Add blur spot (0/8)'));
       await tester.tap(find.text('Add blur spot (0/8)'));
       await tester.pump();
@@ -152,6 +157,14 @@ void main() {
         }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
+        await EditedMedia.instance.cancel();
+        // Drain queued debounce timers after the editor releases its consumers.
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
       } finally {
         semantics.dispose();
       }

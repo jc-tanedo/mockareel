@@ -171,7 +171,10 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                         clock.begin(timeUs)
                         val entry = FeedMotion.entry(sceneOffset + clock.elapsed(timeUs), transition)
                         Matrix().apply {
-                            if (clip["slowPanZoom"] == true) {
+                            val camera = clip["cameraMotion"] as? Map<String, Any>
+                            if (camera != null) {
+                                setValues(StreetviewMotion.matrix(sceneOffset + clock.elapsed(timeUs), total, camera))
+                            } else if (clip["slowPanZoom"] == true) {
                                 val t = ((sceneOffset + clock.elapsed(timeUs)) / total).coerceIn(0.0, 1.0).toFloat()
                                 postScale(1 + t * .06f, 1 + t * .06f)
                                 postTranslate(-2 * t * 8 / 360f, 0f)

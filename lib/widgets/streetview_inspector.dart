@@ -8,6 +8,8 @@ import '../pages/maps_web_header_page.dart';
 import '../services/project_store.dart';
 import 'place_actions_editor.dart';
 import 'media_edits_editor.dart';
+import 'streetview_chrome.dart';
+import '../model/streetview_layout.dart';
 
 class StreetviewInspector extends StatefulWidget {
   final ReelProject project;
@@ -52,7 +54,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         MaterialPageRoute(
           builder: (_) => MapsWebHeaderPage(
             place: _s.place,
-            aspectRatio: 360 / 370,
+            aspectRatio: 360 / StreetviewLayout.mapHeight,
             showHeaderGuide: false,
           ),
         ),
@@ -110,6 +112,30 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       ),
     ],
   );
+  Widget _amount(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> change, {
+    bool percent = false,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        '$label · ${(percent ? value * 100 : value).toStringAsFixed(1)}${percent ? '%' : '°'}',
+      ),
+      Slider(
+        value: value,
+        min: min,
+        max: max,
+        onChanged: (v) {
+          change(v);
+          widget.onChanged();
+        },
+      ),
+    ],
+  );
   Widget _switch(String label, bool value, ValueChanged<bool> change) =>
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
@@ -156,6 +182,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           PlaceActionsEditor(
             key: ValueKey(_revision),
             place: _s.place,
+            suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
             onChanged: widget.onChanged,
           ),
         ],
@@ -196,17 +223,59 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         2,
         (v) => _s.transitionSeconds = v,
       ),
-      _switch('Slow pan / zoom', _s.panZoom, (v) => _s.panZoom = v),
+      ExpansionTile(
+        title: const Text('Camera motion'),
+        tilePadding: EdgeInsets.zero,
+        children: [
+          _switch('Slow zoom', _s.slowZoom, (v) => _s.slowZoom = v),
+          if (_s.slowZoom)
+            _amount(
+              'Zoom amount',
+              _s.zoomAmount,
+              0,
+              .2,
+              (v) => _s.zoomAmount = v,
+              percent: true,
+            ),
+          _switch('Slow pan', _s.slowPan, (v) => _s.slowPan = v),
+          if (_s.slowPan)
+            _amount(
+              'Pan distance',
+              _s.panAmount,
+              -.08,
+              .08,
+              (v) => _s.panAmount = v,
+              percent: true,
+            ),
+          _switch('Slow turntable', _s.turntable, (v) => _s.turntable = v),
+          if (_s.turntable)
+            _amount(
+              'Turn angle',
+              _s.turntableDegrees,
+              -15,
+              15,
+              (v) => _s.turntableDegrees = v,
+            ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Camera movements carry the navigation arrows with the scene.',
+            ),
+          ),
+        ],
+      ),
       ExpansionTile(
         title: const Text('Street View overlays'),
         children: [
           _field('Capture date / age', _s.date, (v) => _s.date = v),
-          _field('Copyright', _s.copyright, (v) => _s.copyright = v),
           _field(
-            'More dates label',
-            _s.moreDatesLabel,
-            (v) => _s.moreDatesLabel = v,
+            'Street View place title',
+            _s.streetviewTitle,
+            (v) => _s.streetviewTitle = v,
           ),
+          _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
+          _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
+
           _field(
             'Source attribution',
             _s.attribution,

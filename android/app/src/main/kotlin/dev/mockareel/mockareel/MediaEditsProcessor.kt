@@ -36,7 +36,7 @@ internal class MediaEditsProcessor(private val context: Context) {
             val duration = call.argument<Number>("duration")!!.toDouble()
             val trim = call.argument<Number>("trimStart")!!.toDouble()
             require(duration.isFinite() && duration > 0 && duration <= 30 && trim.isFinite() && trim >= 0)
-            val spec = MediaEditSpec.from(requireNotNull(call.argument<Map<String, Any>>("edits")))
+            val spec = MediaEditSpec.from(requireNotNull(call.argument<Map<String, Any>>("edits")), video)
             val target = File(requireNotNull(call.argument<String>("output")))
             require(!target.exists())
             val scratch = File("${target.path}.processing.mp4")

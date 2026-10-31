@@ -86,6 +86,7 @@ void main() {
     () async {
       final result = await processor.prepare(clip(video: true));
       expect(calls.single['isVideo'], true);
+      expect((calls.single['edits'] as Map)['spots'], isEmpty);
       expect(calls.single['trimStart'], 1.5);
       expect(calls.single['duration'], 2);
       expect(result.isVideo, true);
@@ -119,18 +120,45 @@ void main() {
         sourceDuration: .6,
         trimStart: .1,
         duration: 1.2,
-        edits: MediaEdits(spots: [BlurSpot()]),
+        edits: MediaEdits(
+          fisheye: true,
+          lens: 'pincushion',
+          spots: [BlurSpot()],
+        ),
       );
       final result = await processor.prepare(c);
       expect(calls.single['path'], isNot(gif.path));
       expect(calls.single['path'], endsWith('.mp4'));
       expect(calls.single['isVideo'], true);
+      expect((calls.single['edits'] as Map)['spots'], isEmpty);
       expect(calls.single['trimStart'], 0);
       expect(calls.single['duration'], 1.2);
+      expect((calls.single['edits'] as Map)['lens'], 'pincushion');
       expect(result.isVideo, true);
       expect(result.isGif, false);
       expect(result.duration, 1.2);
       expect(result.trimStart, 0);
+    },
+  );
+  test(
+    'legacy video and GIF blur spots are ignored while photo blur remains active',
+    () async {
+      for (final gif in [false, true]) {
+        final c = ReelClip(
+          id: 'timed',
+          path: original.path,
+          name: 'Timed',
+          isVideo: !gif,
+          isGif: gif,
+          sourceDuration: 3,
+          edits: MediaEdits(spots: [BlurSpot()]),
+        );
+        expect(c.supportsBlur, false);
+        expect(c.effectiveEdits.active, false);
+        expect(await processor.prepare(c), same(c));
+      }
+      expect(calls, isEmpty);
+      expect(clip().effectiveEdits.spots, hasLength(1));
     },
   );
   test('rapid slider updates skip obsolete edits before encoding', () async {
@@ -190,7 +218,7 @@ void main() {
       expect(saved.edits.spots.single.y, .4);
       expect(saved.streetview.canCaptureMap, true);
       expect(await File(saved.path).readAsBytes(), [1, 2, 3]);
-      expect(saved.path, isNot(contains('source-edits-v1')));
+      expect(saved.path, isNot(contains('source-edits-v2')));
     },
   );
   test(

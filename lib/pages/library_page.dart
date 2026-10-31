@@ -67,6 +67,7 @@ class _LibraryPageState extends State<LibraryPage> {
     if (template == null || !mounted) return;
     final p = ReelProject(
       template: template,
+      darkOutput: template == 'streetview',
       title: template == 'tiktok-feed' ? 'Untitled feed' : 'Untitled reel',
     );
     await _store.save(p);

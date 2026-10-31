@@ -44,7 +44,7 @@ class _MediaFrameState extends State<MediaFrame> {
     _video = null;
     _error = null;
     _prepared = null;
-    _preparing = widget.clip.edits.active;
+    _preparing = widget.clip.effectiveEdits.active;
     await previous?.dispose();
     if (!mounted || generation != _generation) return;
     if (!widget.clip.isTimed && !_preparing) return;
@@ -171,7 +171,7 @@ class _MediaFrameState extends State<MediaFrame> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.clip.id != widget.clip.id ||
         ((widget.clip.isGif ||
-                widget.clip.edits.active ||
+                widget.clip.effectiveEdits.active ||
                 _prepared?.path != widget.clip.path) &&
             _loadedStamp != _gifStamp)) {
       _load();
@@ -200,7 +200,8 @@ class _MediaFrameState extends State<MediaFrame> {
       ),
     );
     if (_error != null) return error;
-    if (_preparing || (widget.clip.edits.active && _prepared == null)) {
+    if (_preparing ||
+        (widget.clip.effectiveEdits.active && _prepared == null)) {
       return const Center(child: CircularProgressIndicator());
     }
     if (!widget.clip.isTimed) {
@@ -279,7 +280,7 @@ class _ClipPosterState extends State<ClipPoster> {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         if (!mounted || stamp != _stamp) return widget.clip.path;
       }
-      return widget.clip.isTimed || widget.clip.edits.active
+      return widget.clip.isTimed || widget.clip.effectiveEdits.active
           ? await NativeRenderer().poster(
               widget.clip,
               position: widget.position,
@@ -312,7 +313,7 @@ class _ClipPosterState extends State<ClipPoster> {
         ),
       );
       if (!snapshot.hasData ||
-          (widget.clip.edits.active &&
+          (widget.clip.effectiveEdits.active &&
               snapshot.connectionState != ConnectionState.done)) {
         return fallback;
       }

@@ -23,13 +23,22 @@ class BlurSpot {
 class MediaEdits {
   static const maxSpots = 8;
   bool fisheye;
+  String lens;
   double strength;
   final List<BlurSpot> spots;
-  MediaEdits({this.fisheye = false, this.strength = .35, List<BlurSpot>? spots})
-    : spots = spots ?? [];
+  MediaEdits({
+    this.fisheye = false,
+    this.lens = 'fisheye',
+    this.strength = .35,
+    List<BlurSpot>? spots,
+  }) : spots = spots ?? [];
+  MediaEdits forMedia({required bool photo}) => photo
+      ? this
+      : MediaEdits(fisheye: fisheye, lens: lens, strength: strength);
   bool get active => (fisheye && strength > 0) || spots.isNotEmpty;
   factory MediaEdits.fromJson(Map<String, dynamic> j) => MediaEdits(
     fisheye: j['fisheye'] == true,
+    lens: j['lens'] == 'pincushion' ? 'pincushion' : 'fisheye',
     strength: _bounded(j['strength'], .35, 0, 1),
     spots: (j['spots'] as List? ?? [])
         .take(maxSpots)
@@ -38,6 +47,7 @@ class MediaEdits {
   );
   Map<String, dynamic> toJson() => {
     'fisheye': fisheye,
+    'lens': lens,
     'strength': strength,
     'spots': spots.map((s) => s.toJson()).toList(),
   };

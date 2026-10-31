@@ -97,6 +97,9 @@ def main():
     at = lambda x, y, channel=0: (y * 64 + x) * 4 + channel
     assert distorted[at(16, 32)] > original[at(16, 32)] + 8, 'Fisheye must magnify the center'
     assert abs(distorted[at(32, 32)] - original[at(32, 32)]) <= 2, 'Lens center must stay fixed'
+    pincushion = render(-.8)
+    assert distorted[at(16, 32)] > distorted[at(16, 16)], 'Fisheye lines must bow outward'
+    assert pincushion[at(16, 32)] < pincushion[at(16, 16)], 'Pincushion must bow the opposite way'
     proc('glUniform3f', None, integer, flt, flt, flt)(spot_uniforms[0], .3, .25, .15)
     blurred = render(0)
     assert abs(blurred[at(19, 47, 2)] - original[at(19, 47, 2)]) > 20, 'Spot must blur its chosen source region'
@@ -106,7 +109,7 @@ def main():
     proc('eglDestroyContext', uint, ptr, ptr)(display, context)
     proc('eglDestroySurface', uint, ptr, ptr)(display, surface)
     proc('eglTerminate', uint, ptr)(display)
-    print('Production GLSL compiled and rendered: identity, fisheye, blur isolation and coordinate orientation passed.')
+    print('Production GLSL compiled and rendered: identity, fisheye, pincushion, blur isolation and coordinate orientation passed.')
 
 
 if __name__ == '__main__':

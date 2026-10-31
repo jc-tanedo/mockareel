@@ -1,12 +1,13 @@
-import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/streetview_timeline.dart';
+import '../model/streetview_motion.dart';
+import '../model/streetview_layout.dart';
 import 'media_frame.dart';
-import 'story_tags.dart';
 import 'streetview_chrome.dart';
+import 'streetview_camera.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -25,17 +26,13 @@ class StreetviewCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
-    final scene = StreetviewTimeline.at(project, position);
-    final i = scene.mediaIndex;
-    final clip = project.clips[i];
-    final settings = clip.streetview;
+    final scene = StreetviewTimeline.at(project, position),
+        i = scene.mediaIndex;
+    final clip = project.clips[i], settings = clip.streetview;
     final elapsed = scene.elapsed(position);
-    final map = scene.kind == 'map' || scene.kind == 'ending-map';
-    final movement = scene.kind == 'arrow';
-    final ripple = scene.kind == 'back'
-        ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
-              StreetviewTimeline.rippleSeconds
-        : map && scene.kind != 'ending-map'
+    final map = scene.kind == 'map' || scene.kind == 'ending-map',
+        movement = scene.kind == 'arrow';
+    final ripple = scene.kind == 'back' || (map && scene.kind != 'ending-map')
         ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
               StreetviewTimeline.rippleSeconds
         : movement
@@ -46,331 +43,201 @@ class StreetviewCanvas extends StatelessWidget {
                   max(.001, scene.duration - StreetviewTimeline.rippleSeconds))
               .clamp(0.0, 1.0)
         : 0.0;
-    final dark = project.darkOutput;
-    final surface = dark ? const Color(0xff202124) : Colors.white;
-    final ink = dark ? Colors.white : const Color(0xff202124);
+    final direction = settings.arrow == 'left' ? -1.0 : 1.0;
     Widget image(ReelClip c, double seconds) => ClipPoster(
       clip: c,
       position: seconds,
-      resolvedPath: posters['${c.id}:end'] != null && seconds > 0
+      resolvedPath: seconds >= c.duration && posters['${c.id}:end'] != null
           ? posters['${c.id}:end']
           : posters[c.id],
     );
-    Widget media({ReelClip? source, double? localSeconds}) {
-      if (movement && source == null) {
-        final direction = settings.arrow == 'left' ? -1.0 : 1.0;
-        return ColoredBox(
-          color: Colors.black,
-          child: ClipRect(
-            child: ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(
-                sigmaX: sin(t * pi) * 10,
-                sigmaY: sin(t * pi) * 2,
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Transform.translate(
-                    offset: Offset(-direction * 130 * t, 0),
-                    child: Transform.scale(
-                      scale: 1 + t * .25,
-                      child: media(source: clip, localSeconds: clip.duration),
-                    ),
-                  ),
-                  Opacity(
-                    opacity: t,
-                    child: Transform.translate(
-                      offset: Offset(direction * 130 * (1 - t), 0),
-                      child: Transform.scale(
-                        scale: 1 + (1 - t) * .25,
-                        child: media(
-                          source: project.clips[i + 1],
-                          localSeconds: 0,
-                        ),
+    Widget media(ReelClip c, double seconds, {bool pixels = true}) =>
+        StreetviewCamera(
+          clip: c,
+          seconds: seconds,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (pixels)
+                posterOnly
+                    ? image(c, seconds)
+                    : MediaFrame(
+                        key: ValueKey(c.id),
+                        clip: c,
+                        position: seconds,
+                        playing:
+                            playing &&
+                            scene.kind == 'media' &&
+                            c.id == clip.id &&
+                            position < project.duration,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+              if (c.streetview.showArrows) const StreetviewArrows(),
+            ],
           ),
         );
-      }
-      final current = source ?? clip;
-      final seconds =
-          localSeconds ?? (scene.kind == 'back' ? clip.duration : elapsed);
-      final pan = current.streetview.panZoom
-          ? seconds / max(.001, current.duration)
-          : 0.0;
-      return ClipRect(
-        child: Transform.translate(
-          offset: Offset(-pan * 8, 0),
-          child: Transform.scale(
-            scale: 1 + pan * .06,
-            child: posterOnly
-                ? image(current, seconds)
-                : MediaFrame(
-                    key: ValueKey(current.id),
-                    clip: current,
-                    position: seconds,
-                    playing:
-                        playing &&
-                        scene.kind == 'media' &&
-                        current.id == clip.id &&
-                        position < project.duration,
-                  ),
+    Widget transition() => ColoredBox(
+      color: Colors.black,
+      child: ClipRect(
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(
+            sigmaX: sin(t * pi) * 10,
+            sigmaY: sin(t * pi) * 2,
           ),
-        ),
-      );
-    }
-
-    final direction = settings.arrow == 'left' ? -1.0 : 1.0;
-    final children = <Widget>[
-      if (!overlayOnly)
-        Positioned.fill(
-          child: ColoredBox(
-            color: movement ? Colors.black : Colors.transparent,
-          ),
-        ),
-      if (!overlayOnly)
-        Positioned.fill(
-          key: const ValueKey('streetview-media-players'),
-          child: ClipRect(
-            child: ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(
-                sigmaX: movement ? sin(t * pi) * 10 : 0,
-                sigmaY: movement ? sin(t * pi) * 2 : 0,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Transform.translate(
+                offset: Offset(-direction * 130 * t, 0),
+                child: Transform.scale(
+                  scale: 1 + t * .25,
+                  child: media(clip, clip.duration),
+                ),
               ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  for (
-                    var j = max(0, i - 1);
-                    j <= min(project.clips.length - 1, i + 1);
-                    j++
-                  )
-                    Positioned.fill(
-                      key: ValueKey('streetview-player-${project.clips[j].id}'),
-                      child: Opacity(
-                        opacity: map
-                            ? 0
-                            : movement
-                            ? (j == i
-                                  ? 1
-                                  : j == i + 1
-                                  ? t
-                                  : 0)
-                            : j == i
-                            ? 1
-                            : 0,
-                        child: Transform.translate(
-                          offset: Offset(
-                            movement
-                                ? direction * 130 * (j == i ? -t : 1 - t)
-                                : 0,
-                            0,
-                          ),
-                          child: Transform.scale(
-                            scale: movement
-                                ? 1 + .25 * (j == i ? t : 1 - t)
-                                : 1,
-                            child: media(
-                              source: project.clips[j],
-                              localSeconds: j < i
-                                  ? project.clips[j].duration
-                                  : j > i || map
-                                  ? 0
-                                  : scene.kind == 'media'
-                                  ? elapsed
-                                  : clip.duration,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      if (map) ...[
-        Positioned.fill(child: ColoredBox(color: surface)),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: 370,
-          child: settings.mapPath == null
-              ? const ColoredBox(color: Color(0xffdfe6dd))
-              : Image.file(File(settings.mapPath!), fit: BoxFit.contain),
-        ),
-        Positioned(
-          left: 12,
-          right: 12,
-          top: 30,
-          child: Material(
-            color: surface,
-            borderRadius: BorderRadius.circular(28),
-            elevation: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_back, color: ink, size: 20),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      settings.place.name,
-                      style: TextStyle(color: ink, fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.close, color: ink, size: 20),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 370,
-          bottom: 0,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    settings.place.name,
-                    maxLines: 2,
-                    style: TextStyle(
-                      color: ink,
-                      fontSize: 23,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    [
-                      settings.place.rating,
-                      settings.place.category,
-                    ].where((s) => s.isNotEmpty).join(' · '),
-                    style: TextStyle(color: ink, fontSize: 12),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    settings.place.address,
-                    maxLines: 2,
-                    style: TextStyle(color: ink, fontSize: 12),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      for (final action in settings.place.actions.take(4))
-                        Column(
-                          children: [
-                            Icon(
-                              placeActionIcon(action.kind),
-                              color: const Color(0xff1a73e8),
-                              size: 22,
-                            ),
-                            Text(
-                              action.label,
-                              style: const TextStyle(
-                                color: Color(0xff1a73e8),
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          top: 235,
-          width: 100,
-          height: 110,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                image(clip, 0),
-                const Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ColoredBox(
-                    color: Colors.black54,
-                    child: Padding(
-                      padding: EdgeInsets.all(5),
-                      child: Text(
-                        'Street View',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
+              Opacity(
+                opacity: t,
+                child: Transform.translate(
+                  offset: Offset(direction * 130 * (1 - t), 0),
+                  child: Transform.scale(
+                    scale: 1 + (1 - t) * .25,
+                    child: media(project.clips[i + 1], 0),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ] else ...[
-        if ((movement && overlayOnly) || (overlayOnly && scene.kind == 'back'))
-          Positioned.fill(child: media()),
-        Positioned.fill(
-          child: StreetviewChrome(settings: settings, dark: dark),
-        ),
-      ],
-      if (map)
-        Positioned(
-          left: 12,
-          bottom: 8,
-          right: 12,
-          child: Text(
-            settings.attribution,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: ink, fontSize: 10),
-          ),
-        ),
-      if (ripple >= 0 && ripple < 1)
-        Positioned(
-          left: map
-              ? 66
-              : scene.kind == 'back'
-              ? 26
-              : settings.arrow == 'left'
-              ? 56
-              : 304,
-          top: map
-              ? 290
-              : scene.kind == 'back'
-              ? 108
-              : 491,
-          child: _Ripple(progress: ripple),
-        ),
-    ];
+      ),
+    );
+    final arrow = StreetviewMotion.at(clip, clip.duration).project(
+      settings.arrow == 'left'
+          ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
+          : 360 - StreetviewLayout.arrowLeft - StreetviewLayout.arrowWidth / 2,
+      StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
+    );
     return FittedBox(
       child: SizedBox(
         width: 360,
         height: 640,
         child: DefaultTextStyle(
           style: const TextStyle(fontFamily: 'Roboto'),
-          child: Stack(clipBehavior: Clip.hardEdge, children: children),
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              if (!overlayOnly)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: movement ? Colors.black : Colors.transparent,
+                  ),
+                ),
+              if (!overlayOnly)
+                Positioned.fill(
+                  key: const ValueKey('streetview-media-players'),
+                  child: ClipRect(
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(
+                        sigmaX: movement ? sin(t * pi) * 10 : 0,
+                        sigmaY: movement ? sin(t * pi) * 2 : 0,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          for (
+                            var j = max(0, i - 1);
+                            j <= min(project.clips.length - 1, i + 1);
+                            j++
+                          )
+                            Positioned.fill(
+                              key: ValueKey(
+                                'streetview-player-${project.clips[j].id}',
+                              ),
+                              child: Opacity(
+                                opacity: map
+                                    ? 0
+                                    : movement
+                                    ? (j == i
+                                          ? 1
+                                          : j == i + 1
+                                          ? t
+                                          : 0)
+                                    : j == i
+                                    ? 1
+                                    : 0,
+                                child: Transform.translate(
+                                  offset: Offset(
+                                    movement
+                                        ? direction *
+                                              130 *
+                                              (j == i ? -t : 1 - t)
+                                        : 0,
+                                    0,
+                                  ),
+                                  child: Transform.scale(
+                                    scale: movement
+                                        ? 1 + .25 * (j == i ? t : 1 - t)
+                                        : 1,
+                                    child: media(
+                                      project.clips[j],
+                                      j < i
+                                          ? project.clips[j].duration
+                                          : j > i || map
+                                          ? 0
+                                          : scene.kind == 'media'
+                                          ? elapsed
+                                          : clip.duration,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (map)
+                Positioned.fill(
+                  child: StreetviewMapScene(
+                    settings: settings,
+                    dark: project.darkOutput,
+                    thumbnail: image(clip, 0),
+                  ),
+                )
+              else ...[
+                if (overlayOnly)
+                  Positioned.fill(
+                    child: movement
+                        ? transition()
+                        : media(
+                            clip,
+                            scene.kind == 'back' ? clip.duration : elapsed,
+                            pixels: scene.kind == 'back',
+                          ),
+                  ),
+                Positioned.fill(
+                  child: StreetviewChrome(
+                    settings: settings,
+                    dark: project.darkOutput,
+                  ),
+                ),
+              ],
+              if (ripple >= 0 && ripple < 1)
+                Positioned(
+                  left: map
+                      ? StreetviewLayout.thumbnailLeft +
+                            StreetviewLayout.thumbnailWidth / 2
+                      : scene.kind == 'back'
+                      ? 333
+                      : arrow.x,
+                  top: map
+                      ? StreetviewLayout.thumbnailTop +
+                            StreetviewLayout.thumbnailHeight / 2
+                      : scene.kind == 'back'
+                      ? 35
+                      : arrow.y,
+                  child: _Ripple(progress: ripple),
+                ),
+            ],
+          ),
         ),
       ),
     );

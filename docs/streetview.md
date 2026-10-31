@@ -36,27 +36,36 @@ transition. Each ripple is included in its containing scene exactly once.
 The optional ending adds a back-control transition and a final map hold, with
 no thumbnail tap to reenter Street View. By default the output ends on media.
 
-Slow pan/zoom applies a gentle 6% zoom and eight logical pixels of horizontal
-movement over a media segment. It can be enabled independently for each item.
-Location/date card, top controls and navigation arrows can be hidden separately.
+Expand **Camera motion** to enable slow zoom, horizontal pan and a simulated
+turntable independently for each item. Adjust zoom amount, signed pan distance
+and signed turn angle (up to 15°). Turntable applies a gentle perspective yaw to
+ordinary media. All three motions carry the navigation arrows with the scene;
+the toolbar and place sheet stay fixed. Default zoom/pan amounts are 6% and eight
+logical pixels. The camera slightly overscans the source to keep edges filled.
+Place sheet, top controls and navigation arrows can be hidden separately.
 Output theme and background music use the shared controls.
 
-The Street View interface follows the supplied reference: centered Google and
-copyright text, circular back/share/overflow controls, large unboxed white
-navigation chevrons, and an edge-to-edge address/date sheet with a grab handle
-and editable “See more dates” text. Phone chrome, Messenger and video-player
-controls are excluded.
+The interface follows the updated references: Maps has a rounded search bar,
+nearby pill, layer/location controls and a small Street View thumbnail above a
+collapsed place sheet. Street View has a Google/date pill, overflow and close
+circles, perspective ground chevrons, an editable Aerial badge and an expand
+control. Both use a rounded place sheet with teal action buttons. New Streetview
+projects default to dark output; existing theme choices are retained. Phone
+chrome, Messenger and video-player controls are excluded. Captured map colors
+come from the selected map; output theme changes the interface, not map pixels.
 
 ## Media effects
 
 Expand **Media effects** for the selected media in Place or Timeline → Motion.
-Enable **Fisheye** and adjust its strength from 0–100%. Use **Add blur spot** to
+Enable **Lens effect**, choose **Fisheye** or **Pincushion**, and adjust its
+strength from 0–100%. For photos, use **Add blur spot** to
 create up to eight feathered circular spots. Drag a circle on the source preview,
 select a numbered spot to edit it, adjust its size, or remove the selected spot.
-Spots stay at their chosen position throughout that media segment.
+Spots stay at their chosen position throughout that media segment. Videos and
+GIFs support lens effects only; any older blur recipes on timed media are ignored.
 
-These are non-destructive source edits. Fisheye and spot blur run before template
-framing, slow pan/zoom and interface composition. Maps and UI are never warped
+These are non-destructive source edits. Lens effects and spot blur run before template
+framing, camera motion and interface composition. Maps and UI are never warped
 or blurred. The same processed source supplies playback, thumbnails, transition
 frames and export. Changes are coalesced and processed asynchronously; the
 source editor shows progress while an updated preview is being prepared.
@@ -90,6 +99,6 @@ travel between pins remain outside this template.
 
 For an optional Linux GPU smoke check using headless Mesa EGL (no extra Python
 packages), run `python3 tool/check_media_shader.py`. It compiles and executes the
-production GLSL and checks zero-strength identity, lens magnification, isolated
+production GLSL and checks zero-strength identity, opposite lens distortion, isolated
 spot blur and the editor’s top-left coordinate convention. This complements the
 native tests; it does not replace hardware codec testing on Android.

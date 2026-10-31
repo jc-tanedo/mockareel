@@ -38,6 +38,8 @@ class ReelClip {
        post = post ?? FeedPost() {
     normalize();
   }
+  bool get supportsBlur => !isTimed;
+  MediaEdits get effectiveEdits => edits.forMedia(photo: supportsBlur);
   bool get isTimed => isVideo || isGif;
   double get maxDuration => isTimed && !(isGif && loopGif) && sourceDuration > 0
       ? min(30, sourceDuration)

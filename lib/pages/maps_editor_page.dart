@@ -1,3 +1,4 @@
+import '../model/streetview_motion.dart';
 import '../widgets/streetview_inspector.dart';
 import '../model/streetview_timeline.dart';
 import '../services/gif_media.dart';
@@ -704,7 +705,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         );
       }
       final media = scene.kind == 'media';
-      final count = media ? 1 : (scene.duration * 30).ceil();
+      final animatedArrows =
+          media && clip.streetview.showArrows && StreetviewMotion.active(clip);
+      final count = media && !animatedArrows ? 1 : (scene.duration * 30).ceil();
       final paths = <String>[];
       for (var f = 0; f < count; f++) {
         if (_cancelled || !mounted) {
@@ -722,10 +725,14 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         paths.add(file.path);
       }
       overlays.add(paths.last);
-      frames.add(media ? [] : paths);
+      frames.add(media && !animatedArrows ? [] : paths);
       clips.add(
         media
-            ? {...clip.toJson(), 'slowPanZoom': clip.streetview.panZoom}
+            ? {
+                ...clip.toJson(),
+                'slowPanZoom': clip.streetview.panZoom,
+                'cameraMotion': StreetviewMotion.native(clip),
+              }
             : {
                 ...clip.toJson(),
                 'path': paths.first,

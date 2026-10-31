@@ -177,7 +177,7 @@ void main() {
         );
         image.dispose();
       });
-      expect(find.text('Address 0'), findsOneWidget);
+      expect(find.text('Place 0'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

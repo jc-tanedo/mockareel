@@ -131,6 +131,11 @@ IconData placeActionIcon(String kind) => switch (kind) {
   'website' => Icons.language,
   'save' => Icons.bookmark_border,
   'order' => Icons.shopping_bag_outlined,
+  'start' => Icons.navigation,
+  'ask' => Icons.travel_explore,
+  'share' => Icons.share_outlined,
+  'directory' => Icons.storefront_outlined,
+  'add_label' => Icons.flag_outlined,
   _ => Icons.touch_app_outlined,
 };
 

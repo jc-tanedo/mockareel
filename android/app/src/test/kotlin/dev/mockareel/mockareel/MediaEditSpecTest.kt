@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MediaEditSpecTest {
+    @Test fun pincushionBendsOppositeToFisheyeAndTimedMediaHasNoBlur() {
+        val data = mapOf<String, Any>("fisheye" to true, "lens" to "pincushion",
+            "strength" to .7, "spots" to listOf(mapOf("x" to .2, "y" to .3)))
+        val photo = MediaEditSpec.from(data)
+        assertEquals(-.7f, photo.strength, .00001f)
+        assertEquals(1, photo.spots.size)
+        val video = MediaEditSpec.from(data, video = true)
+        assertEquals(photo.strength, video.strength, 0f)
+        assertTrue(video.spots.isEmpty())
+    }
     @Test fun olderProjectsHaveNoLensDistortionOrBlur() {
         val spec = MediaEditSpec.from(emptyMap())
         assertEquals(0f, spec.strength, 0f)

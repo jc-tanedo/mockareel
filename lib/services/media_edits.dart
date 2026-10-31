@@ -21,11 +21,12 @@ class EditedMedia {
   EditedMedia({this.root});
 
   static String stamp(ReelClip c) =>
-      '${c.path}:${c.isVideo}:${c.isGif}:${c.trimStart}:${c.duration}:${c.loopGif}:${jsonEncode(c.edits.toJson())}';
+      '${c.path}:${c.isVideo}:${c.isGif}:${c.trimStart}:${c.duration}:${c.loopGif}:${jsonEncode(c.effectiveEdits.toJson())}';
 
   Future<ReelClip> prepare(ReelClip clip) async {
-    if (!clip.edits.active) return clip;
+    if (!clip.effectiveEdits.active) return clip;
     final request = ReelClip.fromJson(clip.toJson());
+    request.edits = request.effectiveEdits;
     final signature = stamp(request), token = _generation;
     _latest[request.id] = signature;
     final stat = await File(request.path).stat();
@@ -35,13 +36,13 @@ class EditedMedia {
     final key = sha256
         .convert(
           utf8.encode(
-            'source-edits-v1:$signature:${stat.size}:${stat.modified.microsecondsSinceEpoch}',
+            'source-edits-v2:$signature:${stat.size}:${stat.modified.microsecondsSinceEpoch}',
           ),
         )
         .toString();
     final dir =
         root ??
-        Directory('${Directory.systemTemp.path}/mockareel-source-edits-v1');
+        Directory('${Directory.systemTemp.path}/mockareel-source-edits-v2');
     await dir.create(recursive: true);
     final target = File('${dir.path}/$key.${request.isTimed ? 'mp4' : 'png'}');
     if (await target.exists() && await target.length() > 0) {
