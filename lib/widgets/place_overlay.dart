@@ -6,6 +6,11 @@ import '../model/template_layout.dart';
 import 'media_frame.dart';
 import 'story_tags.dart';
 import 'output_palette.dart';
+import 'star_rating.dart';
+import 'place_review_card.dart';
+import 'place_action_row.dart';
+import 'place_tab_section.dart';
+import 'story_chrome_overlay.dart';
 
 /// Only the gallery rectangle is transparent. This surface is shared by the
 /// live preview, transparent PNG, and each frame of the native compositor.
@@ -236,15 +241,10 @@ class PlaceOverlay extends StatelessWidget {
                                   size: 11,
                                 ),
                                 const SizedBox(width: 4),
-                                ...List.generate(
-                                  5,
-                                  (i) => Icon(
-                                    i < (double.tryParse(p.rating) ?? 0).round()
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    size: 12,
-                                    color: const Color(0xffedb928),
-                                  ),
+                                StarRating(
+                                  rating: double.tryParse(p.rating) ?? 0,
+                                  size: 12,
+                                  color: const Color(0xffedb928),
                                 ),
                                 const SizedBox(width: 5),
                                 if (p.reviewCount.isNotEmpty)
@@ -292,46 +292,9 @@ class PlaceOverlay extends StatelessWidget {
                             right: 16,
                             top: 214,
                             height: 27,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final action in p.actions)
-                                  Expanded(
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 4),
-                                      decoration: BoxDecoration(
-                                        color: action.kind == 'directions'
-                                            ? colors.accent
-                                            : colors.pale,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            placeActionIcon(action.kind),
-                                            size: 11,
-                                            color: action.kind == 'directions'
-                                                ? colors.primaryText
-                                                : colors.accent,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Flexible(
-                                            child: line(
-                                              action.label,
-                                              size: 8,
-                                              weight: FontWeight.w500,
-                                              color: action.kind == 'directions'
-                                                  ? colors.primaryText
-                                                  : colors.accent,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            child: PlaceActionRow(
+                              actions: p.actions,
+                              colors: colors,
                             ),
                           ),
                           if (caption.isNotEmpty)
@@ -359,176 +322,18 @@ class PlaceOverlay extends StatelessWidget {
                               right: 16,
                               top: 530,
                               height: 100,
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: colors.reviewSurface,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 12,
-                                          backgroundColor: const Color(
-                                            0xffe97e16,
-                                          ),
-                                          child: Text(
-                                            project.review.author.trim().isEmpty
-                                                ? '★'
-                                                : String.fromCharCodes(
-                                                    project.review.author
-                                                        .trim()
-                                                        .runes
-                                                        .take(1),
-                                                  ).toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              line(
-                                                project.review.author
-                                                        .trim()
-                                                        .isEmpty
-                                                    ? 'Featured review'
-                                                    : project.review.author,
-                                                size: 10,
-                                                color: colors.text,
-                                              ),
-                                              Row(
-                                                children: [
-                                                  for (var i = 0; i < 5; i++)
-                                                    Icon(
-                                                      i < project.review.rating
-                                                          ? Icons.star
-                                                          : Icons.star_border,
-                                                      size: 10,
-                                                      color: const Color(
-                                                        0xffedb928,
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 7),
-                                    Expanded(
-                                      child: line(
-                                        project.review.text.trim(),
-                                        size: 10,
-                                        lines: 4,
-                                        color: colors.reviewText,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              child: PlaceReviewCard(
+                                review: project.review,
+                                colors: colors,
                               ),
                             )
-                          else ...[
+                          else
                             Positioned(
                               left: 16,
                               right: 16,
                               top: 530,
-                              height: 25,
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  for (final tab in [
-                                    'Overview',
-                                    if (p.hasMenu) 'Menu',
-                                    'Reviews',
-                                    'Photos',
-                                    'Updates',
-                                  ])
-                                    Container(
-                                      padding: const EdgeInsets.only(bottom: 7),
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          bottom: BorderSide(
-                                            color: tab == 'Overview'
-                                                ? colors.accent
-                                                : Colors.transparent,
-                                            width: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      child: line(
-                                        tab,
-                                        size: 8,
-                                        color: tab == 'Overview'
-                                            ? colors.accent
-                                            : colors.muted,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              child: PlaceTabSection(place: p, colors: colors),
                             ),
-                            Positioned(
-                              left: 16,
-                              right: 16,
-                              top: 565,
-                              height: 28,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: colors.pale,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.open_in_new,
-                                      color: colors.accent,
-                                      size: 12,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    line(
-                                      p.footer,
-                                      size: 11,
-                                      color: colors.accent,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: 18,
-                              right: 18,
-                              top: 610,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.schedule,
-                                    color: colors.muted,
-                                    size: 12,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: line(
-                                      p.hours.isEmpty
-                                          ? 'Hours not set'
-                                          : p.hours,
-                                      size: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                           if (project.clips.isNotEmpty) ...[
                             Positioned(
                               left: 18,
@@ -577,60 +382,10 @@ class PlaceOverlay extends StatelessWidget {
                             Positioned.fill(
                               child: StoryTagLayer(tags: project.tags),
                             ),
-                          if (project.storyChrome) ...[
-                            const Positioned(
-                              left: 16,
-                              top: 20,
-                              child: Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 22,
-                              ),
+                          if (project.storyChrome)
+                            const Positioned.fill(
+                              child: StoryChromeOverlay(),
                             ),
-                            const Positioned(
-                              right: 20,
-                              top: 20,
-                              child: Text(
-                                'Aa',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const Positioned(
-                              right: 20,
-                              top: 54,
-                              child: Icon(
-                                Icons.sentiment_satisfied_alt,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            for (var i = 0; i < 3; i++)
-                              Positioned(
-                                right: 10,
-                                top: 106 + i * 36,
-                                child: Container(
-                                  width: 29,
-                                  height: 29,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xff929292),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    [
-                                      Icons.music_note,
-                                      Icons.auto_awesome,
-                                      Icons.favorite_border,
-                                    ][i],
-                                    size: 13,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                          ],
                         ],
                       ),
                     ),

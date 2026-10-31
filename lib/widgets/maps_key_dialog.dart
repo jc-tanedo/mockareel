@@ -1,9 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MapsAdvancedSettings {
   final String key;
   final bool useApiHeaders;
   const MapsAdvancedSettings(this.key, {this.useApiHeaders = false});
+
+  static Future<MapsAdvancedSettings> load({String defaultKey = ''}) async {
+    final prefs = await SharedPreferences.getInstance();
+    return MapsAdvancedSettings(
+      prefs.getString('mapsApiKey') ?? defaultKey,
+      useApiHeaders: prefs.getBool('mapsUseApiHeaders') ?? false,
+    );
+  }
+
+  Future<void> save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('mapsApiKey', key);
+    await prefs.setBool('mapsUseApiHeaders', useApiHeaders);
+  }
+
+  static Future<MapsAdvancedSettings?> show(
+    BuildContext context, {
+    required String initialKey,
+    required bool useApiHeaders,
+  }) =>
+      showDialog<MapsAdvancedSettings>(
+        context: context,
+        builder: (_) => MapsKeyDialog(
+          initialValue: initialKey,
+          useApiHeaders: useApiHeaders,
+        ),
+      );
 }
 
 class MapsKeyDialog extends StatefulWidget {
@@ -48,61 +76,41 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
                   color: colors.onSurface,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'Browser search and map capture work without a key. Add your own Google Cloud key to use API lookup or automatic static map headers.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Enable these APIs in your Google Cloud project:',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '1. Places API (New) — API place search and details.\n2. Maps Static API — automatic map header images.\n\nEnable billing for API requests. Maps SDK for Android, Maps JavaScript API and Geocoding API are not required by Mockareel.',
+                'By default, Mockareel captures map imagery directly using the '
+                'built-in browser engine — no API keys or billing required. '
+                'If you prefer Google Static Maps API imagery, provide a key '
+                'below.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
-                  height: 1.5,
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _controller,
-                obscureText: true,
-                autocorrect: false,
-                enableSuggestions: false,
-                decoration: const InputDecoration(
-                  labelText: 'API key (optional)',
-                  prefixIcon: Icon(Icons.key_outlined),
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Google Maps API key',
+                  hintText: 'AIzaSy…',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _controller.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(_controller.clear),
+                        )
+                      : null,
                 ),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 8),
-              SwitchListTile(
+              const SizedBox(height: 16),
+              SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Use API map headers'),
+                value: _apiHeaders,
+                onChanged: (v) => setState(() => _apiHeaders = v),
+                title: const Text('Prefer API headers'),
                 subtitle: const Text(
-                  'Load Google map uses Maps Static API instead of browser capture.',
-                ),
-                value: _apiHeaders && _controller.text.trim().isNotEmpty,
-                onChanged: _controller.text.trim().isEmpty
-                    ? null
-                    : (v) => setState(() => _apiHeaders = v),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'API lookup is in the Google Maps search menu. Restrict your key to the APIs you use and set quotas in Google Cloud. Requests go directly to the web APIs; Android package/SHA restrictions alone may not work with these HTTP endpoints.\n\nThe key is stored in app-private preferences on this device, not encrypted storage, and is excluded from project backups. Clear the field to remove it.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
-                  height: 1.5,
+                  'Use Static Maps API for Place headers when a key is set',
                 ),
               ),
             ],
@@ -111,16 +119,13 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(
-            context,
-            MapsAdvancedSettings(
-              _controller.text.trim(),
-              useApiHeaders: _apiHeaders && _controller.text.trim().isNotEmpty,
-            ),
+          onPressed: () => Navigator.of(context).pop(
+            MapsAdvancedSettings(_controller.text.trim(),
+                useApiHeaders: _apiHeaders),
           ),
           child: const Text('Save'),
         ),

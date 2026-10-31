@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
+import 'clip_strip.dart';
 import 'editor_section_card.dart';
 import 'editor_workspace.dart';
+import 'empty_placeholder.dart';
 import 'media_frame.dart';
 import 'streetview_inspector.dart';
+
+export 'clip_strip.dart';
 
 class MapsTimelineEditor extends StatelessWidget {
   final ReelProject project;
@@ -59,102 +63,11 @@ class MapsTimelineEditor extends StatelessWidget {
     required ReelProject project,
     required int selectedIndex,
     required ValueChanged<int> onSelectClip,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 74,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: project.clips.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (_, i) {
-          final c = project.clips[i];
-          final active = i == selectedIndex;
-          return Semantics(
-            label: 'Clip ${i + 1}: ${c.name}',
-            selected: active,
-            button: true,
-            child: Tooltip(
-              message: c.name,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => onSelectClip(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: (c.duration * 12).clamp(78, 150),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active ? colors.primary : colors.outlineVariant,
-                      width: active ? 2 : 1,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ClipPoster(clip: c),
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Colors.black87],
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 6,
-                          top: 5,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: active ? colors.primary : Colors.black54,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${i + 1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: active ? colors.onPrimary : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 6,
-                          right: 4,
-                          bottom: 5,
-                          child: Text(
-                            '${c.duration.toStringAsFixed(c.isGif ? 2 : 1)}s',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: active ? colors.primary : Colors.white70,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  }) => ClipStrip(
+    project: project,
+    selectedIndex: selectedIndex,
+    onSelectClip: onSelectClip,
+  );
 
   Widget _motionInspector(BuildContext context) {
     final mutedStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -478,42 +391,14 @@ class MapsTimelineEditor extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
-                    Center(
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: colors.secondaryContainer.withValues(
-                            alpha: .55,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.video_collection_outlined,
-                          color: colors.onSecondaryContainer,
-                          size: 30,
-                        ),
-                      ),
+                    EmptyPlaceholder(
+                      icon: Icons.video_collection_outlined,
+                      title: 'Start with your photos & videos',
+                      description:
+                          'Add media, tap a clip to edit it, '
+                          'then set the pace.',
+                      action: addMediaButton,
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Start with your photos & videos',
-                      textAlign: TextAlign.center,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Add media, tap a clip to edit it, then set the pace.',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    addMediaButton,
                   ],
                 ),
               ),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../model/project.dart';
 import 'gif_media.dart';
@@ -46,6 +47,32 @@ class MediaImporter {
     );
     await GifMedia.hydrate(clip);
     return clip;
+  }
+
+  static Future<({List<ReelClip> clips, int failures})> pickMultipleClips({
+    required ProjectStore store,
+    required NativeRenderer renderer,
+    double defaultDuration = 3.5,
+    double? cardWidth,
+  }) async {
+    final files = await ImagePicker().pickMultipleMedia();
+    final clips = <ReelClip>[];
+    var failures = 0;
+    for (final file in files) {
+      try {
+        final clip = await retainClip(
+          file,
+          store: store,
+          renderer: renderer,
+          defaultDuration: defaultDuration,
+          cardWidth: cardWidth,
+        );
+        clips.add(clip);
+      } catch (_) {
+        failures++;
+      }
+    }
+    return (clips: clips, failures: failures);
   }
 
   static Future<MusicTrack?> pickMusicTrack({

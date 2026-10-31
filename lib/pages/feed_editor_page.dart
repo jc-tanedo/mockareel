@@ -1,19 +1,18 @@
 import '../services/media_importer.dart';
-import '../widgets/export_monitor.dart';
-import '../services/feed_capture_plan.dart';
+import '../services/feed_export_pipeline.dart';
 import '../widgets/feed_export_panel.dart';
 import '../widgets/feed_posts_editor.dart';
 import '../widgets/feed_sequence_editor.dart';
 import '../widgets/project_name_dialog.dart';
+import '../widgets/editor_app_bar.dart';
+import '../widgets/editor_export_overlay.dart';
+import '../widgets/offscreen_capture_stage.dart';
 import '../model/feed_timeline.dart';
 import '../pages/exported_video_page.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:image_picker/image_picker.dart';
 import '../model/project.dart';
 import '../services/native_renderer.dart';
@@ -41,7 +40,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   String _status = '';
   double? _progress;
   Timer? _autosave;
-  StreamSubscription<double>? _subscription;
   double _captureTime = 0, _exportPosition = 0;
   ExportPhase _exportPhase = ExportPhase.preparing;
   bool _overlayOnly = false;
@@ -99,10 +97,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   }
 
   Future<void> _rename() async {
-    final title = await showDialog<String>(
-      context: context,
-      builder: (_) => ProjectNameDialog(initialValue: p.title),
-    );
+    final title = await ProjectNameDialog.show(context, p.title);
     if (title != null && title.isNotEmpty && mounted) {
       p.title = title;
       _change();
@@ -120,28 +115,23 @@ class _FeedEditorPageState extends State<FeedEditorPage>
 
   Future<void> _pickMedia() async {
     setState(() => _busy = true);
-    var failures = 0;
     try {
-      final files = await ImagePicker().pickMultipleMedia();
-      for (final file in files) {
-        try {
-          final clip = await MediaImporter.retainClip(
-            file,
-            store: widget.store,
-            renderer: _renderer,
-            defaultDuration: 5,
-            cardWidth: 1,
-          );
-          if (!mounted) return;
-          p.clips.add(clip);
-          _selected = p.clips.length - 1;
-        } catch (_) {
-          failures++;
-        }
+      final result = await MediaImporter.pickMultipleClips(
+        store: widget.store,
+        renderer: _renderer,
+        defaultDuration: 5,
+        cardWidth: 1,
+      );
+      if (!mounted) return;
+      if (result.clips.isNotEmpty) {
+        p.clips.addAll(result.clips);
+        _selected = p.clips.length - 1;
+        _change();
       }
-      if (mounted) _change();
-      if (failures > 0) {
-        _toast('$failures files could not be opened. Try JPG/PNG or MP4.');
+      if (result.failures > 0) {
+        _toast(
+          '${result.failures} files could not be opened. Try JPG/PNG or MP4.',
+        );
       }
     } catch (_) {
       _toast('Could not open the media picker.');
@@ -246,7 +236,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autosave?.cancel();
-    _subscription?.cancel();
     if (_exporting) _renderer.cancel();
     super.dispose();
   }
@@ -263,121 +252,32 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       },
       child: Stack(
         children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            width: 360,
-            height: 640,
-            child: ExcludeSemantics(
-              child: IgnorePointer(
-                child: MediaQuery.withNoTextScaling(
-                  child: RepaintBoundary(
-                    key: _captureKey,
-                    child: FeedCanvas(
-                      project: p,
-                      position: _captureTime,
-                      overlayOnly: _overlayOnly,
-                      posterOnly: true,
-                      posters: _posters,
-                    ),
-                  ),
-                ),
-              ),
+          OffscreenCaptureStage(
+            captureKey: _captureKey,
+            child: FeedCanvas(
+              project: p,
+              position: _captureTime,
+              overlayOnly: _overlayOnly,
+              posterOnly: true,
+              posters: _posters,
             ),
           ),
           Scaffold(
-            appBar: AppBar(
-              leading: IconButton(
-                tooltip: 'Back to projects',
-                onPressed: _exporting ? null : _back,
-                icon: const Icon(Icons.arrow_back),
-              ),
-              titleSpacing: 0,
-              title: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: _rename,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              p.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 13,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'TIKTOK FYP SCROLL · 9:16',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: colors.primary,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                IconButton(
-                  tooltip: 'Save project',
-                  onPressed: () async {
-                    if (await _save()) _toast('Project saved on this device');
-                  },
-                  icon: Icon(
-                    _dirty ? Icons.save_outlined : Icons.check_circle_outline,
-                    color: _dirty ? colors.primary : colors.onSurfaceVariant,
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'More project options',
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (s) {
-                    if (s == 'rename') _rename();
-                    if (s == 'backup') _backup();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'rename',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.drive_file_rename_outline),
-                        title: Text('Rename project'),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'backup',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.ios_share_outlined),
-                        title: Text('Share project backup'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            appBar: EditorAppBar(
+              title: p.title,
+              formatLabel: 'TIKTOK FYP SCROLL · 9:16',
+              dirty: _dirty,
+              exporting: _exporting,
+              onBack: _back,
+              onRename: _rename,
+              onSave: () async {
+                if (await _save()) _toast('Project saved on this device');
+              },
+              onMenuSelected: (s) {
+                if (s == 'rename') _rename();
+                if (s == 'backup') _backup();
+              },
+              menuItems: EditorAppBar.standardMenuItems(),
             ),
             body: Column(
               children: [
@@ -395,8 +295,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                       : EditorWorkspace(
                           keyboardVisible: keyboard,
                           previewFraction: .5,
-                          hint:
-                              'LIVE PREVIEW · ${_tab == 1 ? 'POST ${_selected + 1}' : 'FULL SEQUENCE'}',
+                          hint: _tab == 1
+                              ? 'LIVE PREVIEW · POST ${_selected + 1}'
+                              : 'LIVE PREVIEW · FULL SEQUENCE',
                           previewBuilder: (height) => TimelinePreview(
                             key: ValueKey(
                               '${p.id}-${_tab == 1 ? _selected : -1}',
@@ -463,32 +364,27 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                   ),
           ),
           if (_exporting)
-            Positioned.fill(
-              child: ExportMonitor(
-                title: p.title,
-                status: _status,
-                phase: _exportPhase,
-                progress: _progress,
+            EditorExportOverlay(
+              title: p.title,
+              status: _status,
+              phase: _exportPhase,
+              progress: _progress,
+              position: _exportPosition,
+              duration: FeedTimeline.duration(p),
+              preview: FeedCanvas(
+                project: p,
                 position: _exportPosition,
-                duration: FeedTimeline.duration(p),
-                preview: IgnorePointer(
-                  child: FeedCanvas(
-                    project: p,
-                    position: _exportPosition,
-                    posterOnly: true,
-                    posters: _posters,
-                  ),
-                ),
-                onCancel: _cancelled || _exportPhase == ExportPhase.finishing
-                    ? null
-                    : () {
-                        setState(() {
-                          _cancelled = true;
-                          _status = 'Cancelling export…';
-                        });
-                        _renderer.cancel();
-                      },
+                posterOnly: true,
+                posters: _posters,
               ),
+              cancelled: _cancelled,
+              onCancel: () {
+                setState(() {
+                  _cancelled = true;
+                  _status = 'Cancelling export…';
+                });
+                _renderer.cancel();
+              },
             ),
         ],
       ),
@@ -512,21 +408,14 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       _exportPosition = time;
       _overlayOnly = overlay;
     });
-    await SchedulerBinding.instance.endOfFrame;
-    // Allow resolved poster futures to paint before reading the boundary.
-    await SchedulerBinding.instance.endOfFrame;
-    final boundary =
-        _captureKey.currentContext!.findRenderObject()!
-            as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 3);
-    try {
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      final file = File('${dir.path}/$name.png');
-      await file.writeAsBytes(bytes!.buffer.asUint8List());
-      return file.path;
-    } finally {
-      image.dispose();
-    }
+    final bytes = await OffscreenCaptureStage.capturePng(
+      _captureKey,
+      pixelRatio: 3,
+      settleFrames: 2,
+    );
+    final file = File('${dir.path}/$name.png');
+    await file.writeAsBytes(bytes);
+    return file.path;
   }
 
   Future<void> _export() async {
@@ -539,140 +428,32 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       _exportPhase = ExportPhase.preparing;
       _exportPosition = 0;
     });
-    Directory? temp;
     try {
       if (!await _save()) return;
-      temp = await Directory(
-        '${widget.store.root!.path}/exports/feed_${newId()}',
-      ).create();
-      final posters = <String, String>{};
-      for (final c in [
-        ...p.clips,
-        if (p.feed.homeMedia != null) p.feed.homeMedia!,
-      ]) {
-        if (_cancelled || !mounted) {
-          throw const FormatException('Export cancelled');
-        }
-        if (!await File(c.path).exists()) {
-          throw FormatException('“${c.name}” is missing. Replace this media.');
-        }
-        for (final end in [false, true]) {
-          final path = await _renderer.poster(
-            c,
-            position: end ? c.duration - .001 : 0,
-          );
-          posters['${c.id}:${end ? 'end' : 'start'}'] = path;
-          await _precache(path);
-        }
-      }
-      for (final c in p.clips) {
-        if (c.post.avatarPath != null) await _precache(c.post.avatarPath!);
-      }
-      if (!mounted) return;
-      setState(() => _posters = posters);
-      final clips = <Map<String, dynamic>>[],
-          overlays = <String>[],
-          frames = <List<String>>[],
-          transitions = <double>[];
-      final scenes = FeedTimeline.scenes(p);
-      final totalFrames = scenes.fold<int>(0, (sum, scene) {
-        final animated = scene.kind == 'post'
-            ? FeedTimeline.transition(p, scene.postIndex)
-            : scene.duration;
-        return sum + (animated * 30).ceil() + 1;
-      });
-      var completedFrames = 0;
-      for (var i = 0; i < scenes.length; i++) {
-        final s = scenes[i];
-        final isPost = s.kind == 'post';
-        setState(
-          () => _status = 'Preparing scene ${i + 1} of ${scenes.length}…',
-        );
-        final transition = isPost
-            ? FeedTimeline.transition(p, s.postIndex)
-            : 0.0;
-        final animated = isPost ? transition : s.duration;
-        final sceneFrames = <String>[];
-        final cached = <String, String>{};
-        // UI is static after each swipe; capture only the changing interval.
-        for (var frame = 0; frame < (animated * 30).ceil(); frame++) {
-          if (_cancelled || !mounted) {
-            throw const FormatException('Export cancelled');
-          }
-          final key = FeedCapturePlan.key(p, s, frame);
-          final path = cached[key] ??= await _capture(
-            temp,
-            'scene_${i}_$frame',
-            s.start + frame / 30,
-            overlay: true,
-          );
-          sceneFrames.add(path);
-          completedFrames++;
-          if (mounted) {
-            setState(() => _progress = completedFrames / totalFrames * .35);
-          }
-        }
-        final overlay = await _capture(
-          temp,
-          'overlay_$i',
-          s.start + min(s.duration - .001, animated + .001),
-          overlay: true,
-        );
-        completedFrames++;
-        overlays.add(overlay);
-        frames.add(sceneFrames);
-        transitions.add(transition);
-        ReelClip? source = isPost
-            ? p.clips[s.postIndex]
-            : s.kind.startsWith('home')
-            ? p.feed.homeMedia
-            : null;
-        if (source == null) {
-          final base = await _capture(temp, 'base_$i', s.start);
-          clips.add(
-            ReelClip(
-              id: newId(),
-              path: base,
-              name: 'Scene',
-              isVideo: false,
-              duration: s.duration,
-            ).toJson(),
-          );
-        } else {
-          // Split a short video wallpaper into repeats; each copy reuses the same UI scene clock.
-          clips.add({
-            ...source.toJson(),
-            'duration': s.duration,
-            'loopSource': !isPost && source.isTimed,
-            'loopDuration': source.duration,
-          });
-        }
-      }
-      if (_cancelled) throw const FormatException('Export cancelled');
-      if (mounted) {
-        setState(() {
-          _exportPhase = ExportPhase.encoding;
-          _status = 'Encoding video…';
-          _progress = .35;
-          _exportPosition = 0;
-        });
-      }
-      _subscription = _renderer.progress.listen((value) {
-        if (mounted) {
-          setState(() {
-            _status = 'Encoding video…';
-            _exportPosition = FeedTimeline.duration(p) * value.clamp(0, 1);
-            _progress = .35 + .65 * value;
-          });
-        }
-      });
-      final path = await _renderer.exportFeed(
-        clips: clips,
-        overlays: overlays,
-        frames: frames,
-        transitions: transitions,
-        music: p.music,
+      final pipeline = FeedExportPipeline(
+        project: p,
+        store: widget.store,
+        renderer: _renderer,
+        onPrecache: _precache,
+        onCapture: _capture,
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
+        onProgress: (v) {
+          if (mounted) setState(() => _progress = v);
+        },
+        onPhase: (phase) {
+          if (mounted) setState(() => _exportPhase = phase);
+        },
+        onPosition: (pos) {
+          if (mounted) setState(() => _exportPosition = pos);
+        },
+        onPosters: (posters) {
+          if (mounted) setState(() => _posters = posters);
+        },
+        isCancelled: () => _cancelled || !mounted,
       );
+      final path = await pipeline.run();
       if (!mounted || _cancelled) return;
       setState(() {
         _exportPhase = ExportPhase.finishing;
@@ -687,11 +468,6 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     } catch (e) {
       _toast(e.toString().replaceFirst('FormatException: ', ''));
     } finally {
-      await _subscription?.cancel();
-      _subscription = null;
-      if (temp != null && await temp.exists()) {
-        await temp.delete(recursive: true);
-      }
       if (mounted) {
         setState(() {
           _exporting = false;

@@ -5,6 +5,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../model/maps_web_result.dart';
 import '../model/project.dart';
 import '../services/maps_web_session.dart';
+import '../widgets/empty_placeholder.dart';
+import '../widgets/maps_web_place_view.dart';
 import '../widgets/place_search_dialog.dart';
 
 class MapsWebSearchPage extends StatefulWidget {
@@ -19,6 +21,20 @@ class MapsWebSearchPage extends StatefulWidget {
     this.driver,
     this.browserOverride,
   }) : assert(driver == null || browserOverride != null);
+
+  static Future<MapsWebImport?> search(
+    BuildContext context, {
+    String initial = '',
+    Future<String?> Function()? requestApiKey,
+  }) =>
+      Navigator.of(context).push<MapsWebImport>(
+        MaterialPageRoute(
+          builder: (_) => MapsWebSearchPage(
+            initial: initial,
+            requestApiKey: requestApiKey,
+          ),
+        ),
+      );
   @override
   State<MapsWebSearchPage> createState() => _MapsWebSearchPageState();
 }
@@ -51,7 +67,8 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
               TargetPlatform.macOS,
             ].contains(defaultTargetPlatform)) {
           throw const FormatException(
-            'Key-free search needs a supported mobile WebView. You can use API lookup or edit the place manually.',
+            'Key-free search needs a supported mobile WebView. '
+            'You can use API lookup or edit the place manually.',
           );
         }
         _controller = WebViewController();
@@ -69,7 +86,8 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
       if (mounted) {
         setState(
           () => _message =
-              'Search could not start. Check that Android System WebView is up to date, or use API lookup/manual editing.',
+              'Search could not start. Check that Android System WebView is '
+              'up to date, or use API lookup/manual editing.',
         );
       }
     }
@@ -83,10 +101,12 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
       _message = snapshot.state == 'empty'
           ? 'No places found. Try a name and city.'
           : snapshot.state == 'interaction'
-          ? 'Google needs your interaction. Show the browser to continue, then tap Read page.'
-          : snapshot.place == null && snapshot.results.isEmpty
-          ? 'No readable place yet. Try Read page after the browser finishes loading.'
-          : null;
+              ? 'Google needs your interaction. Show the browser to '
+                  'continue, then tap Read page.'
+              : snapshot.place == null && snapshot.results.isEmpty
+                  ? 'No readable place yet. Try Read page after the browser '
+                      'finishes loading.'
+                  : null;
       _showBrowser = false;
     });
   }
@@ -169,173 +189,11 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
     super.dispose();
   }
 
-  Widget _place() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final detail = _details!, place = detail.place!;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-      children: [
-        Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  place.name,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (place.category.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.secondaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          place.category,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: colors.onSecondaryContainer,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    if (place.rating.isNotEmpty)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            size: 16,
-                            color: Color(0xffffcc66),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            place.rating,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    if (place.reviewCount.isNotEmpty)
-                      Text(
-                        '${place.reviewCount} reviews',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final field in [
-                  (Icons.place_outlined, place.address),
-                  (Icons.schedule, place.hours),
-                  (Icons.phone_outlined, place.phone),
-                  (Icons.language, place.website),
-                ])
-                  if (field.$2.isNotEmpty)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      leading: Icon(field.$1, size: 20, color: colors.primary),
-                      title: Text(
-                        field.$2,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurface,
-                        ),
-                      ),
-                    ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'All imported details remain editable.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Map header: capture a Google map without a key in Place → Header.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        if (detail.reviews.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Text(
-            'Featured review',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Optional. Google may shorten the text; you can edit it after import.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Card(
-            margin: EdgeInsets.zero,
-            child: RadioGroup<int>(
-              groupValue: _review,
-              onChanged: (v) => setState(() => _review = v ?? -1),
-              child: Column(
-                children: [
-                  const RadioListTile<int>(
-                    value: -1,
-                    title: Text('No featured review'),
-                  ),
-                  for (var i = 0; i < detail.reviews.length; i++)
-                    RadioListTile<int>(
-                      value: i,
-                      title: Text(
-                        detail.reviews[i].author.isEmpty
-                            ? 'Review ${i + 1}'
-                            : detail.reviews[i].author,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      secondary: Text(
-                        '${detail.reviews[i].rating}/5',
-                        style: TextStyle(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        detail.reviews[i].text,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+  Widget _place() => MapsWebPlaceView(
+    details: _details!,
+    selectedReview: _review,
+    onSelectReview: (v) => setState(() => _review = v ?? -1),
+  );
 
   Widget _resultsView() {
     final theme = Theme.of(context);
@@ -385,7 +243,8 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                       return Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          'Results from Google Maps · Refine your search for more places.',
+                          'Results from Google Maps · '
+                          'Refine your search for more places.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -433,46 +292,11 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                     );
                   },
                 )
-              : Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: colors.primaryContainer.withValues(
-                              alpha: 0.35,
-                            ),
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Icon(
-                            Icons.travel_explore,
-                            color: colors.primary,
-                            size: 36,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _busy ? 'Finding your place' : 'Find a place',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Search by name and city, or paste a Google Maps share link. No API key needed.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              : EmptyPlaceholder(
+                  icon: Icons.travel_explore,
+                  title: _busy ? 'Finding your place' : 'Find a place',
+                  description: 'Search by name and city, or paste a '
+                      'Google Maps share link. No API key needed.',
                 ),
         ),
       ],

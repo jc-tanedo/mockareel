@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 class ProjectNameDialog extends StatefulWidget {
   final String initialValue;
   const ProjectNameDialog({super.key, required this.initialValue});
+
+  static Future<String?> show(BuildContext context, String initialValue) =>
+      showDialog<String>(
+        context: context,
+        builder: (_) => ProjectNameDialog(initialValue: initialValue),
+      );
   @override
   State<ProjectNameDialog> createState() => _ProjectNameDialogState();
 }
