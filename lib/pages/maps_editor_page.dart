@@ -1,6 +1,5 @@
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
-import '../services/gif_media.dart';
 import '../services/media_importer.dart';
 import '../widgets/maps_export_panel.dart';
 import '../widgets/maps_place_editor.dart';
@@ -30,7 +29,6 @@ import '../widgets/editor_workspace.dart';
 import '../widgets/creation_steps.dart';
 import '../services/project_store.dart';
 import '../widgets/reel_preview.dart';
-import '../widgets/media_frame.dart';
 import '../widgets/text_editor.dart';
 import '../widgets/audio_editor.dart';
 import 'exported_video_page.dart';
