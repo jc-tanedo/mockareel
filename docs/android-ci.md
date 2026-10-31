@@ -4,9 +4,13 @@ Both workflows use Flutter **3.47.7**, Temurin **21**, Android SDK/build tools *
 
 ## Self-hosted runners
 
-All jobs use `runs-on: self-hosted`. Register an Ubuntu/Debian Linux **x64** runner with Bash and Git available for checkout. The runner account needs root or passwordless `sudo` when system dependencies are missing, plus writable home and tool-cache directories. Missing command-line tools (including Python and the release job's GitHub CLI) are installed through `apt`; existing tools are reused. Android jobs install/cache the pinned Java, Flutter and Android SDK components, and fetch locked Dart dependencies. The secret scan reuses Gitleaks 8.24.3 if present, otherwise downloads and verifies that version.
+All jobs use `runs-on: self-hosted`. Register an Ubuntu/Debian Linux **x64** runner with Bash and Git available for checkout. The runner account needs root or passwordless `sudo` when system dependencies are missing, plus writable home and tool-cache directories. Missing command-line tools (including Python and the release job's GitHub CLI) are installed through `apt`; existing tools are reused. Android jobs reuse locally installed pinned Java, Flutter and Android SDK components, installing missing versions and fetching locked Dart dependencies. The secret scan reuses Gitleaks 8.24.3 if present, otherwise downloads and verifies that version.
 
-Persistent runners reuse installed toolchains. Gradle configuration is updated without duplicate settings, and the publish job clears its previous `dist/` before downloading this run's artifacts.
+Persistent runners reuse installed toolchains. Java setup uses the runner tool cache, and Flutter setup uses its existing SDK directory with remote archive caching disabled. Gradle and pub reuse their local dependency caches; setup does not download and extract remote Gradle/Flutter/pub cache archives on every job. A remote “cache hit” can otherwise transfer several gigabytes even when the same files are already on disk.
+
+Keep each runner’s tool cache (`RUNNER_TOOL_CACHE`), Gradle user home (`GRADLE_USER_HOME`, normally `~/.gradle`), pub cache (`PUB_CACHE`, normally `~/.pub-cache`) and Android SDK directory on persistent storage. With Docker, each runner should have its own persistent volumes or bind mounts at those paths, writable by its runner account. Retaining only the checkout does not retain these caches. Do not share a writable Flutter SDK or runner tool cache between concurrent runners. A new/recreated runner without those volumes must install/download dependencies once; subsequent jobs reuse them until a pinned version changes. No repository variable is needed to enable local reuse.
+
+Gradle configuration is updated without duplicate settings, and the publish job clears its previous `dist/` before downloading this run's artifacts.
 
 ## Debug APKs
 
