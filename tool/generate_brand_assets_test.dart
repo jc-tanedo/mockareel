@@ -45,26 +45,26 @@ class _Mark {
 }
 
 _Mark _geometry() => _Mark()
-  ..m(43.5, 51.5)
-  ..c(35.5, 43.0, 26.0, 37.0, 16.5, 35.0)
-  ..q(14.0, 35.0, 17.5, 40.0)
-  ..c(21.0, 48.0, 24.5, 56.5, 26.0, 64.0)
-  ..c(24.5, 71.5, 21.0, 80.0, 17.5, 88.0)
-  ..q(14.0, 93.0, 16.5, 93.0)
-  ..c(26.0, 91.0, 35.5, 85.0, 43.5, 76.5)
-  ..c(49.2, 89.2, 61.2, 98.0, 75.0, 98.0)
-  ..c(90.5, 98.0, 105.0, 86.5, 108.5, 69.5)
-  ..c(106.0, 68.0, 102.5, 66.5, 100.5, 64.0)
-  ..c(102.5, 61.5, 106.0, 60.0, 108.5, 58.5)
-  ..c(105.0, 41.5, 90.5, 30.0, 75.0, 30.0)
-  ..c(61.2, 30.0, 49.2, 38.8, 43.5, 51.5)
+  ..m(42.5, 51.5)
+  ..c(34.5, 43.0, 25.0, 37.0, 15.5, 35.0)
+  ..q(13.0, 35.0, 16.5, 40.0)
+  ..c(21.0, 48.0, 25.5, 56.5, 27.0, 64.0)
+  ..c(25.5, 71.5, 21.0, 80.0, 16.5, 88.0)
+  ..q(13.0, 93.0, 15.5, 93.0)
+  ..c(25.0, 91.0, 34.5, 85.0, 42.5, 76.5)
+  ..c(48.0, 89.0, 59.5, 97.0, 74.0, 97.0)
+  ..c(88.5, 97.0, 100.5, 87.5, 105.5, 72.0)
+  ..c(103.0, 68.5, 99.0, 66.0, 99.0, 64.0)
+  ..c(99.0, 62.0, 103.0, 59.5, 105.5, 56.0)
+  ..c(100.5, 40.5, 88.5, 31.0, 74.0, 31.0)
+  ..c(59.5, 31.0, 48.0, 39.0, 42.5, 51.5)
   ..close()
-  ..hole(63.0, 52.0, 8.0)
-  ..hole(87.0, 52.0, 8.0)
-  ..hole(63.0, 76.0, 8.0)
-  ..hole(87.0, 76.0, 8.0)
-  ..hole(75.0, 64.0, 3.5)
-  ..hole(99.0, 50.5, 2.5);
+  ..hole(62.33, 52.33, 7.5)
+  ..hole(85.67, 52.33, 7.5)
+  ..hole(62.33, 75.67, 7.5)
+  ..hole(85.67, 75.67, 7.5)
+  ..hole(74.0, 64.0, 3.5)
+  ..hole(96.5, 51.5, 2.6);
 
 Future<void> png(
   String path,
@@ -86,10 +86,10 @@ Future<void> png(
 
 void _drawMark(Canvas canvas, _Mark mark, Rect bounds, Color color) {
   canvas.save();
-  // The glyph's optical center is (63,64); its silhouette is 94×68 units.
-  final scale = bounds.width / 94;
+  // The glyph's optical center is (62,64); its silhouette is 90×66 units.
+  final scale = bounds.width / 92;
   canvas.translate(
-    bounds.center.dx - 63 * scale,
+    bounds.center.dx - 62 * scale,
     bounds.center.dy - 64 * scale,
   );
   canvas.scale(scale);
@@ -134,7 +134,7 @@ void main() {
         'android/app/src/main/res/drawable/${entry.$1}.xml',
       ).writeAsString('''<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="16.2" android:translateY="15.6" android:scaleX="0.6" android:scaleY="0.6">
+    <group android:translateX="16.8" android:translateY="15.6" android:scaleX="0.6" android:scaleY="0.6">
         <path android:fillColor="${entry.$2}" android:fillType="evenOdd" android:pathData="$d" />
     </group>
 </vector>
@@ -148,8 +148,9 @@ void main() {
       ('xxxhdpi', 192),
     ]) {
       for (final round in [false, true]) {
+        final suffix = round ? '_round' : '';
         await png(
-          'android/app/src/main/res/mipmap-${entry.$1}/ic_launcher${round ? '_round' : ''}.png',
+          'android/app/src/main/res/mipmap-${entry.$1}/ic_launcher$suffix.png',
           entry.$2,
           (canvas, size) {
             final paint = Paint()
@@ -207,7 +208,7 @@ void main() {
         brandInk,
       );
     });
-    // A review sheet shows the app icon, a one-color glyph, and actual small sizes.
+    // A review sheet shows the app icon, a one-color glyph, and small sizes.
     await png('${brand.path}/icon-preview.png', 1024, (canvas, size) {
       canvas.drawColor(const Color(0xfff4f3f8), BlendMode.src);
       canvas.drawRRect(
@@ -248,7 +249,7 @@ void main() {
           brandGround,
         );
       }
-      // Adaptive launcher's circular mask preview (108dp asset seen through 72dp).
+      // Adaptive launcher circular mask preview (108dp asset seen in 72dp).
       canvas.save();
       canvas.clipPath(Path()..addOval(const Rect.fromLTWH(744, 604, 128, 128)));
       canvas.drawColor(brandGround, BlendMode.src);
