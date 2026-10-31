@@ -1,3 +1,5 @@
+import 'media_preparation_queue.dart';
+import 'media_edits.dart';
 import 'gif_media.dart';
 import 'gif_videos.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +20,7 @@ class NativeRenderer {
   Future<String> thumbnail(String path, double seconds) async => (await channel
       .invokeMethod<String>('thumbnail', {'path': path, 'seconds': seconds}))!;
   Future<String> poster(ReelClip clip, {double position = 0}) async {
+    clip = await EditedMedia.instance.prepare(clip);
     if (clip.isGif) {
       final video = await GifVideos.instance.video(clip);
       return thumbnail(video, position.clamp(0, clip.duration - .001));
@@ -31,6 +34,7 @@ class NativeRenderer {
   }
 
   Future<Map<String, dynamic>> _source(ReelClip clip) async {
+    clip = await EditedMedia.instance.prepare(clip);
     await GifMedia.hydrate(clip);
     if (!clip.isGif) return clip.toJson();
     final path = await GifVideos.instance.video(clip);
@@ -60,22 +64,29 @@ class NativeRenderer {
         throw PlatformException(code: 'CANCELLED', message: 'Export cancelled');
       }
     }
-    final path = await channel.invokeMethod<String>('export', {
-      'clips': clips,
-      'overlays': overlays,
-      'posters': starts,
-      'endPosters': ends,
-      'layout': TemplateLayout.native,
-      'backgroundColor': OutputPalette(
-        dark: project.darkOutput,
-      ).surface.toARGB32(),
-      'progressColor': OutputPalette(
-        dark: project.darkOutput,
-      ).progress.toARGB32(),
-      'slideSeconds': project.slideSeconds,
-      'music': project.music?.toJson(),
-      'sheetIntroSeconds': introFrames.isEmpty ? 0 : project.sheetIntroSeconds,
-      'introFrames': introFrames,
+    final path = await MediaPreparationQueue.run(() {
+      if (generation != _generation) {
+        throw PlatformException(code: 'CANCELLED', message: 'Export cancelled');
+      }
+      return channel.invokeMethod<String>('export', {
+        'clips': clips,
+        'overlays': overlays,
+        'posters': starts,
+        'endPosters': ends,
+        'layout': TemplateLayout.native,
+        'backgroundColor': OutputPalette(
+          dark: project.darkOutput,
+        ).surface.toARGB32(),
+        'progressColor': OutputPalette(
+          dark: project.darkOutput,
+        ).progress.toARGB32(),
+        'slideSeconds': project.slideSeconds,
+        'music': project.music?.toJson(),
+        'sheetIntroSeconds': introFrames.isEmpty
+            ? 0
+            : project.sheetIntroSeconds,
+        'introFrames': introFrames,
+      });
     });
     if (path == null) throw StateError('The renderer did not return a video.');
     return path;
@@ -103,16 +114,21 @@ class NativeRenderer {
         throw PlatformException(code: 'CANCELLED', message: 'Export cancelled');
       }
     }
-    final path = await channel.invokeMethod<String>('export', {
-      'template': 'tiktok-feed',
-      'clips': sources,
-      'overlays': overlays,
-      'posters': posters,
-      'endPosters': posters,
-      'layout': TemplateLayout.native,
-      'sceneFrames': frames,
-      'transitions': transitions,
-      'music': music?.toJson(),
+    final path = await MediaPreparationQueue.run(() {
+      if (generation != _generation) {
+        throw PlatformException(code: 'CANCELLED', message: 'Export cancelled');
+      }
+      return channel.invokeMethod<String>('export', {
+        'template': 'tiktok-feed',
+        'clips': sources,
+        'overlays': overlays,
+        'posters': posters,
+        'endPosters': posters,
+        'layout': TemplateLayout.native,
+        'sceneFrames': frames,
+        'transitions': transitions,
+        'music': music?.toJson(),
+      });
     });
     if (path == null) throw StateError('The renderer did not return a video.');
     return path;
@@ -123,6 +139,7 @@ class NativeRenderer {
     return Future.wait<void>([
       channel.invokeMethod<void>('cancel'),
       GifVideos.instance.cancel(),
+      EditedMedia.instance.cancel(),
     ]).then((_) {});
   }
 

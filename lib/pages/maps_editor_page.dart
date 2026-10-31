@@ -1,3 +1,7 @@
+import '../widgets/editor_section_card.dart';
+import '../model/streetview_motion.dart';
+import '../widgets/streetview_inspector.dart';
+import '../model/streetview_timeline.dart';
 import '../services/gif_media.dart';
 import 'maps_web_search_page.dart';
 import 'maps_web_header_page.dart';
@@ -438,7 +442,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         ? _project.mapHeaderPath
         : null;
     if (heroPath != null) await _precache(heroPath);
-    if (_project.headerMode == 'map' && heroPath == null) {
+    if (!_project.isStreetview &&
+        _project.headerMode == 'map' &&
+        heroPath == null) {
       throw const FormatException(
         'Load a Google map or upload a map image in Place before exporting.',
       );
@@ -455,6 +461,16 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         }
         paths[c.id] = await _renderer.poster(c);
         await _precache(paths[c.id]!);
+        if (_project.isStreetview) {
+          paths['${c.id}:end'] = await _renderer.poster(
+            c,
+            position: c.duration - .001,
+          );
+          await _precache(paths['${c.id}:end']!);
+          if (c.streetview.mapPath != null) {
+            await _precache(c.streetview.mapPath!);
+          }
+        }
       }
     }
     if (!mounted) return;
@@ -532,16 +548,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     double max,
     String display,
     ValueChanged<double> onChanged,
-  ) => Column(
-    children: [
-      Row(
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-          Text(display, style: const TextStyle(color: mint, fontSize: 12)),
-        ],
-      ),
-      Slider(value: value, min: min, max: max, onChanged: onChanged),
-    ],
+  ) => EditorSlider(
+    label: label,
+    valueLabel: display,
+    value: value,
+    min: min,
+    max: max,
+    onChanged: onChanged,
   );
 
   Future<void> _export() async {
@@ -574,6 +587,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         throw const FormatException('Export cancelled');
       }
       setState(() => _captureSnapshot = false);
+      if (_project.isStreetview) {
+        await _exportStreetview(temp);
+        return;
+      }
       final overlays = <String>[];
       for (var i = 0; i < _project.clips.length; i++) {
         if (!mounted) return;
@@ -671,6 +688,96 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     }
   }
 
+  Future<void> _exportStreetview(Directory temp) async {
+    final scenes = StreetviewTimeline.scenes(_project);
+    final clips = <Map<String, dynamic>>[];
+    final overlays = <String>[];
+    final frames = <List<String>>[];
+    for (var i = 0; i < scenes.length; i++) {
+      final scene = scenes[i];
+      final clip = _project.clips[scene.mediaIndex];
+      if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+          clip.streetview.mapPath == null) {
+        throw FormatException(
+          'Capture a map for “${clip.name}” before exporting.',
+        );
+      }
+      final media = scene.kind == 'media';
+      final animatedArrows =
+          media && clip.streetview.showArrows && StreetviewMotion.active(clip);
+      final count = media && !animatedArrows ? 1 : (scene.duration * 30).ceil();
+      final paths = <String>[];
+      for (var f = 0; f < count; f++) {
+        if (_cancelled || !mounted) {
+          throw const FormatException('Export cancelled');
+        }
+        setState(() {
+          _captureSnapshot = false;
+          _capturePosition = scene.start + f / 30;
+          _exportPosition = _capturePosition!;
+          _progress = .35 * (i + f / count) / scenes.length;
+          _status = 'Preparing journey scene ${i + 1} of ${scenes.length}…';
+        });
+        final file = File('${temp.path}/streetview-$i-$f.png');
+        await file.writeAsBytes(await _capturePng());
+        paths.add(file.path);
+      }
+      overlays.add(paths.last);
+      frames.add(media && !animatedArrows ? [] : paths);
+      clips.add(
+        media
+            ? {
+                ...clip.toJson(),
+                'slowPanZoom': clip.streetview.panZoom,
+                'cameraMotion': StreetviewMotion.native(clip),
+              }
+            : {
+                ...clip.toJson(),
+                'path': paths.first,
+                'edits': <String, dynamic>{},
+                'isVideo': false,
+                'isGif': false,
+                'duration': scene.duration,
+                'trimStart': 0.0,
+                'zoom': 1.0,
+                'panX': 0.0,
+              },
+      );
+    }
+    if (_cancelled || !mounted) throw const FormatException('Export cancelled');
+    setState(() {
+      _exportPhase = ExportPhase.encoding;
+      _status = 'Encoding video…';
+      _exportPosition = 0;
+      _capturePosition = null;
+    });
+    _progressSubscription = _renderer.progress.listen((v) {
+      if (mounted) {
+        setState(() {
+          _progress = .35 + .65 * v;
+          _exportPosition = _project.duration * v;
+        });
+      }
+    });
+    final path = await _renderer.exportFeed(
+      clips: clips,
+      overlays: overlays,
+      frames: frames,
+      transitions: List.filled(clips.length, 0),
+      music: _project.music,
+    );
+    if (_cancelled || !mounted) return;
+    setState(() {
+      _exportPhase = ExportPhase.finishing;
+      _progress = 1;
+    });
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -762,9 +869,11 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const Text(
-                      'MAPS PLACE STORY · 9:16',
-                      style: TextStyle(
+                    Text(
+                      _project.isStreetview
+                          ? 'STREET VIEW JOURNEY · 9:16'
+                          : 'MAPS PLACE STORY · 9:16',
+                      style: const TextStyle(
                         fontSize: 9,
                         color: mint,
                         letterSpacing: 1,
@@ -916,6 +1025,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           key: ValueKey(_previewRevision),
           project: _project,
           selected: _selected,
+          startAtBeginning: _project.isStreetview && _selected == 0,
           maxHeight: maxHeight,
         );
   void _goToStep(int step) => setState(() {
@@ -923,7 +1033,29 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     _previewRevision = newId();
   });
 
-  Widget _editTab() => Column(
+  Widget _editTab() =>
+      _project.isStreetview ? _streetviewTab() : _mapsEditTab();
+
+  Widget _streetviewTab() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      OutputThemePicker(project: _project, onChanged: _change),
+      if (_project.clips.isEmpty)
+        _addMedia()
+      else ...[
+        _clipStrip(),
+        StreetviewInspector(
+          key: ValueKey(_project.clips[_selected].id),
+          project: _project,
+          clip: _project.clips[_selected],
+          store: _store,
+          onChanged: _change,
+        ),
+      ],
+    ],
+  );
+
+  Widget _mapsEditTab() => Column(
     children: [
       InspectorTabs(
         labels: const ['Details', 'Look', 'Header', 'Buttons', 'Review'],
@@ -936,18 +1068,23 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
           children: switch (_placeTool) {
             0 => [
-              FilledButton.icon(
-                onPressed: _findPlace,
-                icon: const Icon(Icons.search, size: 18),
-                label: const Text('Find a place on Google Maps'),
+              EditorSectionCard(
+                title: const Text('Place details'),
+                spacing: 0,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _findPlace,
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('Find a place on Google Maps'),
+                  ),
+                  const SizedBox(height: 16),
+                  _field('Place name', _name),
+                  _field('Category & description', _category),
+                  _field('Address', _address),
+                ],
               ),
-              const SizedBox(height: 16),
-              _field('Place name', _name),
-              _field('Category & description', _category),
-              _field('Address', _address),
-              ExpansionTile(
+              EditorSectionCard(
                 title: const Text('More place details'),
-                tilePadding: EdgeInsets.zero,
                 children: [
                   _field(
                     'Rating',
@@ -969,16 +1106,22 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             ],
             1 => [
               OutputThemePicker(project: _project, onChanged: _change),
-              const Divider(height: 28),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Story controls overlay'),
-                subtitle: const Text('Decorative controls from the reference'),
-                value: _project.storyChrome,
-                onChanged: (v) {
-                  _project.storyChrome = v;
-                  _change();
-                },
+              EditorSectionCard(
+                title: const Text('Story controls'),
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Story controls overlay'),
+                    subtitle: const Text(
+                      'Decorative controls from the reference',
+                    ),
+                    value: _project.storyChrome,
+                    onChanged: (v) {
+                      _project.storyChrome = v;
+                      _change();
+                    },
+                  ),
+                ],
               ),
             ],
             2 => [
@@ -1006,7 +1149,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   'actions-${_project.id}-${_project.place.placeId}',
                 ),
                 place: _project.place,
-                expanded: true,
                 onChanged: _change,
               ),
             ],
@@ -1015,7 +1157,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 project: _project,
                 loading: _importing,
                 showHeader: false,
-                expanded: true,
                 onChanged: _change,
                 onLoadMap: _loadMap,
                 useApiHeaders: _useApiHeaders && _key.isNotEmpty,
@@ -1109,7 +1250,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                           },
                         )
                       : Text(
-                          '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                          '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.white60,
@@ -1161,7 +1302,15 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                 key: ValueKey('timeline-inspector-$_timelineTool'),
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                 children: [
-                  if (_timelineTool == 2)
+                  if (_timelineTool == 2 && _project.isStreetview)
+                    StreetviewInspector(
+                      key: ValueKey(_project.clips[_selected].id),
+                      project: _project,
+                      clip: _project.clips[_selected],
+                      store: _store,
+                      onChanged: _change,
+                    )
+                  else if (_timelineTool == 2)
                     _motionInspector()
                   else
                     _clipCard(_selected.clamp(0, _project.clips.length - 1)),
@@ -1203,59 +1352,58 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Widget _motionInspector() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
-        'Opening scroll reveal',
-        style: TextStyle(fontWeight: FontWeight.w600),
+      EditorSectionCard(
+        title: const Text('Opening scroll reveal'),
+        children: [
+          _framingControl(
+            'Reveal duration',
+            _project.sheetIntroSeconds,
+            0,
+            2,
+            '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
+            (v) {
+              _project.sheetIntroSeconds = v < .1 ? 0 : v;
+              _previewRevision = newId();
+              _change();
+            },
+          ),
+          const Text(
+            'Set to zero to start with the sheet already in position.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+        ],
       ),
-      const SizedBox(height: 12),
-      _framingControl(
-        'Reveal duration',
-        _project.sheetIntroSeconds,
-        0,
-        2,
-        '${_project.sheetIntroSeconds.toStringAsFixed(1)}s',
-        (v) {
-          _project.sheetIntroSeconds = v < .1 ? 0 : v;
-          _previewRevision = newId();
-          _change();
-        },
-      ),
-      const Text(
-        'Set to zero to start with the sheet already in position.',
-        style: TextStyle(fontSize: 11, color: Colors.white54),
-      ),
-      const Divider(height: 28),
-      const Text(
-        'Left-scroll snap',
-        style: TextStyle(fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 12),
-      _framingControl(
-        'Slide speed',
-        _project.slideSeconds,
-        .15,
-        .8,
-        '${_project.slideSeconds.toStringAsFixed(2)}s',
-        (v) {
-          _project.slideSeconds = v;
-          _change();
-        },
-      ),
-      const Text(
-        'Slide time is included in each clip’s duration.',
-        style: TextStyle(fontSize: 11, color: Colors.white54),
-      ),
-      TextButton(
-        onPressed: () {
-          for (final c in _project.clips) {
-            c.duration = 1.56;
-            c.normalize();
-          }
-          _project.slideSeconds = .35;
-          _previewRevision = newId();
-          _change();
-        },
-        child: const Text('Use reference pace · 1.56s per card'),
+      EditorSectionCard(
+        title: const Text('Left-scroll snap'),
+        children: [
+          _framingControl(
+            'Slide speed',
+            _project.slideSeconds,
+            .15,
+            .8,
+            '${_project.slideSeconds.toStringAsFixed(2)}s',
+            (v) {
+              _project.slideSeconds = v;
+              _change();
+            },
+          ),
+          const Text(
+            'Slide time is included in each clip’s duration.',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+          TextButton(
+            onPressed: () {
+              for (final c in _project.clips) {
+                c.duration = 1.56;
+                c.normalize();
+              }
+              _project.slideSeconds = .35;
+              _previewRevision = newId();
+              _change();
+            },
+            child: const Text('Use reference pace · 1.56s per card'),
+          ),
+        ],
       ),
     ],
   );
@@ -1339,143 +1487,138 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Widget _clipCard(int index) {
     final clip = _project.clips[index];
-    return Card(
+    return EditorSectionCard(
       key: ValueKey(clip.id),
-      margin: const EdgeInsets.only(bottom: 12),
-      color: panel,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_timelineTool == 0) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Move clip earlier',
-                    onPressed: index == 0 ? null : () => _move(index, -1),
-                    icon: const Icon(Icons.chevron_left, size: 18),
-                  ),
-                  IconButton(
-                    tooltip: 'Move clip later',
-                    onPressed: index == _project.clips.length - 1
-                        ? null
-                        : () => _move(index, 1),
-                    icon: const Icon(Icons.chevron_right, size: 18),
-                  ),
-                ],
+      title: Text(_timelineTool == 0 ? 'Media timing' : 'Media framing'),
+      children: [
+        if (_timelineTool == 0) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Duration · ${clip.duration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              Slider(
-                value: clip.duration,
-                min: clip.minDuration,
-                max: clip.maxDuration,
-                onChanged: (v) {
-                  clip.duration = v;
-                  clip.normalize();
+              IconButton(
+                tooltip: 'Move clip earlier',
+                onPressed: index == 0 ? null : () => _move(index, -1),
+                icon: const Icon(Icons.chevron_left, size: 18),
+              ),
+              IconButton(
+                tooltip: 'Move clip later',
+                onPressed: index == _project.clips.length - 1
+                    ? null
+                    : () => _move(index, 1),
+                icon: const Icon(Icons.chevron_right, size: 18),
+              ),
+            ],
+          ),
+          Slider(
+            value: clip.duration,
+            min: clip.minDuration,
+            max: clip.maxDuration,
+            onChanged: (v) {
+              clip.duration = v;
+              clip.normalize();
+              _change();
+            },
+          ),
+          if (clip.isGif)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Loop GIF'),
+              subtitle: const Text(
+                'Repeat the animation to fill the clip duration',
+              ),
+              value: clip.loopGif,
+              onChanged: (v) {
+                clip.setGifLoop(v);
+                _change();
+              },
+            ),
+          if (clip.isTimed && clip.maxTrimStart > .001) ...[
+            Text(
+              'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            Slider(
+              value: clip.trimStart,
+              max: clip.maxTrimStart,
+              onChanged: (v) {
+                clip.trimStart = v;
+                clip.normalize();
+                _change();
+              },
+            ),
+          ],
+          TextFormField(
+            key: ValueKey('caption-${clip.id}'),
+            initialValue: clip.caption,
+            maxLength: 120,
+            decoration: const InputDecoration(
+              labelText: 'Caption (optional)',
+              counterText: '',
+            ),
+            onChanged: (v) {
+              clip.caption = v;
+              _change();
+            },
+          ),
+        ],
+        if (_timelineTool == 1)
+          Column(
+            children: [
+              if (!_project.isStreetview)
+                _framingControl(
+                  'Card width',
+                  clip.cardWidth,
+                  .45,
+                  1,
+                  '${(clip.cardWidth * 328).round()} px',
+                  (v) {
+                    clip.cardWidth = v;
+                    _change();
+                  },
+                ),
+              if (!_project.isStreetview)
+                _framingControl(
+                  'Card height',
+                  clip.cardHeight,
+                  .55,
+                  1,
+                  '${(clip.cardHeight * 250).round()} px',
+                  (v) {
+                    clip.cardHeight = v;
+                    _change();
+                  },
+                ),
+              _framingControl(
+                'Zoom',
+                clip.zoom,
+                1,
+                3,
+                '${clip.zoom.toStringAsFixed(2)}×',
+                (v) {
+                  clip.zoom = v;
                   _change();
                 },
               ),
-              if (clip.isGif)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Loop GIF'),
-                  subtitle: const Text(
-                    'Repeat the animation to fill the clip duration',
-                  ),
-                  value: clip.loopGif,
-                  onChanged: (v) {
-                    clip.setGifLoop(v);
-                    _change();
-                  },
-                ),
-              if (clip.isTimed && clip.maxTrimStart > .001) ...[
-                Text(
-                  'Start at ${clip.trimStart.toStringAsFixed(clip.isGif ? 2 : 1)}s of ${clip.sourceDuration.toStringAsFixed(clip.isGif ? 2 : 1)}s',
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                ),
-                Slider(
-                  value: clip.trimStart,
-                  max: clip.maxTrimStart,
-                  onChanged: (v) {
-                    clip.trimStart = v;
-                    clip.normalize();
-                    _change();
-                  },
-                ),
-              ],
-              TextFormField(
-                key: ValueKey('caption-${clip.id}'),
-                initialValue: clip.caption,
-                maxLength: 120,
-                decoration: const InputDecoration(
-                  labelText: 'Caption (optional)',
-                  counterText: '',
-                ),
-                onChanged: (v) {
-                  clip.caption = v;
+              _framingControl(
+                'Horizontal crop',
+                clip.panX,
+                -1,
+                1,
+                '${(clip.panX * 100).round()}%',
+                (v) {
+                  clip.panX = v;
                   _change();
                 },
               ),
             ],
-            if (_timelineTool == 1)
-              Column(
-                children: [
-                  _framingControl(
-                    'Card width',
-                    clip.cardWidth,
-                    .45,
-                    1,
-                    '${(clip.cardWidth * 328).round()} px',
-                    (v) {
-                      clip.cardWidth = v;
-                      _change();
-                    },
-                  ),
-                  _framingControl(
-                    'Card height',
-                    clip.cardHeight,
-                    .55,
-                    1,
-                    '${(clip.cardHeight * 250).round()} px',
-                    (v) {
-                      clip.cardHeight = v;
-                      _change();
-                    },
-                  ),
-                  _framingControl(
-                    'Zoom',
-                    clip.zoom,
-                    1,
-                    3,
-                    '${clip.zoom.toStringAsFixed(2)}×',
-                    (v) {
-                      clip.zoom = v;
-                      _change();
-                    },
-                  ),
-                  _framingControl(
-                    'Horizontal crop',
-                    clip.panX,
-                    -1,
-                    1,
-                    '${(clip.panX * 100).round()}%',
-                    (v) {
-                      clip.panX = v;
-                      _change();
-                    },
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -1488,8 +1631,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Widget _exportTab() {
-    final needsMap =
-        _project.headerMode == 'map' && _project.mapHeaderPath == null;
+    final needsMap = _project.isStreetview
+        ? StreetviewTimeline.scenes(_project)
+              .where((s) => s.kind == 'map' || s.kind == 'ending-map')
+              .any(
+                (s) => _project.clips[s.mediaIndex].streetview.mapPath == null,
+              )
+        : _project.headerMode == 'map' && _project.mapHeaderPath == null;
     return Column(
       children: [
         Expanded(
@@ -1522,7 +1670,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(1)} seconds',
+                      '${_project.clips.length} clips · ${_project.duration.toStringAsFixed(_project.isStreetview ? 2 : 1)} seconds',
                       style: const TextStyle(color: mint, fontSize: 12),
                     ),
                   ],
@@ -1542,10 +1690,15 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Your map header needs an image.',
-                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                          _project.isStreetview
+                              ? 'Capture the journey’s map screens in Place.'
+                              : 'Your map header needs an image.',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                       TextButton(
@@ -1559,8 +1712,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
                   ),
                 ),
               const SizedBox(height: 12),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
+              EditorSectionCard(
                 title: const Text('Still images'),
                 subtitle: const Text('Transparent template or full snapshot'),
                 children: [

@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../model/project.dart';
 import '../services/maps_web_header_session.dart';
+import '../model/map_capture_viewport.dart';
+import '../widgets/map_attribution.dart';
 import '../theme/app_theme.dart';
 
 /// A visible, hardware-composited map viewport: PixelCopy includes GPU map
@@ -13,12 +16,17 @@ class MapsWebHeaderPage extends StatefulWidget {
   final PlaceDetails place;
   final MapsHeaderDriver? driver;
   final Widget? browserOverride;
+  final double aspectRatio;
+  final bool showHeaderGuide;
   const MapsWebHeaderPage({
     super.key,
     required this.place,
     this.driver,
     this.browserOverride,
-  }) : assert(driver == null || browserOverride != null);
+    this.aspectRatio = 1000 / 625,
+    this.showHeaderGuide = true,
+  }) : assert(driver == null || browserOverride != null),
+       assert(aspectRatio > 0 && aspectRatio < 10);
   @override
   State<MapsWebHeaderPage> createState() => _MapsWebHeaderPageState();
 }
@@ -28,6 +36,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   WebViewController? _controller;
   MapsHeaderDriver? _driver;
   bool _ready = false, _busy = false;
+  String _credits = "";
   String _status = 'Loading Google Maps…';
   String? _error;
   int _generation = 0;
@@ -77,6 +86,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     });
     try {
       await _driver!.load(widget.place);
+      if (!mounted || generation != _generation) return;
       if (mounted && generation == _generation) {
         setState(() {
           _ready = true;
@@ -110,16 +120,19 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
 
   Future<void> _capture() async {
     if (!_ready || _busy) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      // Keep the entire viewport visible, including on shorter phones.
-      await Scrollable.ensureVisible(_frame.currentContext!, alignment: .5);
+      if (!mounted) return;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
       // Let the last pan/zoom frame settle before copying the native window.
       await Future<void>.delayed(const Duration(milliseconds: 700));
       if (!mounted) return;
+      await Scrollable.ensureVisible(_frame.currentContext!, alignment: .5);
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       final box = _frame.currentContext!.findRenderObject()! as RenderBox;
@@ -133,12 +146,17 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
           box.size.height * dpr,
         ),
       );
-      if (mounted) Navigator.pop(context, bytes);
-    } catch (_) {
+      final attributed = await MapAttributionPainter.apply(
+        bytes,
+        credits: _credits,
+      );
+      if (mounted) Navigator.pop(context, attributed);
+    } catch (e) {
       if (mounted) {
         setState(
-          () => _error =
-              'Could not capture the map on this device. Retry, upload a map image, or use the optional Maps Static API.',
+          () => _error = e is FormatException
+              ? e.message
+              : 'Could not capture the map on this device. Retry, upload a map image, or use the optional Maps Static API.',
         );
       }
     } finally {
@@ -154,33 +172,55 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   }
 
   Widget _mapFrame() => AspectRatio(
-    aspectRatio: 1000 / 625,
+    aspectRatio: widget.aspectRatio,
     child: ClipRect(
       key: _frame,
       child: Stack(
+        key: const ValueKey('map-capture-viewport'),
         fit: StackFit.expand,
         children: [
           _controller == null && widget.browserOverride == null
               ? const ColoredBox(color: ink)
-              : IgnorePointer(
-                  ignoring: _busy,
-                  child: FittedBox(
-                    fit: BoxFit.fill,
-                    child: SizedBox(
-                      width: 1000,
-                      height: 625,
-                      child:
-                          widget.browserOverride ??
-                          WebViewWidget.fromPlatformCreationParams(
-                            params: AndroidWebViewWidgetCreationParams(
-                              controller: _controller!.platform,
-                              displayWithHybridComposition: true,
-                            ),
+              : LayoutBuilder(
+                  builder: (context, bounds) {
+                    final viewport = MapCaptureViewport(widget.aspectRatio);
+                    final browser = viewport.browser;
+                    final scale = bounds.maxWidth / viewport.content.width;
+                    return OverflowBox(
+                      minWidth: browser.width * scale,
+                      maxWidth: browser.width * scale,
+                      minHeight: browser.height * scale,
+                      maxHeight: browser.height * scale,
+                      child: IgnorePointer(
+                        ignoring: _busy,
+                        child: FittedBox(
+                          fit: BoxFit.fill,
+                          child: SizedBox(
+                            width: browser.width,
+                            height: browser.height,
+                            child:
+                                widget.browserOverride ??
+                                WebViewWidget.fromPlatformCreationParams(
+                                  params: AndroidWebViewWidgetCreationParams(
+                                    controller: _controller!.platform,
+                                    displayWithHybridComposition: true,
+                                  ),
+                                ),
                           ),
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
           if (!_busy)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: MapAttributionPainter(credits: _credits),
+                ),
+              ),
+            ),
+          if (!_busy && widget.showHeaderGuide)
             Positioned(
               left: 0,
               right: 0,
@@ -229,6 +269,18 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         ),
       ],
     ),
+    TextFormField(
+      enabled: !_busy,
+      decoration: const InputDecoration(
+        labelText: 'Map / imagery credits',
+        hintText: 'Add source attribution text',
+        helperText: 'Added beside Google Maps after the image is cropped.',
+      ),
+      maxLength: 300,
+      minLines: 1,
+      maxLines: 3,
+      onChanged: (value) => setState(() => _credits = value),
+    ),
     if (!_ready && _error == null) const LinearProgressIndicator(minHeight: 2),
     if (_error != null)
       Padding(
@@ -236,9 +288,11 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         child: Text(_error!, style: const TextStyle(color: Colors.white70)),
       ),
     const SizedBox(height: 12),
-    const Text(
-      'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google branding and attribution are retained. No API key needed.',
-      style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+    Text(
+      widget.showHeaderGuide
+          ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google Maps and your entered credits are added after cropping. No API key needed.'
+          : 'Frame the place inside the visible crop. Google Maps and your entered credits are added after capture. The image is saved for preview, export and backups. No API key needed.',
+      style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
     ),
   ];
 
@@ -247,14 +301,20 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     child: FilledButton.icon(
       onPressed: _ready && !_busy ? _capture : null,
       icon: Icon(_busy ? Icons.hourglass_top : Icons.check),
-      label: Text(_busy ? 'Capturing map…' : 'Use map header'),
+      label: Text(
+        _busy
+            ? 'Capturing map…'
+            : widget.showHeaderGuide
+            ? 'Use map header'
+            : 'Use map',
+      ),
     ),
   );
 
   List<Widget> _heading() => [
-    const Text(
-      'KEY-FREE MAP HEADER',
-      style: TextStyle(color: mint, fontSize: 10, letterSpacing: 1.4),
+    Text(
+      widget.showHeaderGuide ? 'KEY-FREE MAP HEADER' : 'KEY-FREE MAP',
+      style: const TextStyle(color: mint, fontSize: 10, letterSpacing: 1.4),
     ),
     const SizedBox(height: 10),
     Text(widget.place.name, style: Theme.of(context).textTheme.titleLarge),
@@ -265,7 +325,9 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Frame map header')),
+    appBar: AppBar(
+      title: Text(widget.showHeaderGuide ? 'Frame map header' : 'Frame map'),
+    ),
     body: SafeArea(
       top: false,
       child: LayoutBuilder(
@@ -311,7 +373,13 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
                       ..._heading(),
                       Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 680),
+                          constraints: BoxConstraints(
+                            maxWidth: min(
+                              680,
+                              max(1, constraints.maxHeight - 120) *
+                                  widget.aspectRatio,
+                            ),
+                          ),
                           child: _mapFrame(),
                         ),
                       ),

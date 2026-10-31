@@ -1,3 +1,4 @@
+import 'editor_section_card.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -281,8 +282,7 @@ class _TextEditorState extends State<TextEditor> {
               ],
             ),
             const SizedBox(height: 12),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
+            EditorSectionCard(
               title: const Text('Transform'),
               children: [
                 Text('Size · ${tag.size.round()}'),

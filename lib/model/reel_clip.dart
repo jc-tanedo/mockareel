@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'ids.dart';
 import 'feed_post.dart';
+import 'streetview.dart';
+import 'media_edits.dart';
+export 'media_edits.dart';
 
 class ReelClip {
   final String id, path, name;
@@ -10,6 +13,8 @@ class ReelClip {
   double duration, trimStart, cardWidth, cardHeight, zoom, panX;
   String caption;
   FeedPost post;
+  StreetviewMedia streetview;
+  MediaEdits edits;
   ReelClip({
     required this.id,
     required this.path,
@@ -22,13 +27,19 @@ class ReelClip {
     this.trimStart = 0,
     this.caption = '',
     FeedPost? post,
+    StreetviewMedia? streetview,
+    MediaEdits? edits,
     this.cardWidth = .78,
     this.cardHeight = 1,
     this.zoom = 1,
     this.panX = 0,
-  }) : post = post ?? FeedPost() {
+  }) : edits = edits ?? MediaEdits(),
+       streetview = streetview ?? StreetviewMedia(),
+       post = post ?? FeedPost() {
     normalize();
   }
+  bool get supportsBlur => !isTimed;
+  MediaEdits get effectiveEdits => edits.forMedia(photo: supportsBlur);
   bool get isTimed => isVideo || isGif;
   double get maxDuration => isTimed && !(isGif && loopGif) && sourceDuration > 0
       ? min(30, sourceDuration)
@@ -72,6 +83,12 @@ class ReelClip {
     duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
     trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
     caption: json['caption'] as String? ?? '',
+    edits: MediaEdits.fromJson(
+      Map<String, dynamic>.from(json['edits'] as Map? ?? {}),
+    ),
+    streetview: StreetviewMedia.fromJson(
+      Map<String, dynamic>.from(json['streetview'] as Map? ?? {}),
+    ),
     post: FeedPost.fromJson(
       Map<String, dynamic>.from(json['post'] as Map? ?? {}),
     ),
@@ -92,6 +109,8 @@ class ReelClip {
     'trimStart': trimStart,
     'caption': caption,
     'post': post.toJson(),
+    'streetview': streetview.toJson(),
+    'edits': edits.toJson(),
     'cardWidth': cardWidth,
     'cardHeight': cardHeight,
     'zoom': zoom,

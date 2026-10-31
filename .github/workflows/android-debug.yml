@@ -1,7 +1,7 @@
 name: Android debug APK
 on:
   push:
-    branches: [main, work, 'poc/**']
+    branches: [main, work, 'poc/**', feature/streetview-template]
   pull_request:
     branches: [main, work]
   workflow_dispatch:
@@ -14,23 +14,29 @@ jobs:
   build:
     runs-on: self-hosted
     timeout-minutes: 45
+    env:
+      MOCKAREEL_REQUIRE_DEBUG_SIGNING: ${{ github.event_name != 'pull_request' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-android-build
-      - name: Analyze and test
-        run: bash tool/ci/check_android.sh
-      - name: Restore optional stable debug signing key
+      - name: Check stable debug signing configuration
         if: github.event_name != 'pull_request'
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
-          if [[ -n "$DEBUG_KEYSTORE_BASE64" ]]; then
-            mkdir -p "$HOME/.android"
-            printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-            chmod 600 "$HOME/.android/debug.keystore"
+          if [[ -z "$DEBUG_KEYSTORE_BASE64" ]]; then
+            echo '::error::Set repository secret ANDROID_DEBUG_KEYSTORE_BASE64 to keep debug APK updates compatible.'
+            exit 1
           fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-android-build
+      - name: Restore required stable debug signing key
+        if: github.event_name != 'pull_request'
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: python3 tool/ci/debug_signing.py
+      - name: Analyze and test
+        run: bash tool/ci/check_android.sh
       - name: Build debug APK
         run: bash tool/ci/build_apk.sh debug
       - uses: ./.github/actions/setup-s3
@@ -44,3 +50,9 @@ jobs:
       - name: Explain pull-request artifact policy
         if: github.event_name == 'pull_request'
         run: echo 'PR checks and APK build passed. S3 uploads run only on pushes/manual runs so PR code receives no storage credentials.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary debug signing key
+        if: always()
+        run: |
+          if [[ -n "${MOCKAREEL_DEBUG_KEYSTORE_PATH:-}" ]]; then
+            rm -f -- "$MOCKAREEL_DEBUG_KEYSTORE_PATH"
+          fi

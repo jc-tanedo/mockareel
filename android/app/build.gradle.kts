@@ -14,6 +14,10 @@ val hasReleaseSigning = listOf(releaseStore, releaseStorePassword, releaseAlias,
 if (System.getenv("MOCKAREEL_REQUIRE_RELEASE_SIGNING") == "true" && !hasReleaseSigning) {
     throw GradleException("Release signing is required. Configure the Android signing secrets.")
 }
+val debugStore = System.getenv("MOCKAREEL_DEBUG_KEYSTORE_PATH")
+if (System.getenv("MOCKAREEL_REQUIRE_DEBUG_SIGNING") == "true" && debugStore.isNullOrBlank()) {
+    throw GradleException("Stable debug signing is required. Configure ANDROID_DEBUG_KEYSTORE_BASE64.")
+}
 
 android {
     namespace = "dev.mockareel.mockareel"
@@ -42,6 +46,14 @@ android {
     }
 
     signingConfigs {
+        if (!debugStore.isNullOrBlank()) {
+            getByName("debug") {
+                storeFile = file(debugStore)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         if (hasReleaseSigning) {
             create("distribution") {
                 storeFile = file(requireNotNull(releaseStore))

@@ -8,6 +8,7 @@ import 'maps_web_session.dart';
 abstract interface class MapsHeaderDriver {
   Future<void> initialize();
   Future<void> load(PlaceDetails place);
+
   Future<void> zoom(bool inward);
   Future<Uint8List> capture(Rect physicalBounds);
   void dispose();
@@ -17,6 +18,9 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
   final WebViewController controller;
   late final _session = MapsWebSession(controller, onStatus: (_) {});
   static const _channel = MethodChannel('dev.mockareel/map-snapshot');
+  late final Future<String> _script = rootBundle.loadString(
+    'assets/maps_header.js',
+  );
   int _generation = 0;
   bool _closed = false;
   MapsWebHeaderSession(this.controller);
@@ -26,7 +30,7 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
   Future<void> load(PlaceDetails place) async {
     final generation = ++_generation;
     await controller.loadRequest(MapsWebUrls.header(place));
-    final script = await rootBundle.loadString('assets/maps_header.js');
+    final script = await _script;
     final timer = Stopwatch()..start();
     var stable = 0;
     while (timer.elapsed < const Duration(seconds: 35)) {
@@ -60,8 +64,49 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
   Future<void> zoom(bool inward) => controller.runJavaScript(
     'document.querySelector(\'button[aria-label="Zoom ${inward ? 'in' : 'out'}"]\')?.click()',
   );
+  Future<void> _ensureMapReady() async {
+    Object state = await controller.runJavaScriptReturningResult(await _script);
+    for (var i = 0; i < 2 && state is String; i++) {
+      state = jsonDecode(state);
+    }
+    if (_closed) throw const FormatException('Map closed.');
+    if (state is! Map || state['state'] != 'ready') {
+      throw const FormatException(
+        'Map is not ready to capture. Retry loading it.',
+      );
+    }
+  }
+
   @override
   Future<Uint8List> capture(Rect bounds) async {
+    final generation = _generation;
+    // Reapply cleanup and let the WebView paint it before native PixelCopy.
+    // This also covers controls inserted since the last load/zoom poll.
+    await _ensureMapReady();
+    await controller.runJavaScript('''
+window.__mockareelHeaderCaptureReady = false;
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  window.__mockareelHeaderCaptureReady = true;
+}));
+''');
+    var painted = false;
+    for (var attempt = 0; attempt < 40; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (_closed || generation != _generation) {
+        throw const FormatException('Map closed.');
+      }
+      final ready = await controller.runJavaScriptReturningResult(
+        'window.__mockareelHeaderCaptureReady === true',
+      );
+      if (ready == true || ready == 'true') {
+        painted = true;
+        break;
+      }
+    }
+    if (!painted) throw const FormatException('Map is not ready to capture.');
+    if (_closed || generation != _generation) {
+      throw const FormatException('Map closed.');
+    }
     final bytes = await _channel
         .invokeMethod<Uint8List>('capture', {
           'left': bounds.left,

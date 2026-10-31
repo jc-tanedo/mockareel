@@ -1,15 +1,18 @@
+import 'editor_section_card.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'story_tags.dart';
 
 class PlaceActionsEditor extends StatefulWidget {
   final PlaceDetails place;
-  final bool expanded;
+  final List<PlaceAction>? suggestedActions;
+  final bool embedded;
   final VoidCallback onChanged;
   const PlaceActionsEditor({
     super.key,
     required this.place,
-    this.expanded = false,
+    this.suggestedActions,
+    this.embedded = false,
     required this.onChanged,
   });
   @override
@@ -18,6 +21,10 @@ class PlaceActionsEditor extends StatefulWidget {
 
 class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
   PlaceDetails get place => widget.place;
+  List<PlaceAction> get actions =>
+      place.actionOverrides ??
+      widget.suggestedActions ??
+      place.suggestedActions;
   VoidCallback get onChanged => widget.onChanged;
   int _revision = 0;
   void _structureChanged() {
@@ -25,21 +32,22 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
     onChanged();
   }
 
-  void _customize() => place.actionOverrides ??= place.suggestedActions;
+  void _customize() => place.actionOverrides ??= actions
+      .map((a) => PlaceAction(kind: a.kind, label: a.label))
+      .toList();
   @override
-  Widget build(BuildContext context) => ExpansionTile(
-    initiallyExpanded: widget.expanded,
-    tilePadding: EdgeInsets.zero,
+  Widget build(BuildContext context) => EditorSectionCard(
+    embedded: widget.embedded,
     title: const Text('Template buttons'),
     subtitle: const Text('Suggested from this place · fully editable'),
     children: [
-      for (var i = 0; i < place.actions.length; i++)
+      for (var i = 0; i < actions.length; i++)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             children: [
               DropdownButton<String>(
-                value: place.actions[i].kind,
+                value: actions[i].kind,
                 items: [
                   for (final kind in [
                     'directions',
@@ -48,6 +56,11 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
                     'website',
                     'save',
                     'order',
+                    'start',
+                    'ask',
+                    'share',
+                    'directory',
+                    'add_label',
                     'custom',
                   ])
                     DropdownMenuItem(
@@ -66,7 +79,7 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
               Expanded(
                 child: TextFormField(
                   key: ValueKey('action-${place.placeId}-$_revision-$i'),
-                  initialValue: place.actions[i].label,
+                  initialValue: actions[i].label,
                   decoration: InputDecoration(
                     labelText: 'Button ${i + 1} label',
                   ),
@@ -97,10 +110,12 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
             ],
           ),
         ),
-      Row(
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
         children: [
           TextButton.icon(
-            onPressed: place.actions.length >= 4
+            onPressed: actions.length >= 4
                 ? null
                 : () {
                     _customize();

@@ -67,6 +67,7 @@ class _LibraryPageState extends State<LibraryPage> {
     if (template == null || !mounted) return;
     final p = ReelProject(
       template: template,
+      darkOutput: template == 'streetview',
       title: template == 'tiktok-feed' ? 'Untitled feed' : 'Untitled reel',
     );
     await _store.save(p);
@@ -245,6 +246,11 @@ class _ProjectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = project;
+    final templateLabel = p.isStreetview
+        ? 'STREET VIEW'
+        : p.isFeed
+        ? 'FYP SCROLL'
+        : 'MAPS STORY';
     return Semantics(
       button: true,
       label: 'Open ${p.title}',
@@ -286,7 +292,7 @@ class _ProjectTile extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '${p.isFeed ? 'FYP SCROLL' : 'MAPS STORY'} · ${p.clips.length} clips',
+              '$templateLabel · ${p.clips.length} clips',
               style: const TextStyle(
                 fontSize: 9,
                 color: Colors.white54,
@@ -346,6 +352,14 @@ class TemplatePickerPage extends StatelessWidget {
                 'Search, swipe & tell a story',
                 Icons.swipe_up_outlined,
                 mint,
+              ),
+              _template(
+                context,
+                'streetview',
+                'Streetview journey',
+                'Maps, moments & movement',
+                Icons.streetview,
+                const Color(0xffb2d7cb),
               ),
             ],
           ),
