@@ -27,29 +27,28 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
   static List<PopupMenuEntry<String>> standardMenuItems({
     bool hasBackup = true,
     List<PopupMenuEntry<String>> extra = const [],
-  }) =>
-      [
-        const PopupMenuItem(
-          value: 'rename',
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.drive_file_rename_outline),
-            title: Text('Rename project'),
-          ),
+  }) => [
+    const PopupMenuItem(
+      value: 'rename',
+      child: ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.drive_file_rename_outline),
+        title: Text('Rename project'),
+      ),
+    ),
+    if (hasBackup)
+      const PopupMenuItem(
+        value: 'backup',
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.ios_share_outlined),
+          title: Text('Share project backup'),
         ),
-        if (hasBackup)
-          const PopupMenuItem(
-            value: 'backup',
-            child: ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.ios_share_outlined),
-              title: Text('Share project backup'),
-            ),
-          ),
-        ...extra,
-      ];
+      ),
+    ...extra,
+  ];
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);

@@ -383,9 +383,7 @@ class PlaceOverlay extends StatelessWidget {
                               child: StoryTagLayer(tags: project.tags),
                             ),
                           if (project.storyChrome)
-                            const Positioned.fill(
-                              child: StoryChromeOverlay(),
-                            ),
+                            const Positioned.fill(child: StoryChromeOverlay()),
                         ],
                       ),
                     ),

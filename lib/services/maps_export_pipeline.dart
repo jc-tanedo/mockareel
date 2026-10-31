@@ -145,8 +145,8 @@ class MapsExportPipeline {
       }
 
       final introFrames = <String>[];
-      final maxFrame =
-          (min(project.sheetIntroSeconds, project.duration) * 30).ceil();
+      final maxFrame = (min(project.sheetIntroSeconds, project.duration) * 30)
+          .ceil();
       for (var frame = 0; frame < maxFrame; frame++) {
         if (isCancelled()) throw const FormatException('Export cancelled');
         final position = frame / 30;
@@ -209,11 +209,13 @@ class MapsExportPipeline {
           );
         }
         final media = scene.kind == 'media';
-        final animatedArrows = media &&
+        final animatedArrows =
+            media &&
             clip.streetview.showArrows &&
             StreetviewMotion.active(clip);
-        final count =
-            media && !animatedArrows ? 1 : (scene.duration * 30).ceil();
+        final count = media && !animatedArrows
+            ? 1
+            : (scene.duration * 30).ceil();
         final paths = <String>[];
 
         for (var f = 0; f < count; f++) {

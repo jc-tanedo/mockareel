@@ -234,7 +234,8 @@ class _LibraryPageState extends State<LibraryPage> {
                       child: EmptyPlaceholder(
                         icon: Icons.video_library_outlined,
                         title: 'Your next reel starts here',
-                        description: 'Choose a familiar interface.\n'
+                        description:
+                            'Choose a familiar interface.\n'
                             'Make the story your own.',
                         action: FilledButton.icon(
                           onPressed: _new,
@@ -376,4 +377,3 @@ class _ProjectTile extends StatelessWidget {
     );
   }
 }
-

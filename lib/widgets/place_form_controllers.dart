@@ -12,15 +12,15 @@ class PlaceFormControllers {
   final hours = TextEditingController();
 
   List<TextEditingController> get all => [
-        name,
-        category,
-        rating,
-        address,
-        localName,
-        reviews,
-        price,
-        hours,
-      ];
+    name,
+    category,
+    rating,
+    address,
+    localName,
+    reviews,
+    price,
+    hours,
+  ];
 
   void populate(ReelPlace place) {
     name.text = place.name;

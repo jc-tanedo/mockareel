@@ -38,9 +38,7 @@ class MapHeaderService {
     }
   }
 
-  static Future<String?> uploadMap({
-    required ProjectStore store,
-  }) async {
+  static Future<String?> uploadMap({required ProjectStore store}) async {
     final file = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (file == null) return null;
     return await store.retainMedia(file.path, file.name);

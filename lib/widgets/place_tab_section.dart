@@ -6,11 +6,7 @@ class PlaceTabSection extends StatelessWidget {
   final PlaceDetails place;
   final OutputPalette colors;
 
-  const PlaceTabSection({
-    super.key,
-    required this.place,
-    required this.colors,
-  });
+  const PlaceTabSection({super.key, required this.place, required this.colors});
 
   @override
   Widget build(BuildContext context) {

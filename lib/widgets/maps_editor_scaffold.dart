@@ -4,7 +4,9 @@ import '../model/project.dart';
 import '../services/project_store.dart';
 import 'creation_steps.dart';
 import 'editor_app_bar.dart';
+import 'editor_export_overlay.dart';
 import 'editor_workspace.dart';
+import 'export_monitor.dart';
 import 'maps_editor_inspector.dart';
 import 'place_form_controllers.dart';
 import 'text_editor.dart';
@@ -22,6 +24,13 @@ class MapsEditorScaffold extends StatelessWidget {
   final bool useApiHeaders;
   final String apiKey;
   final PlaceFormControllers form;
+  final String status;
+  final ExportPhase exportPhase;
+  final double? progress;
+  final double exportPosition;
+  final String exportFormat;
+  final bool cancelled;
+  final VoidCallback onCancelExport;
   final VoidCallback onBack;
   final VoidCallback onRename;
   final VoidCallback onSave;
@@ -47,7 +56,7 @@ class MapsEditorScaffold extends StatelessWidget {
   final VoidCallback onPreviewUpdated;
   final Widget Function(double height) previewBuilder;
   final Widget captureStage;
-  final Widget? exportOverlay;
+  final Widget exportPreview;
 
   const MapsEditorScaffold({
     super.key,
@@ -63,6 +72,13 @@ class MapsEditorScaffold extends StatelessWidget {
     required this.useApiHeaders,
     required this.apiKey,
     required this.form,
+    required this.status,
+    required this.exportPhase,
+    required this.progress,
+    required this.exportPosition,
+    required this.exportFormat,
+    required this.cancelled,
+    required this.onCancelExport,
     required this.onBack,
     required this.onRename,
     required this.onSave,
@@ -88,7 +104,7 @@ class MapsEditorScaffold extends StatelessWidget {
     required this.onPreviewUpdated,
     required this.previewBuilder,
     required this.captureStage,
-    this.exportOverlay,
+    required this.exportPreview,
   });
 
   @override
@@ -209,7 +225,19 @@ class MapsEditorScaffold extends StatelessWidget {
                     onSelected: onGoToStep,
                   ),
           ),
-          if (exportOverlay != null) exportOverlay!,
+          if (exporting)
+            EditorExportOverlay(
+              title: project.title,
+              status: status,
+              phase: exportPhase,
+              progress: progress,
+              position: exportPosition,
+              duration: project.duration,
+              format: exportFormat,
+              preview: exportPreview,
+              cancelled: cancelled,
+              onCancel: onCancelExport,
+            ),
         ],
       ),
     );

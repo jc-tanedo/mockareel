@@ -67,22 +67,12 @@ extension HomeGlyphMedia on HomeGlyphCanvas {
         rect(0, 20, 100, 17, white);
         rect(0, 25, 100, 7, const Color(0xff57caff));
         line(
-          const [
-            Offset(3, 91),
-            Offset(42, 59),
-            Offset(58, 46),
-            Offset(57, 1),
-          ],
+          const [Offset(3, 91), Offset(42, 59), Offset(58, 46), Offset(57, 1)],
           white,
           16,
         );
         line(
-          const [
-            Offset(3, 91),
-            Offset(42, 59),
-            Offset(58, 46),
-            Offset(57, 1),
-          ],
+          const [Offset(3, 91), Offset(42, 59), Offset(58, 46), Offset(57, 1)],
           const Color(0xfff8c928),
           8,
         );

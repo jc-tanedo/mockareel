@@ -42,10 +42,7 @@ class OffscreenCaptureStage extends StatelessWidget {
     child: ExcludeSemantics(
       child: IgnorePointer(
         child: MediaQuery.withNoTextScaling(
-          child: RepaintBoundary(
-            key: captureKey,
-            child: child,
-          ),
+          child: RepaintBoundary(key: captureKey, child: child),
         ),
       ),
     ),

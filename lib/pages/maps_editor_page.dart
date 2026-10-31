@@ -12,12 +12,12 @@ import '../services/maps_export_pipeline.dart';
 import '../services/media_importer.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
-import '../widgets/editor_export_overlay.dart';
 import '../widgets/export_monitor.dart';
 import '../widgets/maps_editor_scaffold.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/offscreen_capture_stage.dart';
 import '../widgets/place_form_controllers.dart';
+import '../widgets/project_name_dialog.dart';
 import '../widgets/reel_preview.dart';
 import 'exported_video_page.dart';
 
@@ -85,11 +85,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   void _setProject(ReelProject project) {
     _project = project;
-    _selected = 0;
-    _captureIndex = 0;
-    _captureHeroPath = null;
+    _selected = _captureIndex = 0;
+    _captureHeroPath = _capturePosition = null;
     _captureSnapshot = false;
-    _capturePosition = null;
     _capturePosters = {};
     _form.populate(project.place);
     _dirty = false;
@@ -145,43 +143,51 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     _change();
   }
 
-  Future<void> _loadMap() => _runImport(() => MapsEditorActions.loadMap(
-        project: _project,
-        store: _store,
-        useApiHeaders: _useApiHeaders,
-        apiKey: _key,
-        context: context,
-        precache: _precache,
-        onApplyHeader: _applyMapHeader,
-      ));
+  Future<void> _loadMap() => _runImport(
+    () => MapsEditorActions.loadMap(
+      project: _project,
+      store: _store,
+      useApiHeaders: _useApiHeaders,
+      apiKey: _key,
+      context: context,
+      precache: _precache,
+      onApplyHeader: _applyMapHeader,
+    ),
+  );
 
-  Future<void> _uploadMap() => _runImport(() => MapsEditorActions.uploadMap(
-        store: _store,
-        precache: _precache,
-        onApplyHeader: _applyMapHeader,
-      ));
+  Future<void> _uploadMap() => _runImport(
+    () => MapsEditorActions.uploadMap(
+      store: _store,
+      precache: _precache,
+      onApplyHeader: _applyMapHeader,
+    ),
+  );
 
-  Future<void> _pickMusic() => _runImport(() => MapsEditorActions.pickMusic(
-        project: _project,
-        store: _store,
-        renderer: _renderer,
-        onChanged: () {
-          _previewRevision = newId();
-          _change();
-        },
-      ));
+  Future<void> _pickMusic() => _runImport(
+    () => MapsEditorActions.pickMusic(
+      project: _project,
+      store: _store,
+      renderer: _renderer,
+      onChanged: () {
+        _previewRevision = newId();
+        _change();
+      },
+    ),
+  );
 
-  Future<void> _pickMedia() => _runImport(() => MapsEditorActions.pickMedia(
-        project: _project,
-        store: _store,
-        renderer: _renderer,
-        onAdded: (index) {
-          _selected = index;
-          _previewRevision = newId();
-          _change();
-        },
-        onToast: _toast,
-      ));
+  Future<void> _pickMedia() => _runImport(
+    () => MapsEditorActions.pickMedia(
+      project: _project,
+      store: _store,
+      renderer: _renderer,
+      onAdded: (index) {
+        _selected = index;
+        _previewRevision = newId();
+        _change();
+      },
+      onToast: _toast,
+    ),
+  );
 
   Future<void> _settings() async {
     final value = await MapsAdvancedSettings.show(
@@ -200,16 +206,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     }
   }
 
-  Future<void> _findPlace() => _runImport(() => MapsEditorActions.findPlace(
-        context: context,
-        project: _project,
-        form: _form,
-        apiKey: _key,
-        useApiHeaders: _useApiHeaders,
-        onRequestApiKey: _settings,
-        onLoadMap: _loadMap,
-        onChanged: _change,
-      ));
+  Future<void> _findPlace() => _runImport(
+    () => MapsEditorActions.findPlace(
+      context: context,
+      project: _project,
+      form: _form,
+      apiKey: _key,
+      useApiHeaders: _useApiHeaders,
+      onRequestApiKey: _settings,
+      onLoadMap: _loadMap,
+      onChanged: _change,
+    ),
+  );
 
   Future<void> _projects() async {
     await _save(silent: true);
@@ -217,10 +225,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<void> _rename() => MapsEditorActions.renameProject(
-        context: context,
-        project: _project,
-        onChanged: _change,
-      );
+    context: context,
+    project: _project,
+    onChanged: _change,
+  );
 
   Future<void> _backup() async {
     try {
@@ -242,10 +250,12 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Future<Uint8List> _capturePng() async {
     if (_cancelled || !mounted) throw const FormatException('Export cancelled');
     await SchedulerBinding.instance.endOfFrame;
-    final boundary = _captureKey.currentContext!
-        .findRenderObject()! as RenderRepaintBoundary;
-    final image =
-        await boundary.toImage(pixelRatio: TemplateLayout.exportScale);
+    final boundary =
+        _captureKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(
+      pixelRatio: TemplateLayout.exportScale,
+    );
     try {
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       return bytes!.buffer.asUint8List();
@@ -259,22 +269,22 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   MapsExportPipeline _createPipeline() => MapsExportPipeline(
-        project: _project,
-        store: _store,
-        renderer: _renderer,
-        onPrecache: _precache,
-        onCapturePng: _capturePng,
-        onStatus: (s) => _updateState(() => _status = s),
-        onProgress: (v) => _updateState(() => _progress = v),
-        onPhase: (p) => _updateState(() => _exportPhase = p),
-        onPosition: (p) => _updateState(() => _exportPosition = p),
-        onCaptureIndex: (i) => _updateState(() => _captureIndex = i),
-        onCapturePosition: (p) => _updateState(() => _capturePosition = p),
-        onCaptureSnapshot: (s) => _updateState(() => _captureSnapshot = s),
-        onCapturePosters: (p) => _updateState(() => _capturePosters = p),
-        onCaptureHeroPath: (h) => _updateState(() => _captureHeroPath = h),
-        isCancelled: () => _cancelled || !mounted,
-      );
+    project: _project,
+    store: _store,
+    renderer: _renderer,
+    onPrecache: _precache,
+    onCapturePng: _capturePng,
+    onStatus: (s) => _updateState(() => _status = s),
+    onProgress: (v) => _updateState(() => _progress = v),
+    onPhase: (p) => _updateState(() => _exportPhase = p),
+    onPosition: (p) => _updateState(() => _exportPosition = p),
+    onCaptureIndex: (i) => _updateState(() => _captureIndex = i),
+    onCapturePosition: (p) => _updateState(() => _capturePosition = p),
+    onCaptureSnapshot: (s) => _updateState(() => _captureSnapshot = s),
+    onCapturePosters: (p) => _updateState(() => _capturePosters = p),
+    onCaptureHeroPath: (h) => _updateState(() => _captureHeroPath = h),
+    isCancelled: () => _cancelled || !mounted,
+  );
 
   Future<void> _runExport({
     required String format,
@@ -311,32 +321,30 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Future<void> _exportPng(bool snapshot) => _runExport(
-        format: 'PNG · 1080 × 1920',
-        initialStatus: 'Preparing image…',
-        action: (p) =>
-            p.runExportPng(snapshot: snapshot, selectedIndex: _selected),
-      );
+    format: 'PNG · 1080 × 1920',
+    initialStatus: 'Preparing image…',
+    action: (p) => p.runExportPng(snapshot: snapshot, selectedIndex: _selected),
+  );
 
   Future<void> _export() => _runExport(
-        format: 'H.264 · 1080 × 1920 · 30 fps',
-        initialStatus: 'Preparing media…',
-        action: (pipeline) async {
-          if (_project.clips.isEmpty) return;
-          final path = await pipeline.runExport();
-          if (!mounted || _cancelled) return;
-          setState(() {
-            _status = 'Export complete';
-            _exportPhase = ExportPhase.finishing;
-            _progress = 1;
-          });
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  ExportedVideoPage(path: path, renderer: _renderer),
-            ),
-          );
-        },
+    format: 'H.264 · 1080 × 1920 · 30 fps',
+    initialStatus: 'Preparing media…',
+    action: (pipeline) async {
+      if (_project.clips.isEmpty) return;
+      final path = await pipeline.runExport();
+      if (!mounted || _cancelled) return;
+      setState(() {
+        _status = 'Export complete';
+        _exportPhase = ExportPhase.finishing;
+        _progress = 1;
+      });
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ExportedVideoPage(path: path, renderer: _renderer),
+        ),
       );
+    },
+  );
 
   void _removeClip(int i) {
     _project.clips.removeAt(i);
@@ -347,9 +355,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   void _selectClip(int i) => setState(() {
-        _selected = i;
-        _previewRevision = newId();
-      });
+    _selected = i;
+    _previewRevision = newId();
+  });
 
   void _goToPlaceHeader() {
     _placeTool = 2;
@@ -379,35 +387,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   Widget _previewCanvas({double? position}) => ReelCanvas(
-        project: _project,
-        position: position ??
-            _capturePosition ??
-            _project.startOf(_captureIndex) +
-                TemplateLayout.transitionDuration(
-                  _project,
-                  _captureIndex,
-                ),
-        animateIntro: _capturePosition != null,
-        overlayOnly: !_captureSnapshot,
-        posterOnly: true,
-        heroPath: _captureHeroPath,
-        posters: _capturePosters,
-      );
-
-  Widget? _buildExportOverlay() => _exporting
-      ? EditorExportOverlay(
-          title: _project.title,
-          status: _status,
-          phase: _exportPhase,
-          progress: _progress,
-          position: _exportPosition,
-          duration: _project.duration,
-          format: _exportFormat,
-          preview: _previewCanvas(position: _exportPosition),
-          cancelled: _cancelled,
-          onCancel: _cancelExport,
-        )
-      : null;
+    project: _project,
+    position:
+        position ??
+        _capturePosition ??
+        _project.startOf(_captureIndex) +
+            TemplateLayout.transitionDuration(_project, _captureIndex),
+    animateIntro: _capturePosition != null,
+    overlayOnly: !_captureSnapshot,
+    posterOnly: true,
+    heroPath: _captureHeroPath,
+    posters: _capturePosters,
+  );
 
   @override
   void dispose() {
@@ -423,9 +414,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     if (!_ready) {
       return Scaffold(
         body: Center(
-          child: _status.isEmpty
-              ? const CircularProgressIndicator()
-              : Text(_status),
+          child:
+              _status.isEmpty
+                  ? const CircularProgressIndicator()
+                  : Text(_status),
         ),
       );
     }
@@ -442,6 +434,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       useApiHeaders: _useApiHeaders,
       apiKey: _key,
       form: _form,
+      status: _status,
+      exportPhase: _exportPhase,
+      progress: _progress,
+      exportPosition: _exportPosition,
+      exportFormat: _exportFormat,
+      cancelled: _cancelled,
+      onCancelExport: _cancelExport,
       onBack: _back,
       onRename: _rename,
       onSave: _save,
@@ -470,24 +469,25 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         captureKey: _captureKey,
         child: _previewCanvas(),
       ),
-      exportOverlay: _buildExportOverlay(),
+      exportPreview: _previewCanvas(position: _exportPosition),
     );
   }
 
-  Widget _preview({double maxHeight = 420}) => _exporting
-      ? SizedBox(height: maxHeight)
-      : TimelinePreview(
-          key: ValueKey(_previewRevision),
-          project: _project,
-          selected: _selected,
-          startAtBeginning: _project.isStreetview && _selected == 0,
-          maxHeight: maxHeight,
-        );
+  Widget _preview({double maxHeight = 420}) =>
+      _exporting
+          ? SizedBox(height: maxHeight)
+          : TimelinePreview(
+            key: ValueKey(_previewRevision),
+            project: _project,
+            selected: _selected,
+            startAtBeginning: _project.isStreetview && _selected == 0,
+            maxHeight: maxHeight,
+          );
 
   void _goToStep(int step) => setState(() {
-        _tab = step;
-        _previewRevision = newId();
-      });
+    _tab = step;
+    _previewRevision = newId();
+  });
 
   void _move(int index, int delta) {
     final clip = _project.clips.removeAt(index);

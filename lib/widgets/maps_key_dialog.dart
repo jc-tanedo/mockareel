@@ -24,14 +24,11 @@ class MapsAdvancedSettings {
     BuildContext context, {
     required String initialKey,
     required bool useApiHeaders,
-  }) =>
-      showDialog<MapsAdvancedSettings>(
-        context: context,
-        builder: (_) => MapsKeyDialog(
-          initialValue: initialKey,
-          useApiHeaders: useApiHeaders,
-        ),
-      );
+  }) => showDialog<MapsAdvancedSettings>(
+    context: context,
+    builder: (_) =>
+        MapsKeyDialog(initialValue: initialKey, useApiHeaders: useApiHeaders),
+  );
 }
 
 class MapsKeyDialog extends StatefulWidget {
@@ -124,8 +121,10 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(
-            MapsAdvancedSettings(_controller.text.trim(),
-                useApiHeaders: _apiHeaders),
+            MapsAdvancedSettings(
+              _controller.text.trim(),
+              useApiHeaders: _apiHeaders,
+            ),
           ),
           child: const Text('Save'),
         ),

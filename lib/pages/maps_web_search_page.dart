@@ -26,15 +26,12 @@ class MapsWebSearchPage extends StatefulWidget {
     BuildContext context, {
     String initial = '',
     Future<String?> Function()? requestApiKey,
-  }) =>
-      Navigator.of(context).push<MapsWebImport>(
-        MaterialPageRoute(
-          builder: (_) => MapsWebSearchPage(
-            initial: initial,
-            requestApiKey: requestApiKey,
-          ),
-        ),
-      );
+  }) => Navigator.of(context).push<MapsWebImport>(
+    MaterialPageRoute(
+      builder: (_) =>
+          MapsWebSearchPage(initial: initial, requestApiKey: requestApiKey),
+    ),
+  );
   @override
   State<MapsWebSearchPage> createState() => _MapsWebSearchPageState();
 }
@@ -101,12 +98,12 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
       _message = snapshot.state == 'empty'
           ? 'No places found. Try a name and city.'
           : snapshot.state == 'interaction'
-              ? 'Google needs your interaction. Show the browser to '
-                  'continue, then tap Read page.'
-              : snapshot.place == null && snapshot.results.isEmpty
-                  ? 'No readable place yet. Try Read page after the browser '
-                      'finishes loading.'
-                  : null;
+          ? 'Google needs your interaction. Show the browser to '
+                'continue, then tap Read page.'
+          : snapshot.place == null && snapshot.results.isEmpty
+          ? 'No readable place yet. Try Read page after the browser '
+                'finishes loading.'
+          : null;
       _showBrowser = false;
     });
   }
@@ -295,7 +292,8 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
               : EmptyPlaceholder(
                   icon: Icons.travel_explore,
                   title: _busy ? 'Finding your place' : 'Find a place',
-                  description: 'Search by name and city, or paste a '
+                  description:
+                      'Search by name and city, or paste a '
                       'Google Maps share link. No API key needed.',
                 ),
         ),

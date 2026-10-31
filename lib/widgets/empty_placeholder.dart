@@ -55,10 +55,7 @@ class EmptyPlaceholder extends StatelessWidget {
                 height: 1.5,
               ),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 24),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 24), action!],
           ],
         ),
       ),

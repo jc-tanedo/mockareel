@@ -47,12 +47,7 @@ class _AppIconPainter extends CustomPainter {
       ),
     );
 
-    HomeGlyphCanvas(
-      canvas: canvas,
-      glyph: glyph,
-      os: os,
-      date: date,
-    ).draw();
+    HomeGlyphCanvas(canvas: canvas, glyph: glyph, os: os, date: date).draw();
 
     canvas.restore();
   }

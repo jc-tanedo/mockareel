@@ -18,7 +18,8 @@ class FeedExportPipeline {
     String name,
     double time, {
     bool overlay,
-  }) onCapture;
+  })
+  onCapture;
   final void Function(String status) onStatus;
   final void Function(double? progress) onProgress;
   final void Function(ExportPhase phase) onPhase;

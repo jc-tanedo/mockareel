@@ -79,14 +79,7 @@ extension HomeGlyphComm on HomeGlyphCanvas {
         final weekday = date.split(',').first.trim();
         final day = RegExp(r'\b\d{1,2}\b').firstMatch(date)?.group(0) ?? '2';
         text(weekday, 50, 10, 14, const Color(0xffe7545b));
-        text(
-          day,
-          50,
-          31,
-          56,
-          const Color(0xff242424),
-          weight: FontWeight.w300,
-        );
+        text(day, 50, 31, 56, const Color(0xff242424), weight: FontWeight.w300);
         return true;
 
       case HomeGlyph.notes:
@@ -201,10 +194,7 @@ extension HomeGlyphComm on HomeGlyphCanvas {
         for (var i = 0; i < 3; i++) {
           final a = i * 2 * pi / 3;
           line(
-            [
-              const Offset(50, 50),
-              Offset(50 + 23 * cos(a), 50 + 23 * sin(a)),
-            ],
+            [const Offset(50, 50), Offset(50 + 23 * cos(a), 50 + 23 * sin(a))],
             const Color(0xffd9dce0),
             5,
           );
