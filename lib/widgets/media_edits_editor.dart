@@ -1,11 +1,10 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import '../model/project.dart';
 import '../services/media_edits.dart';
 import '../services/native_renderer.dart';
+import 'blur_spot_preview.dart';
 
 class MediaEditsEditor extends StatefulWidget {
   final ReelClip clip;
@@ -135,62 +134,37 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
               future: _size,
               builder: (context, snapshot) {
                 final size = snapshot.data ?? const Size(9, 16);
-                return LayoutBuilder(
-                  builder: (context, bounds) {
-                    final fitted = applyBoxFit(
-                      BoxFit.contain,
-                      size,
-                      bounds.biggest,
-                    ).destination;
-                    return Center(
-                      child: SizedBox(
-                        width: fitted.width,
-                        height: fitted.height,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            FutureBuilder<String>(
-                              future: _poster,
-                              builder: (context, image) => Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  if (image.hasData)
-                                    Image.file(
-                                      File(image.data!),
-                                      fit: BoxFit.contain,
-                                    )
-                                  else
-                                    const ColoredBox(color: Colors.black26),
-                                  if (image.connectionState !=
-                                      ConnectionState.done)
-                                    const Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: LinearProgressIndicator(),
-                                    ),
-                                  if (image.hasError)
-                                    Center(
-                                      child: TextButton(
-                                        onPressed: () => setState(_refresh),
-                                        child: const Text(
-                                          'Retry media effects',
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
+                return BlurSpotPreview(
+                  key: ValueKey(widget.clip.id),
+                  sourceSize: size,
+                  spots: widget.clip.supportsBlur ? edits.spots : const [],
+                  selected: _selected,
+                  onSelect: (spot) => setState(() => _selected = spot.id),
+                  onChanged: _change,
+                  image: FutureBuilder<String>(
+                    future: _poster,
+                    builder: (context, image) => Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (image.hasData)
+                          Image.file(File(image.data!), fit: BoxFit.contain)
+                        else
+                          const ColoredBox(color: Colors.black26),
+                        if (image.connectionState != ConnectionState.done)
+                          const Align(
+                            alignment: Alignment.bottomCenter,
+                            child: LinearProgressIndicator(),
+                          ),
+                        if (image.hasError)
+                          Center(
+                            child: TextButton(
+                              onPressed: () => setState(_refresh),
+                              child: const Text('Retry media effects'),
                             ),
-                            for (
-                              var i = 0;
-                              widget.clip.supportsBlur &&
-                                  i < edits.spots.length;
-                              i++
-                            )
-                              _handle(edits.spots[i], i, fitted),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                          ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
@@ -266,44 +240,6 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
           const SizedBox(height: 12),
         ],
       ],
-    );
-  }
-
-  Widget _handle(BlurSpot spot, int index, Size fitted) {
-    final radius = spot.radius * min(fitted.width, fitted.height);
-    return Positioned(
-      left: spot.x * fitted.width - radius,
-      top: spot.y * fitted.height - radius,
-      width: radius * 2,
-      height: radius * 2,
-      child: Semantics(
-        label: 'Blur spot ${index + 1}',
-        selected: spot.id == _selected,
-        child: GestureDetector(
-          dragStartBehavior: DragStartBehavior.down,
-          behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _selected = spot.id),
-          onPanStart: (_) => setState(() => _selected = spot.id),
-          onPanUpdate: (event) {
-            spot.x = (spot.x + event.delta.dx / fitted.width).clamp(0, 1);
-            spot.y = (spot.y + event.delta.dy / fitted.height).clamp(0, 1);
-            _change();
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: .06),
-              border: Border.all(
-                color: spot.id == _selected
-                    ? const Color(0xffb1a6ff)
-                    : Colors.white,
-                width: 2,
-              ),
-            ),
-            child: const Icon(Icons.open_with, size: 16, color: Colors.white),
-          ),
-        ),
-      ),
     );
   }
 }

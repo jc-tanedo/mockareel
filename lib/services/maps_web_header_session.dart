@@ -4,6 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../model/maps_web_result.dart';
 import '../model/project.dart';
 import 'maps_web_session.dart';
+import '../model/map_capture_viewport.dart';
 
 abstract interface class MapsHeaderDriver {
   Future<void> initialize();
@@ -15,14 +16,21 @@ abstract interface class MapsHeaderDriver {
 
 class MapsWebHeaderSession implements MapsHeaderDriver {
   final WebViewController controller;
+  final MapCaptureViewport viewport;
   late final _session = MapsWebSession(controller, onStatus: (_) {});
   static const _channel = MethodChannel('dev.mockareel/map-snapshot');
-  late final Future<String> _script = rootBundle.loadString(
-    'assets/maps_header.js',
-  );
+  late final Future<String> _script = rootBundle
+      .loadString('assets/maps_header.js')
+      .then(
+        (script) =>
+            'window.__mockareelHeaderCrop = ${jsonEncode(viewport.toJson())};\n$script',
+      );
   int _generation = 0;
   bool _closed = false;
-  MapsWebHeaderSession(this.controller);
+  MapsWebHeaderSession(
+    this.controller, {
+    this.viewport = const MapCaptureViewport(1.6),
+  });
   @override
   Future<void> initialize() => _session.initialize();
   @override

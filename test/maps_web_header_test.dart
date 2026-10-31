@@ -116,11 +116,21 @@ void main() {
           tester.view.physicalSize = size;
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await tester.ensureVisible(find.byKey(const ValueKey('map-pixels')));
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('map-capture-viewport')),
+          );
           await tester.pumpAndSettle();
-          final map = tester.getRect(find.byKey(const ValueKey('map-pixels')));
+          final map = tester.getRect(
+            find.byKey(const ValueKey('map-capture-viewport')),
+          );
           expect(map.top, greaterThanOrEqualTo(0));
           expect(map.bottom, lessThanOrEqualTo(size.height));
+          final browser = tester.getRect(
+            find.byKey(const ValueKey('map-pixels')),
+          );
+          expect(browser.width / map.width, closeTo(1920 / 1440, .001));
+          expect(browser.center.dx, closeTo(map.center.dx, .001));
+          expect(browser.center.dy, closeTo(map.center.dy, .001));
           expect(
             find.text(streetview ? 'Use map' : 'Use map header').hitTestable(),
             findsOneWidget,

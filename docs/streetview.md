@@ -7,9 +7,10 @@ address, category, rating and suggested action buttons remain editable.
 The capture button appears only after a Maps search result has been selected for that media.
 Map captures are project assets; preview and export use the saved image offline.
 The captured image is fitted in full to preserve its source attribution.
-Map capture hides Google's browser controls (including zoom, location, layers
-and Pegman) because the template draws its own interface. Pins, map labels,
-Google branding and legal attribution remain visible. Use **Replace captured map**
+Map capture uses a 1440-pixel-wide inner map with 240 extra CSS pixels on every
+edge. The editor and capture show only the centre, cropping out native browser
+controls even when their labels change. Google's original attribution footer is
+kept inside the crop. Pins and map labels remain visible. Use **Replace captured map**
 once for older captures that already contain duplicate controls; those controls
 are baked into the saved PNG.
 
@@ -66,7 +67,10 @@ Enable **Lens effect**, choose **Fisheye** or **Pincushion**, and adjust its
 strength from 0–100%. For photos, use **Add blur spot** to
 create up to eight feathered circular spots. Drag a circle on the source preview,
 select a numbered spot to edit it, adjust its size, or remove the selected spot.
-Spots stay at their chosen position throughout that media segment. Videos and
+Spot handles have a minimum 64-pixel touch target, independent of blur size.
+A 2× magnifier appears above your finger while dragging, with a crosshair showing
+the landing point. Near the top of the screen it moves below your finger to stay
+visible. It disappears on release or cancellation. Spots stay at their chosen position throughout that media segment. Videos and
 GIFs support lens effects only; any older blur recipes on timed media are ignored.
 
 These are non-destructive source edits. Lens effects and spot blur run before template

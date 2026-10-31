@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../model/project.dart';
 import '../services/maps_web_header_session.dart';
+import '../model/map_capture_viewport.dart';
 import '../theme/app_theme.dart';
 
 /// A visible, hardware-composited map viewport: PixelCopy includes GPU map
@@ -57,7 +58,10 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         _driver = widget.driver;
       } else {
         _controller = WebViewController();
-        _driver = MapsWebHeaderSession(_controller!);
+        _driver = MapsWebHeaderSession(
+          _controller!,
+          viewport: MapCaptureViewport(widget.aspectRatio),
+        );
       }
       await _driver!.initialize();
       if (!mounted) return;
@@ -164,27 +168,40 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     child: ClipRect(
       key: _frame,
       child: Stack(
+        key: const ValueKey('map-capture-viewport'),
         fit: StackFit.expand,
         children: [
           _controller == null && widget.browserOverride == null
               ? const ColoredBox(color: ink)
-              : IgnorePointer(
-                  ignoring: _busy,
-                  child: FittedBox(
-                    fit: BoxFit.fill,
-                    child: SizedBox(
-                      width: 1000,
-                      height: 1000 / widget.aspectRatio,
-                      child:
-                          widget.browserOverride ??
-                          WebViewWidget.fromPlatformCreationParams(
-                            params: AndroidWebViewWidgetCreationParams(
-                              controller: _controller!.platform,
-                              displayWithHybridComposition: true,
-                            ),
+              : LayoutBuilder(
+                  builder: (context, bounds) {
+                    final viewport = MapCaptureViewport(widget.aspectRatio);
+                    final scale = bounds.maxWidth / viewport.content.width;
+                    return OverflowBox(
+                      minWidth: viewport.browser.width * scale,
+                      maxWidth: viewport.browser.width * scale,
+                      minHeight: viewport.browser.height * scale,
+                      maxHeight: viewport.browser.height * scale,
+                      child: IgnorePointer(
+                        ignoring: _busy,
+                        child: FittedBox(
+                          fit: BoxFit.fill,
+                          child: SizedBox(
+                            width: viewport.browser.width,
+                            height: viewport.browser.height,
+                            child:
+                                widget.browserOverride ??
+                                WebViewWidget.fromPlatformCreationParams(
+                                  params: AndroidWebViewWidgetCreationParams(
+                                    controller: _controller!.platform,
+                                    displayWithHybridComposition: true,
+                                  ),
+                                ),
                           ),
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
           if (!_busy && widget.showHeaderGuide)
             Positioned(
