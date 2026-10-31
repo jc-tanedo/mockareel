@@ -36,7 +36,13 @@ class StreetviewMedia {
       locationSelected ||
       (place.mapsUrl?.isNotEmpty ?? false) ||
       (place.placeId?.isNotEmpty ?? false);
-  bool showControls, showArrows, showLocation, slowZoom, slowPan, turntable;
+  bool showControls,
+      showArrows,
+      showLocation,
+      slowZoom,
+      slowPan,
+      turntable,
+      turntableReverse;
   double zoomAmount, panAmount, turntableDegrees;
   String aerialLabel, nearbyLabel, streetviewTitle;
   bool get panZoom => slowZoom && slowPan;
@@ -62,6 +68,7 @@ class StreetviewMedia {
     bool? slowZoom,
     bool? slowPan,
     this.turntable = false,
+    this.turntableReverse = false,
     this.zoomAmount = .06,
     this.panAmount = 8 / 360,
     this.turntableDegrees = 8,
@@ -91,9 +98,10 @@ class StreetviewMedia {
     slowZoom: j['slowZoom'] as bool?,
     slowPan: j['slowPan'] as bool?,
     turntable: j['turntable'] == true,
+    turntableReverse: j['turntableReverse'] == true,
     zoomAmount: _seconds(j['zoomAmount'], .06, 0, .2),
     panAmount: _seconds(j['panAmount'], 8 / 360, -.08, .08),
-    turntableDegrees: _seconds(j['turntableDegrees'], 8, -15, 15),
+    turntableDegrees: _seconds(j['turntableDegrees'], 8, 0, 15).abs(),
     aerialLabel: j['aerialLabel'] as String? ?? 'Aerial',
     nearbyLabel: j['nearbyLabel'] as String? ?? 'See nearby attractions',
     streetviewTitle: j['streetviewTitle'] as String? ?? '',
@@ -116,6 +124,7 @@ class StreetviewMedia {
     'slowZoom': slowZoom,
     'slowPan': slowPan,
     'turntable': turntable,
+    'turntableReverse': turntableReverse,
     'zoomAmount': zoomAmount,
     'panAmount': panAmount,
     'turntableDegrees': turntableDegrees,

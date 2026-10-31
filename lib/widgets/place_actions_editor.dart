@@ -157,15 +157,6 @@ class _PlaceActionsEditorState extends State<PlaceActionsEditor> {
             ),
           ],
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Show Menu tab'),
-          value: place.hasMenu,
-          onChanged: (v) {
-            place.menuOverride = v;
-            onChanged();
-          },
-        ),
         TextFormField(
           key: ValueKey('footer-${place.placeId}-$_revision'),
           initialValue: place.footer,

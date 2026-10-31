@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../widgets/wavy_slider_track.dart';
 
 const ink = Color(0xff111015),
     panel = Color(0xff1d1b24),
@@ -70,7 +69,6 @@ ThemeData buildAppTheme() {
     ),
     sliderTheme: SliderThemeData(
       trackHeight: 4,
-      trackShape: const WavySliderTrackShape(),
       activeTrackColor: colorScheme.primary,
       inactiveTrackColor: colorScheme.surfaceContainerHighest,
       thumbColor: colorScheme.primary,

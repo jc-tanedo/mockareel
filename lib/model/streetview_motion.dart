@@ -30,7 +30,8 @@ abstract final class StreetviewMotion {
       0.0,
       1.0,
     );
-    final yaw = s.turntable ? s.turntableDegrees * pi / 180 * t : 0.0;
+    final factor = s.turntableReverse ? (1.0 - 2.0 * t) : (2.0 * t - 1.0);
+    final yaw = s.turntable ? s.turntableDegrees * pi / 180 * factor : 0.0;
     final offsetX = s.slowPan ? -s.panAmount * 360 * t : 0.0;
     final cover =
         (1 + (StreetviewPose.perspective * 180 * sin(yaw)).abs()) /
@@ -46,5 +47,6 @@ abstract final class StreetviewMotion {
     'zoom': c.streetview.slowZoom ? c.streetview.zoomAmount : 0.0,
     'pan': c.streetview.slowPan ? c.streetview.panAmount : 0.0,
     'turn': c.streetview.turntable ? c.streetview.turntableDegrees : 0.0,
+    'turnReverse': c.streetview.turntable && c.streetview.turntableReverse,
   };
 }

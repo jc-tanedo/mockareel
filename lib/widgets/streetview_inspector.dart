@@ -252,14 +252,20 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
               percent: true,
             ),
           _switch('Slow turntable', _s.turntable, (v) => _s.turntable = v),
-          if (_s.turntable)
+          if (_s.turntable) ...[
             _amount(
               'Turn angle',
               _s.turntableDegrees,
-              -15,
+              0,
               15,
               (v) => _s.turntableDegrees = v,
             ),
+            _switch(
+              'Reverse turn direction',
+              _s.turntableReverse,
+              (v) => _s.turntableReverse = v,
+            ),
+          ],
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: Text(

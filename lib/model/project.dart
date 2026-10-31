@@ -17,23 +17,29 @@ class PlaceDetails {
   List<PlaceAction>? actionOverrides;
   bool? menuOverride;
   String? footerOverride;
+  static final _menuCategoryPattern = RegExp(
+    r'\b(restaurant|caf[eé]|coffee|bakery|bar|eatery|bistro|'
+    r'diner|pizzeria|food|pub|grill|kitchen|brewery)\b',
+    caseSensitive: false,
+  );
   bool get hasMenu =>
       menuOverride ??
-      types.any(
-        (t) =>
-            const {
-              'restaurant',
-              'cafe',
-              'coffee_shop',
-              'bakery',
-              'bar',
-              'meal_takeaway',
-              'meal_delivery',
-              'fast_food_restaurant',
-              'food_court',
-            }.contains(t) ||
-            t.endsWith('_restaurant'),
-      );
+      (types.any(
+            (t) =>
+                const {
+                  'restaurant',
+                  'cafe',
+                  'coffee_shop',
+                  'bakery',
+                  'bar',
+                  'meal_takeaway',
+                  'meal_delivery',
+                  'fast_food_restaurant',
+                  'food_court',
+                }.contains(t) ||
+                t.endsWith('_restaurant'),
+          ) ||
+          _menuCategoryPattern.hasMatch(category));
   List<PlaceAction> get suggestedActions => [
     PlaceAction(kind: 'directions', label: 'Directions'),
     if (hasMenu) PlaceAction(kind: 'menu', label: 'Menu'),

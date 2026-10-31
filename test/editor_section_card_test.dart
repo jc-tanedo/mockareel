@@ -88,9 +88,17 @@ void main() {
         of: find.text('Turn angle'),
         matching: find.byType(EditorSlider),
       );
-      tester.widget<EditorSlider>(angle).onChanged(-7);
+      tester.widget<EditorSlider>(angle).onChanged(7);
       await tester.pump();
-      expect(clip.streetview.turntableDegrees, -7);
+      expect(clip.streetview.turntableDegrees, 7);
+      final reverse = find.widgetWithText(
+        SwitchListTile,
+        'Reverse turn direction',
+      );
+      await tester.ensureVisible(reverse);
+      await tester.tap(reverse);
+      await tester.pumpAndSettle();
+      expect(clip.streetview.turntableReverse, true);
       final timing = find.ancestor(
         of: find.text('Opening map'),
         matching: find.byType(EditorSlider),
