@@ -2,11 +2,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:mockareel/services/maps_web_header_session.dart';
+import 'package:mockareel/model/project.dart';
 
 class CaptureController implements WebViewController {
   final scripts = <String>[];
   int paintPolls = 0;
   bool ready = true;
+  bool attributionReady = true;
   VoidCallback? onPoll;
   @override
   Future<void> loadRequest(
@@ -21,7 +23,7 @@ class CaptureController implements WebViewController {
   Future<Object> runJavaScriptReturningResult(String script) async {
     scripts.add(script);
     if (script.contains('mockareel-header-style')) {
-      return '{"state":"${ready ? 'ready' : 'interaction'}"}';
+      return '{"state":"${ready ? 'ready' : 'interaction'}", "attributionReady":$attributionReady}';
     }
     onPoll?.call();
     return ++paintPolls >= 2;
@@ -33,6 +35,41 @@ class CaptureController implements WebViewController {
 
 void main() {
   const channel = MethodChannel('dev.mockareel/map-snapshot');
+  testWidgets(
+    'loaded map with an unknown footer completes and captures the full viewport',
+    (tester) async {
+      final controller = CaptureController()..attributionReady = false;
+      final session = MapsWebHeaderSession(controller);
+      var copies = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        copies++;
+        expect(
+          controller.scripts.lastWhere(
+            (s) => s.contains('mockareel-header-style'),
+          ),
+          startsWith('window.__mockareelHeaderCrop = null;'),
+        );
+        return Uint8List.fromList([7]);
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      await tester.runAsync(() async {
+        await session
+            .load(PlaceDetails(name: 'Fixture'))
+            .timeout(const Duration(seconds: 8));
+        expect(await session.prepareCapture(), false);
+        expect(await session.capture(const Rect.fromLTWH(0, 0, 100, 100)), [7]);
+      });
+      expect(copies, 1);
+      session.dispose();
+    },
+  );
   testWidgets('cleanup must repaint before native map capture', (tester) async {
     final controller = CaptureController();
     final session = MapsWebHeaderSession(controller);

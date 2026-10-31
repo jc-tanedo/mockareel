@@ -34,7 +34,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   final _frame = GlobalKey();
   WebViewController? _controller;
   MapsHeaderDriver? _driver;
-  bool _ready = false, _busy = false;
+  bool _ready = false, _busy = false, _cropped = true;
   String _status = 'Loading Google Maps…';
   String? _error;
   int _generation = 0;
@@ -82,16 +82,21 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     final generation = ++_generation;
     setState(() {
       _ready = false;
+      _cropped = true;
       _error = null;
       _status = 'Loading Google Maps…';
     });
     try {
       await _driver!.load(widget.place);
+      if (!mounted || generation != _generation) return;
+      final cropped = await _driver!.prepareCapture();
       if (mounted && generation == _generation) {
         setState(() {
           _ready = true;
-          _status =
-              'Pan or zoom to frame your map. Check that tiles have loaded.';
+          _cropped = cropped;
+          _status = cropped
+              ? 'Pan or zoom to frame your map. Check that tiles have loaded.'
+              : 'Map loaded. The full map is retained to keep Google branding and attribution visible. Pan or zoom to frame it.';
         });
       }
     } catch (e) {
@@ -125,6 +130,11 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
       _error = null;
     });
     try {
+      final cropped = await _driver!.prepareCapture();
+      if (!mounted) return;
+      setState(() => _cropped = cropped);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
       // Keep the entire viewport visible, including on shorter phones.
       await Scrollable.ensureVisible(_frame.currentContext!, alignment: .5);
       // Let the last pan/zoom frame settle before copying the native window.
@@ -144,11 +154,12 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
         ),
       );
       if (mounted) Navigator.pop(context, bytes);
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(
-          () => _error =
-              'Could not capture the map on this device. Retry, upload a map image, or use the optional Maps Static API.',
+          () => _error = e is FormatException
+              ? e.message
+              : 'Could not capture the map on this device. Retry, upload a map image, or use the optional Maps Static API.',
         );
       }
     } finally {
@@ -176,19 +187,22 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
               : LayoutBuilder(
                   builder: (context, bounds) {
                     final viewport = MapCaptureViewport(widget.aspectRatio);
+                    final browser = _cropped
+                        ? viewport.browser
+                        : viewport.content;
                     final scale = bounds.maxWidth / viewport.content.width;
                     return OverflowBox(
-                      minWidth: viewport.browser.width * scale,
-                      maxWidth: viewport.browser.width * scale,
-                      minHeight: viewport.browser.height * scale,
-                      maxHeight: viewport.browser.height * scale,
+                      minWidth: browser.width * scale,
+                      maxWidth: browser.width * scale,
+                      minHeight: browser.height * scale,
+                      maxHeight: browser.height * scale,
                       child: IgnorePointer(
                         ignoring: _busy,
                         child: FittedBox(
                           fit: BoxFit.fill,
                           child: SizedBox(
-                            width: viewport.browser.width,
-                            height: viewport.browser.height,
+                            width: browser.width,
+                            height: browser.height,
                             child:
                                 widget.browserOverride ??
                                 WebViewWidget.fromPlatformCreationParams(

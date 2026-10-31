@@ -32,8 +32,26 @@ def check_crops(page, script):
             assert edge['x'] + edge['width'] <= 240 or edge['x'] >= 1680 or edge['y'] + edge['height'] <= 240 or edge['y'] >= height + 240
         logo = page.locator('#watermark').bounding_box()
         assert logo['x'] >= 240 and logo['y'] + logo['height'] <= height + 240
-        page.locator('.scene-footer-container').evaluate('(node) => node.remove()')
-        assert json.loads(page.evaluate(script))['state'] == 'loading', 'missing attribution must not be silently cropped'
+        page.locator('.scene-footer-container').evaluate('''(node) => {
+            node.style.height = '0'; node.style.padding = '0 18px';
+            for (const child of node.children) { child.style.position = 'absolute'; child.style.bottom = '0'; }
+        }''')
+        collapsed = json.loads(page.evaluate(script))
+        assert collapsed['state'] == 'ready' and collapsed['attributionReady'], 'zero-height footer wrapper must not block a loaded map'
+        page.locator('.scene-footer-container').evaluate('''(node) => {
+            node.className = 'new-google-footer'; node.id = 'modern-footer';
+            node.style.cssText = 'position:fixed;bottom:0;left:0;width:100%;height:24px;background:white';
+        }''')
+        changed = json.loads(page.evaluate(script))
+        assert changed['state'] == 'ready' and not changed['attributionReady'], 'a footer change must not become a tile-loading timeout'
+        page.evaluate('window.__mockareelHeaderCrop = null')
+        full = json.loads(page.evaluate(script))
+        assert full['state'] == 'ready' and full['attributionReady'], 'full-map fallback must remain capturable'
+        original_credits = page.locator('#modern-footer').bounding_box()
+        assert original_credits['y'] + original_credits['height'] == height + 480
+        assert 'Map data' in page.locator('#modern-footer').inner_text(), 'fallback must retain the original provider credits'
+        page.locator('canvas').evaluate('(node) => node.remove()')
+        assert json.loads(page.evaluate(script))['state'] == 'loading', 'empty viewport must not be marked ready'
 
 
 def main():
@@ -97,9 +115,18 @@ def main():
                 if result != 'passed':
                     raise SystemExit('Map DOM check failed: ' + str(result))
                 check_crops(page, script)
+                page.set_content('<img id="tile" style="width:256px;height:256px">')
+                from urllib.parse import quote
+                svg = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><!-- /maps/vt --><rect width="256" height="256" fill="green"/></svg>'
+                # An offline image fixture carrying the same URL path marker.
+                page.locator('#tile').evaluate('(node, src) => { node.src = src; return node.decode(); }', 'data:image/svg+xml,' + quote(svg))
+                import json
+                assert json.loads(page.evaluate(script))['state'] == 'ready', 'loaded raster map must be ready without a WebGL canvas'
+                page.locator('#tile').evaluate('(node) => node.remove()')
+                assert json.loads(page.evaluate(script))['state'] == 'loading'
             finally:
                 browser.close()
-        print('Production Maps checks passed: controls hidden/cropped, both aspect ratios retain attribution, missing attribution blocks capture, and external zoom remains usable.')
+        print('Production Maps checks passed: controls hidden/cropped, both aspect ratios retain attribution, footer changes use full-map fallback instead of blocking tile readiness, and external zoom remains usable.')
 
 
 if __name__ == '__main__':

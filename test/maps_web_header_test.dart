@@ -21,6 +21,9 @@ class HeaderFixture implements MapsHeaderDriver {
   Future<void> initialize() async {}
   @override
   Future<void> load(PlaceDetails place) async {}
+  bool cropped = true;
+  @override
+  Future<bool> prepareCapture() async => cropped;
   @override
   Future<void> zoom(bool inward) async {}
   @override
@@ -70,86 +73,95 @@ void main() {
   );
 
   for (final streetview in [false, true]) {
-    testWidgets(
-      '${streetview ? 'Streetview map' : 'Map header'} framing fits phone and landscape and returns a capture',
-      (tester) async {
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final driver = HeaderFixture(Uint8List.fromList([1, 2, 3]));
-        Uint8List? result;
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: buildAppTheme(),
-            home: Builder(
-              builder: (context) => TextButton(
-                onPressed: () async {
-                  result = await Navigator.push<Uint8List>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MapsWebHeaderPage(
-                        place: PlaceDetails(name: 'Fixture Cafe'),
-                        aspectRatio: streetview ? 360 / 552 : 1.6,
-                        showHeaderGuide: !streetview,
-                        driver: driver,
-                        browserOverride: const ColoredBox(
-                          key: ValueKey('map-pixels'),
-                          color: Colors.blue,
+    for (final cropped in [true, false]) {
+      testWidgets(
+        '${streetview ? 'Streetview map' : 'Map header'} ${cropped ? 'crop' : 'full-map fallback'} framing fits phone and landscape and returns a capture',
+        (tester) async {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final driver = HeaderFixture(Uint8List.fromList([1, 2, 3]))
+            ..cropped = cropped;
+          Uint8List? result;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: buildAppTheme(),
+              home: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () async {
+                    result = await Navigator.push<Uint8List>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MapsWebHeaderPage(
+                          place: PlaceDetails(name: 'Fixture Cafe'),
+                          aspectRatio: streetview ? 360 / 552 : 1.6,
+                          showHeaderGuide: !streetview,
+                          driver: driver,
+                          browserOverride: const ColoredBox(
+                            key: ValueKey('map-pixels'),
+                            color: Colors.blue,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-                child: const Text('Open map'),
+                    );
+                  },
+                  child: const Text('Open map'),
+                ),
               ),
             ),
-          ),
-        );
-        await tester.tap(find.text('Open map'));
-        await tester.pumpAndSettle();
-        for (final size in [
-          const Size(360, 640),
-          const Size(844, 390),
-          const Size(390, 844),
-        ]) {
-          tester.view.physicalSize = size;
+          );
+          await tester.tap(find.text('Open map'));
           await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
-          await tester.ensureVisible(
-            find.byKey(const ValueKey('map-capture-viewport')),
+          for (final size in [
+            const Size(360, 640),
+            const Size(844, 390),
+            const Size(390, 844),
+          ]) {
+            tester.view.physicalSize = size;
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            await tester.ensureVisible(
+              find.byKey(const ValueKey('map-capture-viewport')),
+            );
+            await tester.pumpAndSettle();
+            final map = tester.getRect(
+              find.byKey(const ValueKey('map-capture-viewport')),
+            );
+            expect(map.top, greaterThanOrEqualTo(0));
+            expect(map.bottom, lessThanOrEqualTo(size.height));
+            final browser = tester.getRect(
+              find.byKey(const ValueKey('map-pixels')),
+            );
+            expect(
+              browser.width / map.width,
+              closeTo(cropped ? 1920 / 1440 : 1, .001),
+            );
+            expect(browser.center.dx, closeTo(map.center.dx, .001));
+            expect(browser.center.dy, closeTo(map.center.dy, .001));
+            expect(
+              find
+                  .text(streetview ? 'Use map' : 'Use map header')
+                  .hitTestable(),
+              findsOneWidget,
+            );
+          }
+          await tester.tap(
+            find.text(streetview ? 'Use map' : 'Use map header'),
           );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 800));
           await tester.pumpAndSettle();
-          final map = tester.getRect(
-            find.byKey(const ValueKey('map-capture-viewport')),
-          );
-          expect(map.top, greaterThanOrEqualTo(0));
-          expect(map.bottom, lessThanOrEqualTo(size.height));
-          final browser = tester.getRect(
-            find.byKey(const ValueKey('map-pixels')),
-          );
-          expect(browser.width / map.width, closeTo(1920 / 1440, .001));
-          expect(browser.center.dx, closeTo(map.center.dx, .001));
-          expect(browser.center.dy, closeTo(map.center.dy, .001));
+          expect(result, orderedEquals([1, 2, 3]));
           expect(
-            find.text(streetview ? 'Use map' : 'Use map header').hitTestable(),
-            findsOneWidget,
+            driver.bounds!.width / driver.bounds!.height,
+            closeTo(streetview ? 360 / 552 : 1.6, .01),
           );
-        }
-        await tester.tap(find.text(streetview ? 'Use map' : 'Use map header'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 800));
-        await tester.pumpAndSettle();
-        expect(result, orderedEquals([1, 2, 3]));
-        expect(
-          driver.bounds!.width / driver.bounds!.height,
-          closeTo(streetview ? 360 / 552 : 1.6, .01),
-        );
-        expect(driver.disposed, isTrue);
-      },
-    );
+          expect(driver.disposed, isTrue);
+        },
+      );
+    }
   }
-
   testWidgets(
     'advanced settings list required APIs and a cleared key disables API headers',
     (tester) async {

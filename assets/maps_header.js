@@ -12,6 +12,9 @@
       bottom: ${Math.max(0, innerHeight - (crop.top + crop.height) * scale)}px !important;
       width: ${crop.width * scale}px !important;
       max-width: ${crop.width * scale}px !important;
+      box-sizing: border-box !important;
+      min-height: 24px !important;
+      margin: 0 !important;
       transform: none !important;
     }
     [data-mockareel-crop-brand] {
@@ -87,7 +90,10 @@
     return r.width > 100 && r.height > 100;
   };
   const canvas = [...document.querySelectorAll('canvas')].find(visible);
-  // Do not silently save an attribution-free crop if Google's footer changes.
+  const tiles = [...document.querySelectorAll('img')].some(node =>
+    node.complete && node.naturalWidth > 0 && visible(node) &&
+    /(?:\/maps\/(?:vt|api\/staticmap)|\/vt[/?]|\/kh[/?])/.test(node.currentSrc || node.src));
+  // Attribution placement is a separate capability, never a tile-loading gate.
   const attribution = !crop || [...document.querySelectorAll('.scene-footer-container')].some(node => {
     const r = node.getBoundingClientRect();
     return r.height > 0 && r.left >= crop.left * scale - 1 &&
@@ -95,7 +101,8 @@
       r.top >= crop.top * scale - 1 && r.bottom <= (crop.top + crop.height) * scale + 1;
   });
   return JSON.stringify({
-    state: interaction ? 'interaction' : canvas && attribution && /Map data|Imagery|Terms/.test(text) ? 'ready' : 'loading',
+    state: interaction ? 'interaction' : canvas || tiles ? 'ready' : 'loading',
+    attributionReady: attribution,
     href: location.href,
   });
 })()

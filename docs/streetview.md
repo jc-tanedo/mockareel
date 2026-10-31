@@ -10,7 +10,10 @@ The captured image is fitted in full to preserve its source attribution.
 Map capture uses a 1440-pixel-wide inner map with 240 extra CSS pixels on every
 edge. The editor and capture show only the centre, cropping out native browser
 controls even when their labels change. Google's original attribution footer is
-kept inside the crop. Pins and map labels remain visible. Use **Replace captured map**
+kept inside the crop. Tile readiness is independent of Google's footer layout.
+If the credits cannot be kept inside the crop, the framing screen uses the full
+map instead, preserving the original attribution without a loading timeout.
+Pins and map labels remain visible. Use **Replace captured map**
 once for older captures that already contain duplicate controls; those controls
 are baked into the saved PNG.
 

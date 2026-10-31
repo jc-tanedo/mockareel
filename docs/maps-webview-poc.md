@@ -11,6 +11,12 @@ Branch: `poc/maps-webview-search`. This branch uses application ID `dev.mockaree
 3. Choose a native result card. Wait for its place details, optionally select a featured review, then tap **Use this place**.
 4. The editor receives editable name, category, rating, review count, address, phone, website and opening-hours text when Google exposes them. Selected review text, author and rating populate the optional featured review. Unknown values stay blank. Exact target coordinates and an official Places ID are retained when present; a map viewport is never treated as the business location.
 5. Under **Place → Header**, tap **Load Google map**. The saved listing opens in a framing screen without an API key. Pan/zoom, wait for visible tiles, then choose **Use map header**. An oversized WebView crops out edge controls; the visible frame matches the saved crop. Google's original footer is positioned inside that crop, retaining branding and legal attribution along with the map's labels and pins. The PNG is stored in project media and used by preview, PNG/MP4 export and portable backups. Reload and capture again to replace older PNGs containing browser controls. You can still upload a map image or choose a photo header.
+
+Map readiness depends on the visible canvas or loaded raster tiles, independently
+of footer CSS. When Google's footer cannot be retained inside the crop, framing
+and capture use the full map with its original credits. The footer layout does
+not cause a tile-loading timeout. Crop mode is checked again before capture,
+and its final viewport is painted before PixelCopy reads the native window.
 6. **More project options → Advanced · Google Maps** keeps an optional API key and **Use API map headers** switch. Browser mode remains the default even when a key is saved. The settings enumerate the required APIs; see [API setup](google-maps.md).
 
 If Google shows a consent/interstitial page, use **Show browser**, complete the interaction yourself and select **Read page**. This does not implement Google sign-in. **Use API lookup** remains available in the search page's menu, and manual editing is always available in the editor. **Refresh place details** can pick up fields that arrived after the initial snapshot.
