@@ -101,15 +101,17 @@ class _TimelinePreviewState extends State<TimelinePreview>
   void didUpdateWidget(TimelinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     final clipsCount = widget.project.clips.length;
-    final mediaAdded =
-        clipsCount > _lastClipsCount ||
-        (oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty);
+    final mediaSelected =
+        oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty;
     _lastClipsCount = clipsCount;
 
     if (oldWidget.project.id != widget.project.id) {
       _userPaused = false;
       _pause();
       _position = _selectedStart;
+      if (mediaSelected && widget.autoPlay && !_userPaused && !_playing) {
+        _play();
+      }
     } else if (oldWidget.selected != widget.selected) {
       if (_playing) {
         _position = _selectedStart;
@@ -117,16 +119,11 @@ class _TimelinePreviewState extends State<TimelinePreview>
         _ticker.stop();
         _ticker.start();
         setState(() {});
-      } else if (widget.autoPlay &&
-          !_userPaused &&
-          widget.project.clips.isNotEmpty) {
-        _position = _selectedStart;
-        _play();
       } else {
         _pause();
         _position = _selectedStart;
       }
-    } else if (mediaAdded) {
+    } else if (mediaSelected) {
       if (widget.autoPlay &&
           !_userPaused &&
           !_playing &&

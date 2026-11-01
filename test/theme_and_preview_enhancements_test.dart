@@ -89,7 +89,8 @@ void main() {
         duration: 2.0,
       );
 
-      final emptyProject = ReelProject(clips: const []);
+      const projectId = 'test-proj-preview';
+      final emptyProject = ReelProject(id: projectId, clips: const []);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -101,8 +102,8 @@ void main() {
       // At start with no media, preview is idle
       expect(find.byTooltip('Play preview'), findsOneWidget);
 
-      // Media gets selected / added
-      final project = ReelProject(clips: [clip1]);
+      // Media gets selected / added (transition from empty to clips)
+      final project = ReelProject(id: projectId, clips: [clip1]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: project)),
@@ -120,7 +121,10 @@ void main() {
       expect(find.byTooltip('Play preview'), findsOneWidget);
 
       // Add a second media clip while paused
-      final updatedProject = ReelProject(clips: [clip1, clip2]);
+      final updatedProject = ReelProject(
+        id: projectId,
+        clips: [clip1, clip2],
+      );
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: updatedProject)),
@@ -151,23 +155,17 @@ void main() {
         isVideo: false,
         duration: 1.0,
       );
-      final emptyProject = ReelProject(clips: const []);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: TimelinePreview(project: emptyProject, loop: true),
-          ),
-        ),
-      );
-      await tester.pump();
-
       final project = ReelProject(clips: [clip]);
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: project, loop: true)),
         ),
       );
+      await tester.pump();
+
+      // Explicitly start playback to test looping behavior
+      await tester.tap(find.byTooltip('Play preview'));
       await tester.pump();
 
       // Let ticker advance past duration
