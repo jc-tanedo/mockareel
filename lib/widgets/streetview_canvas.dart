@@ -87,10 +87,7 @@ class StreetviewCanvas extends StatelessWidget {
     );
     final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0);
     final incomingScale = 1.0 + (1.0 - t) * 0.35;
-    final incomingOffset = Offset(
-      direction * 150 * (1.0 - t),
-      20 * (1.0 - t),
-    );
+    final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
     final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0);
 
     Widget image(ReelClip c, double seconds) => ClipPoster(
