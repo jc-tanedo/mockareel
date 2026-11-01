@@ -78,12 +78,14 @@ void main() {
         id: 'clip1',
         path: 'photo1.jpg',
         name: 'Photo 1',
+        isVideo: false,
         duration: 2.0,
       );
       final clip2 = ReelClip(
         id: 'clip2',
         path: 'photo2.jpg',
         name: 'Photo 2',
+        isVideo: false,
         duration: 2.0,
       );
 
@@ -127,6 +129,7 @@ void main() {
         id: 'clip1',
         path: 'photo.jpg',
         name: 'Photo',
+        isVideo: false,
         duration: 1.0,
       );
       final project = ReelProject(clips: [clip]);

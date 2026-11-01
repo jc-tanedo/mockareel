@@ -173,7 +173,6 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   }
 
   Widget _mapFrame() {
-    final colors = Theme.of(context).colorScheme;
     return AspectRatio(
       aspectRatio: widget.aspectRatio,
       child: ClipRect(
