@@ -8,6 +8,7 @@ import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
+import 'streetview_3d_widgets.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -27,6 +28,7 @@ class StreetviewCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
+    final is3d = project.isStreetview3d;
     final scene = StreetviewTimeline.at(project, position),
         i = scene.mediaIndex;
     final clip = project.clips[i], settings = clip.streetview;
@@ -46,8 +48,10 @@ class StreetviewCanvas extends StatelessWidget {
         : 0.0;
     final direction = settings.arrow == 'left' ? -1.0 : 1.0;
 
-    // 100ms quick transition between map thumbnail and full sized media
-    const transitionSec = 0.1;
+    // Transition timing:
+    // Classic Streetview uses 100ms thumbnail zoom.
+    // Streetview 3D uses 350ms 3D dive / swoop from aerial map into first clip.
+    final transitionSec = is3d ? 0.35 : 0.1;
     final isMedia = scene.kind == 'media';
     final isBack = scene.kind == 'back';
     final isExpanding = isMedia && elapsed < transitionSec;
@@ -68,34 +72,63 @@ class StreetviewCanvas extends StatelessWidget {
 
     const thumbOffset = Offset(-127.0, 191.0);
     const thumbScale = 82.0 / 360.0;
-    final activeScale = isExpanding
-        ? ui.lerpDouble(thumbScale, 1.0, expandT)!
-        : isShrinking
-        ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
-        : 1.0;
-    final activeOffset = isExpanding
-        ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
-        : isShrinking
-        ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
-        : Offset.zero;
-    final activeRadius = isExpanding
-        ? ui.lerpDouble(48.29, 0.0, expandT)!
-        : isShrinking
-        ? ui.lerpDouble(0.0, 48.29, shrinkT)!
-        : 0.0;
+    final activeScale = is3d
+        ? (isExpanding
+            ? ui.lerpDouble(0.65, 1.0, expandT)!
+            : isShrinking
+            ? ui.lerpDouble(1.0, 0.65, shrinkT)!
+            : 1.0)
+        : (isExpanding
+            ? ui.lerpDouble(thumbScale, 1.0, expandT)!
+            : isShrinking
+            ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
+            : 1.0);
+    final activeOffset = is3d
+        ? Offset.zero
+        : (isExpanding
+            ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
+            : isShrinking
+            ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
+            : Offset.zero);
+    final activeRadius = is3d
+        ? 0.0
+        : (isExpanding
+            ? ui.lerpDouble(48.29, 0.0, expandT)!
+            : isShrinking
+            ? ui.lerpDouble(0.0, 48.29, shrinkT)!
+            : 0.0);
 
-    // Dramatic motion blur and streetview camera rush
-    final blurX = sin(t * pi) * 36.0;
-    final blurY = sin(t * pi) * 8.0;
-    final outgoingScale = (1.0 + pow(t, 1.3) * 0.9).toDouble();
+    // Aerial dive 3D matrix for Streetview 3D
+    final aerialDiveProgress = isExpanding
+        ? expandT
+        : isShrinking
+        ? (1.0 - shrinkT)
+        : 0.0;
+    final Matrix4 aerialTransform = Matrix4.identity();
+    if (is3d && hasCardTransition) {
+      aerialTransform
+        ..setEntry(3, 2, 0.0015)
+        ..translate(0.0, -120 * aerialDiveProgress)
+        ..scale(1.0 + 0.85 * aerialDiveProgress)
+        ..rotateX(0.55 * aerialDiveProgress);
+    }
+
+    // Motion blur and camera rush:
+    // On-rails forward rush in 3D, lateral arrow blur in classic streetview
+    final blurX = is3d ? sin(t * pi) * 14.0 : sin(t * pi) * 36.0;
+    final blurY = is3d ? sin(t * pi) * 32.0 : sin(t * pi) * 8.0;
+    final outgoingScale = is3d
+        ? (1.0 + pow(t, 1.25) * 1.15).toDouble()
+        : (1.0 + pow(t, 1.3) * 0.9).toDouble();
     final outgoingProgress = pow(t, 1.2).toDouble();
-    final outgoingOffset = Offset(
-      -direction * 180 * outgoingProgress,
-      -25 * outgoingProgress,
-    );
+    final outgoingOffset = is3d
+        ? Offset(0.0, -35 * outgoingProgress)
+        : Offset(-direction * 180 * outgoingProgress, -25 * outgoingProgress);
     final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0).toDouble();
-    final incomingScale = 1.0 + (1.0 - t) * 0.35;
-    final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
+    final incomingScale = is3d ? 0.72 + 0.28 * t : 1.0 + (1.0 - t) * 0.35;
+    final incomingOffset = is3d
+        ? Offset(0.0, -28 * (1.0 - t))
+        : Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
     final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
 
     Widget image(ReelClip c, double seconds) => ClipPoster(
@@ -126,7 +159,10 @@ class StreetviewCanvas extends StatelessWidget {
                             c.id == clip.id &&
                             position < project.duration,
                       ),
-              if (c.streetview.showArrows) const StreetviewArrows(),
+              if (c.streetview.showArrows)
+                is3d
+                    ? Streetview3dRailOverlay(settings: c.streetview)
+                    : const StreetviewArrows(),
             ],
           ),
         );
@@ -165,12 +201,31 @@ class StreetviewCanvas extends StatelessWidget {
       ),
     );
 
-    final arrow = StreetviewMotion.at(clip, clip.duration).project(
-      settings.arrow == 'left'
-          ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
-          : 360 - StreetviewLayout.arrowLeft - StreetviewLayout.arrowWidth / 2,
-      StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
-    );
+    final arrow = is3d
+        ? StreetviewMotion.at(clip, clip.duration).project(
+            180.0,
+            settings.railStop == 'far' ? 365.0 : 430.0,
+          )
+        : StreetviewMotion.at(clip, clip.duration).project(
+            settings.arrow == 'left'
+                ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
+                : 360 -
+                      StreetviewLayout.arrowLeft -
+                      StreetviewLayout.arrowWidth / 2,
+            StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
+          );
+
+    Widget aerialOrMapScene({Widget? thumb}) => is3d
+        ? Streetview3dAerialScene(
+            settings: settings,
+            dark: project.darkOutput,
+            thumbnail: thumb,
+          )
+        : StreetviewMapScene(
+            settings: settings,
+            dark: project.darkOutput,
+            thumbnail: thumb ?? const SizedBox(),
+          );
 
     return FittedBox(
       child: SizedBox(
@@ -189,11 +244,16 @@ class StreetviewCanvas extends StatelessWidget {
                 ),
                 if (hasCardTransition)
                   Positioned.fill(
-                    child: StreetviewMapScene(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      thumbnail: const SizedBox(),
-                    ),
+                    child: is3d
+                        ? Opacity(
+                            opacity: (1.0 - cardT).clamp(0.0, 1.0),
+                            child: Transform(
+                              transform: aerialTransform,
+                              alignment: Alignment.center,
+                              child: aerialOrMapScene(),
+                            ),
+                          )
+                        : aerialOrMapScene(),
                   ),
                 Positioned.fill(
                   key: const ValueKey('streetview-media-players'),
@@ -225,7 +285,7 @@ class StreetviewCanvas extends StatelessWidget {
                                           ? incomingOpacity
                                           : 0)
                                     : j == i
-                                    ? 1
+                                    ? (hasCardTransition && is3d ? cardT : 1.0)
                                     : 0,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(
@@ -271,21 +331,13 @@ class StreetviewCanvas extends StatelessWidget {
                 ),
                 if (map)
                   Positioned.fill(
-                    child: StreetviewMapScene(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      thumbnail: image(clip, 0),
-                    ),
+                    child: aerialOrMapScene(thumb: image(clip, 0)),
                   ),
               ],
               if (overlayOnly) ...[
                 if (map)
                   Positioned.fill(
-                    child: StreetviewMapScene(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      thumbnail: image(clip, 0),
-                    ),
+                    child: aerialOrMapScene(thumb: image(clip, 0)),
                   )
                 else
                   Positioned.fill(
@@ -305,20 +357,19 @@ class StreetviewCanvas extends StatelessWidget {
                     child: StreetviewChrome(
                       settings: settings,
                       dark: project.darkOutput,
+                      is3d: is3d,
                     ),
                   ),
                 ),
               if (ripple >= 0 && ripple < 1)
                 Positioned(
                   left: map
-                      ? StreetviewLayout.thumbnailLeft +
-                            StreetviewLayout.thumbnailWidth / 2
+                      ? (is3d ? 50.0 : StreetviewLayout.thumbnailLeft + 41.0)
                       : scene.kind == 'back'
                       ? 333
                       : arrow.x,
                   top: map
-                      ? StreetviewLayout.thumbnailTop +
-                            StreetviewLayout.thumbnailHeight / 2
+                      ? (is3d ? 610.0 : StreetviewLayout.thumbnailTop + 27.0)
                       : scene.kind == 'back'
                       ? 35
                       : arrow.y,

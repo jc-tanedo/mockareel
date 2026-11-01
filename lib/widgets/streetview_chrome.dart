@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import 'streetview_place_sheet.dart';
 import 'streetview_map_scene.dart';
+import 'streetview_3d_widgets.dart';
 
 export 'streetview_place_sheet.dart';
 export 'streetview_map_scene.dart';
 export 'streetview_arrows.dart';
+export 'streetview_3d_widgets.dart';
 
 class StreetviewChrome extends StatelessWidget {
   final StreetviewMedia settings;
   final bool dark;
+  final bool is3d;
   const StreetviewChrome({
     super.key,
     required this.settings,
     required this.dark,
+    this.is3d = false,
   });
 
   @override
@@ -65,7 +69,10 @@ class StreetviewChrome extends StatelessWidget {
         Positioned(
           right: 12,
           top: 20,
-          child: streetviewRoundButton(Icons.close, 'Back to Maps'),
+          child: streetviewRoundButton(
+            Icons.close,
+            is3d ? 'Close' : 'Back to Maps',
+          ),
         ),
         if (settings.aerialLabel.isNotEmpty)
           Positioned(
@@ -82,7 +89,7 @@ class StreetviewChrome extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
-                    Icons.accessibility_new,
+                    Icons.directions_walk,
                     color: Colors.white,
                     size: 14,
                   ),
@@ -103,8 +110,8 @@ class StreetviewChrome extends StatelessWidget {
           right: 12,
           bottom: 100,
           child: streetviewRoundButton(
-            Icons.open_in_full,
-            'Expand Street View',
+            is3d ? Icons.close_fullscreen : Icons.open_in_full,
+            is3d ? 'Collapse Street View' : 'Expand Street View',
           ),
         ),
       ],
@@ -113,11 +120,16 @@ class StreetviewChrome extends StatelessWidget {
           left: 0,
           right: 0,
           bottom: 0,
-          child: StreetviewPlaceSheet(
-            settings: settings,
-            dark: dark,
-            map: false,
-          ),
+          child: is3d
+              ? Streetview3dPlaceSheet(
+                  settings: settings,
+                  dark: dark,
+                )
+              : StreetviewPlaceSheet(
+                  settings: settings,
+                  dark: dark,
+                  map: false,
+                ),
         ),
     ],
   );

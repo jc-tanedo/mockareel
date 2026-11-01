@@ -63,6 +63,14 @@ class TemplatePickerPage extends StatelessWidget {
                   Icons.streetview,
                   const Color(0xff8bd3dd),
                 ),
+                _template(
+                  context,
+                  'streetview-3d',
+                  'Streetview 3D',
+                  'Aerial dive & on-rails road journey',
+                  Icons.view_in_ar_outlined,
+                  const Color(0xff77a8ff),
+                ),
               ],
             ),
           ),
@@ -82,7 +90,8 @@ class TemplatePickerPage extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final feed = id == 'tiktok-feed';
-    final street = id == 'streetview';
+    final street = id == 'streetview' || id == 'streetview-3d';
+    final is3d = id == 'streetview-3d';
     return Card(
       margin: EdgeInsets.zero,
       color: colors.surfaceContainerLow,
@@ -224,34 +233,45 @@ class TemplatePickerPage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text(
-                                    'Dropped pin',
+                                  Text(
+                                    is3d ? '296 Keilor Rd' : 'Dropped pin',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: accent,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'Directions',
+                                  if (is3d)
+                                    const Text(
+                                      '11 mo ago · See more >',
                                       style: TextStyle(
-                                        fontSize: 8,
-                                        color: Color(0xff00333c),
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 7.5,
+                                        color: Color(0xff8ab4f8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: const Text(
+                                        'Directions',
+                                        style: TextStyle(
+                                          fontSize: 8,
+                                          color: Color(0xff00333c),
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),

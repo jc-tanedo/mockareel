@@ -146,11 +146,17 @@ class MapsWebImport {
 }
 
 abstract final class MapsWebUrls {
-  static Uri header(PlaceDetails place) {
+  static Uri header(PlaceDetails place, {bool satellite = false}) {
     final saved = place.mapsUrl;
     if (saved != null && Uri.tryParse(saved)?.scheme == 'https') {
       try {
-        return browserUri(search(saved));
+        final parsed = browserUri(search(saved));
+        if (satellite) {
+          final q = Map<String, dynamic>.from(parsed.queryParameters);
+          q['t'] = 'k';
+          return parsed.replace(queryParameters: q);
+        }
+        return parsed;
       } on FormatException {
         /* Imported backups may contain an invalid URL. */
       }
@@ -162,14 +168,24 @@ abstract final class MapsWebUrls {
     if (place.placeId != null &&
         place.placeId!.startsWith('ChIJ') &&
         query.isNotEmpty) {
-      return Uri.https('www.google.com', '/maps/search/', {
+      final params = <String, dynamic>{
         'api': '1',
         'query': query,
         'query_place_id': place.placeId!,
         'hl': 'en',
-      });
+      };
+      if (satellite) params['t'] = 'k';
+      return Uri.https('www.google.com', '/maps/search/', params);
     }
-    if (query.isNotEmpty) return search(query);
+    if (query.isNotEmpty) {
+      final uri = search(query);
+      if (satellite) {
+        final q = Map<String, dynamic>.from(uri.queryParameters);
+        q['t'] = 'k';
+        return uri.replace(queryParameters: q);
+      }
+      return uri;
+    }
     final lat = place.latitude, lng = place.longitude;
     if (lat != null &&
         lng != null &&
@@ -177,7 +193,13 @@ abstract final class MapsWebUrls {
         lng.isFinite &&
         lat.abs() <= 90 &&
         lng.abs() <= 180) {
-      return search('$lat,$lng');
+      final uri = search('$lat,$lng');
+      if (satellite) {
+        final q = Map<String, dynamic>.from(uri.queryParameters);
+        q['t'] = 'k';
+        return uri.replace(queryParameters: q);
+      }
+      return uri;
     }
     throw const FormatException(
       'Find a place or enter a name and address first.',

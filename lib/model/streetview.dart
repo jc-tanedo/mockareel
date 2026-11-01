@@ -53,6 +53,8 @@ class StreetviewMedia {
 
   String transition, arrow;
   double transitionSeconds;
+  String roadLabel;
+  String railStop;
   StreetviewMedia({
     PlaceDetails? place,
     this.mapPath,
@@ -78,6 +80,8 @@ class StreetviewMedia {
     this.transition = 'arrow',
     this.arrow = 'right',
     this.transitionSeconds = .45,
+    this.roadLabel = '',
+    this.railStop = 'near',
   }) : slowZoom = slowZoom ?? panZoom,
        slowPan = slowPan ?? panZoom,
        place = place ?? PlaceDetails();
@@ -108,6 +112,8 @@ class StreetviewMedia {
     transition: j['transition'] == 'map' ? 'map' : 'arrow',
     arrow: j['arrow'] == 'left' ? 'left' : 'right',
     transitionSeconds: _seconds(j['transitionSeconds'], .45, .2, 2),
+    roadLabel: j['roadLabel'] as String? ?? '',
+    railStop: j['railStop'] == 'far' ? 'far' : 'near',
   );
   Map<String, dynamic> toJson() => {
     'place': place.toJson(),
@@ -134,5 +140,7 @@ class StreetviewMedia {
     'transition': transition,
     'arrow': arrow,
     'transitionSeconds': transitionSeconds,
+    'roadLabel': roadLabel,
+    'railStop': railStop,
   };
 }

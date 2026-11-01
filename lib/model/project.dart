@@ -248,7 +248,10 @@ class ReelProject {
   final String template;
   FeedSettings feed;
   StreetviewSettings streetview;
-  bool get isStreetview => template == 'streetview';
+  bool get isStreetview =>
+      template == 'streetview' || template == 'streetview-3d';
+  bool get isStreetview3d => template == 'streetview-3d';
+  bool get isClassicStreetview => template == 'streetview';
   bool get isFeed => template == 'tiktok-feed';
   String? heroClipId;
   bool storyChromeClose;
@@ -368,7 +371,11 @@ class ReelProject {
   factory ReelProject.fromJson(Map<String, dynamic> json) => ReelProject(
     id: json['id'] as String?,
     title: json['title'] as String? ?? 'My place reel',
-    template: const {'tiktok-feed', 'streetview'}.contains(json['template'])
+    template: const {
+      'tiktok-feed',
+      'streetview',
+      'streetview-3d',
+    }.contains(json['template'])
         ? json['template'] as String
         : 'maps-place',
     streetview: StreetviewSettings.fromJson(

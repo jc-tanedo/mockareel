@@ -71,8 +71,12 @@ class _LibraryPageState extends State<LibraryPage> {
     if (template == null || !mounted) return;
     final p = ReelProject(
       template: template,
-      darkOutput: template == 'streetview',
-      title: template == 'tiktok-feed' ? 'Untitled feed' : 'Untitled reel',
+      darkOutput: template == 'streetview' || template == 'streetview-3d',
+      title: template == 'tiktok-feed'
+          ? 'Untitled feed'
+          : template == 'streetview-3d'
+          ? 'Untitled 3D reel'
+          : 'Untitled reel',
     );
     await _store.save(p);
     if (mounted) await _open(p);
@@ -291,12 +295,16 @@ class _ProjectTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final p = project;
-    final templateLabel = p.isStreetview
+    final templateLabel = p.isStreetview3d
+        ? 'STREET VIEW 3D'
+        : p.isStreetview
         ? 'STREET VIEW'
         : p.isFeed
         ? 'FYP SCROLL'
         : 'MAPS STORY';
-    final templateIcon = p.isStreetview
+    final templateIcon = p.isStreetview3d
+        ? Icons.view_in_ar_outlined
+        : p.isStreetview
         ? Icons.streetview
         : p.isFeed
         ? Icons.swipe_up_outlined
