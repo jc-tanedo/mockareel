@@ -307,8 +307,14 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
       const SizedBox(height: 12),
       Text(
         widget.showHeaderGuide
-            ? 'Keep the place inside the lower outlined area: this remains visible after the intro. The full map is revealed during the opening. The map is saved with your project for preview, export and backups. Google Maps and your entered credits are added after cropping. No API key needed.'
-            : 'Frame the place inside the visible crop. Google Maps and your entered credits are added after capture. The image is saved for preview, export and backups. No API key needed.',
+            ? 'Keep the place inside the lower outlined area: this remains '
+                'visible after the intro. The full map is revealed during the '
+                'opening. The map is saved with your project for preview, '
+                'export and backups. Google Maps and your entered credits are '
+                'added after cropping.'
+            : 'Frame the place inside the visible crop. Google Maps and your '
+                'entered credits are added after capture. The image is saved '
+                'for preview, export and backups.',
         style: theme.textTheme.bodySmall?.copyWith(
           color: colors.onSurfaceVariant,
           height: 1.5,
@@ -337,7 +343,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
     final colors = theme.colorScheme;
     return [
       Text(
-        widget.showHeaderGuide ? 'KEY-FREE MAP HEADER' : 'KEY-FREE MAP',
+        widget.showHeaderGuide ? 'MAP HEADER' : 'MAP',
         style: theme.textTheme.labelSmall?.copyWith(
           color: colors.primary,
           fontWeight: FontWeight.w700,

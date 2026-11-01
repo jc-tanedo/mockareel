@@ -1,5 +1,9 @@
 package dev.mockareel.mockareel
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Matrix
@@ -52,6 +56,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             val holder = ProgressHolder()
             if (active.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
                 events?.success(holder.progress / 100.0)
+                postNotification(holder.progress)
             }
             handler.postDelayed(this, 250)
         }
@@ -524,6 +529,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     val path = output?.absolutePath
                     events?.success(1.0)
+                    postNotification(100, isComplete = true)
                     val callback = pending
                     clear(deleteOutput = false)
                     callback?.success(path)
@@ -533,6 +539,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 }
             }).build()
         transformer!!.start(composition, output!!.absolutePath)
+        postNotification(0)
         handler.post(progress)
     }
 
@@ -547,8 +554,74 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         transformer = null
         pending = null
         posterCache?.close(); posterCache = null
-        if (deleteOutput) output?.delete()
+        if (deleteOutput) {
+            output?.delete()
+            dismissNotification()
+        }
         output = null
+    }
+
+    private fun postNotification(percent: Int?, isComplete: Boolean = false) {
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (manager.getNotificationChannel(EXPORT_CHANNEL_ID) == null) {
+                    val channel = NotificationChannel(
+                        EXPORT_CHANNEL_ID,
+                        "Video Export",
+                        NotificationManager.IMPORTANCE_LOW
+                    ).apply {
+                        description = "Shows progress while exporting reels"
+                        setShowBadge(false)
+                    }
+                    manager.createNotificationChannel(channel)
+                }
+            }
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(context, EXPORT_CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(context)
+            }
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            val pendingIntent = if (launchIntent != null) {
+                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+                PendingIntent.getActivity(context, 0, launchIntent, flags)
+            } else null
+            if (pendingIntent != null) builder.setContentIntent(pendingIntent)
+            val icon = if (context.applicationInfo.icon != 0) context.applicationInfo.icon else android.R.drawable.stat_sys_upload
+            builder.setSmallIcon(icon)
+            if (isComplete) {
+                builder.setContentTitle("Export complete")
+                    .setContentText("Your reel is ready")
+                    .setAutoCancel(true)
+                    .setOngoing(false)
+                manager.notify(EXPORT_NOTIFICATION_ID, builder.build())
+            } else {
+                val p = percent ?: 0
+                builder.setContentTitle("Exporting reel…")
+                    .setContentText(if (p > 0) "$p% completed" else "Preparing video…")
+                    .setProgress(100, p, percent == null)
+                    .setOngoing(true)
+                manager.notify(EXPORT_NOTIFICATION_ID, builder.build())
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun dismissNotification() {
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.cancel(EXPORT_NOTIFICATION_ID)
+        } catch (_: Exception) {}
+    }
+
+    companion object {
+        private const val EXPORT_CHANNEL_ID = "mockareel_export"
+        private const val EXPORT_NOTIFICATION_ID = 1001
     }
     fun cancel() { mediaEdits.cancel(); if (pending != null) finishError("CANCELLED", "Export cancelled") }
     fun close() { cancel(); mediaEdits.close(); worker.shutdown() }

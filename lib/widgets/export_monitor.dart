@@ -350,7 +350,7 @@ class _ExportMonitorState extends State<ExportMonitor> {
               children: [
                 Expanded(
                   child: Text(
-                    'Keep Mockareel open',
+                    'Exports continue in the background',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                       fontSize: 11,

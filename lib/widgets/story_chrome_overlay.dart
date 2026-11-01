@@ -1,41 +1,59 @@
 import 'package:flutter/material.dart';
 
 class StoryChromeOverlay extends StatelessWidget {
-  const StoryChromeOverlay({super.key});
+  final bool showClose;
+  final bool showText;
+  final bool showStickers;
+  final bool showMusic;
+  final bool showEffects;
+  final bool showLike;
+
+  const StoryChromeOverlay({
+    super.key,
+    this.showClose = true,
+    this.showText = true,
+    this.showStickers = true,
+    this.showMusic = true,
+    this.showEffects = true,
+    this.showLike = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Stack(
+    return Stack(
       children: [
-        Positioned(
-          left: 16,
-          top: 20,
-          child: Icon(Icons.close, color: Colors.white, size: 22),
-        ),
-        Positioned(
-          right: 20,
-          top: 20,
-          child: Text(
-            'Aa',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+        if (showClose)
+          const Positioned(
+            left: 14,
+            top: 10,
+            child: Icon(Icons.close, color: Colors.white, size: 22),
+          ),
+        if (showText)
+          const Positioned(
+            right: 16,
+            top: 10,
+            child: Text(
+              'Aa',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          right: 20,
-          top: 54,
-          child: Icon(
-            Icons.sentiment_satisfied_alt,
-            color: Colors.white,
-            size: 20,
+        if (showStickers)
+          const Positioned(
+            right: 16,
+            top: 40,
+            child: Icon(
+              Icons.sentiment_satisfied_alt,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
-        ),
-        _SideTool(top: 106, icon: Icons.music_note),
-        _SideTool(top: 142, icon: Icons.auto_awesome),
-        _SideTool(top: 178, icon: Icons.favorite_border),
+        if (showMusic) const _SideTool(top: 76, icon: Icons.music_note),
+        if (showEffects) const _SideTool(top: 112, icon: Icons.auto_awesome),
+        if (showLike) const _SideTool(top: 148, icon: Icons.favorite_border),
       ],
     );
   }

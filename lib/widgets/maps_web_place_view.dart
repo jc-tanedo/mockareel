@@ -119,7 +119,7 @@ class MapsWebPlaceView extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Map header: capture a Google map without a key in Place → Header.',
+          'Map header: capture a Google map in Place → Header.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: colors.onSurfaceVariant,
           ),

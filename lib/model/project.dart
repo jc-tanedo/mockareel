@@ -251,7 +251,28 @@ class ReelProject {
   bool get isStreetview => template == 'streetview';
   bool get isFeed => template == 'tiktok-feed';
   String? heroClipId;
-  bool storyChrome, darkOutput;
+  bool storyChromeClose;
+  bool storyChromeText;
+  bool storyChromeStickers;
+  bool storyChromeMusic;
+  bool storyChromeEffects;
+  bool storyChromeLike;
+  bool get storyChrome =>
+      storyChromeClose ||
+      storyChromeText ||
+      storyChromeStickers ||
+      storyChromeMusic ||
+      storyChromeEffects ||
+      storyChromeLike;
+  set storyChrome(bool val) {
+    storyChromeClose = val;
+    storyChromeText = val;
+    storyChromeStickers = val;
+    storyChromeMusic = val;
+    storyChromeEffects = val;
+    storyChromeLike = val;
+  }
+  bool darkOutput;
   double slideSeconds, sheetIntroSeconds;
   String headerMode;
   String? mapHeaderPath;
@@ -270,7 +291,13 @@ class ReelProject {
     FeedSettings? feed,
     StreetviewSettings? streetview,
     this.storyBadge = '',
-    this.storyChrome = false,
+    bool? storyChrome,
+    bool? storyChromeClose,
+    bool? storyChromeText,
+    bool? storyChromeStickers,
+    bool? storyChromeMusic,
+    bool? storyChromeEffects,
+    bool? storyChromeLike,
     this.darkOutput = false,
     this.heroClipId,
     this.headerMode = 'map',
@@ -285,7 +312,13 @@ class ReelProject {
     List<StoryTag>? tags,
     this.music,
     DateTime? updatedAt,
-  }) : streetview = streetview ?? StreetviewSettings(),
+  }) : storyChromeClose = storyChromeClose ?? (storyChrome ?? false),
+       storyChromeText = storyChromeText ?? (storyChrome ?? false),
+       storyChromeStickers = storyChromeStickers ?? (storyChrome ?? false),
+       storyChromeMusic = storyChromeMusic ?? (storyChrome ?? false),
+       storyChromeEffects = storyChromeEffects ?? (storyChrome ?? false),
+       storyChromeLike = storyChromeLike ?? (storyChrome ?? false),
+       streetview = streetview ?? StreetviewSettings(),
        feed = feed ?? FeedSettings(),
        sheetIntroSeconds = sheetIntroSeconds.isFinite
            ? sheetIntroSeconds.clamp(0, 2).toDouble()
@@ -360,7 +393,18 @@ class ReelProject {
     music: json['music'] == null
         ? null
         : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
-    storyChrome: json['storyChrome'] == true,
+    storyChromeClose: json['storyChromeClose'] as bool? ??
+        (json['storyChrome'] == true),
+    storyChromeText: json['storyChromeText'] as bool? ??
+        (json['storyChrome'] == true),
+    storyChromeStickers: json['storyChromeStickers'] as bool? ??
+        (json['storyChrome'] == true),
+    storyChromeMusic: json['storyChromeMusic'] as bool? ??
+        (json['storyChrome'] == true),
+    storyChromeEffects: json['storyChromeEffects'] as bool? ??
+        (json['storyChrome'] == true),
+    storyChromeLike: json['storyChromeLike'] as bool? ??
+        (json['storyChrome'] == true),
     darkOutput: json['darkOutput'] == true,
     heroClipId: json['heroClipId'] as String?,
     headerMode: json['headerMode'] as String? ?? 'photo',
@@ -388,6 +432,12 @@ class ReelProject {
     'tags': tags.map((t) => t.toJson()).toList(),
     'music': music?.toJson(),
     'storyChrome': storyChrome,
+    'storyChromeClose': storyChromeClose,
+    'storyChromeText': storyChromeText,
+    'storyChromeStickers': storyChromeStickers,
+    'storyChromeMusic': storyChromeMusic,
+    'storyChromeEffects': storyChromeEffects,
+    'storyChromeLike': storyChromeLike,
     'darkOutput': darkOutput,
     'heroClipId': heroClipId,
     'headerMode': headerMode,

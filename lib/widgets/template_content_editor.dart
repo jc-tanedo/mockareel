@@ -110,8 +110,12 @@ class TemplateContentEditor extends StatelessWidget {
                   ),
                 Text(
                   useApiHeaders
-                      ? 'Load again after changing zoom. Using Maps Static API. Switch to key-free browser capture in Advanced · Google Maps.'
-                      : 'No key needed. Frame the map in the browser and save it as your header. Optional API mode is in Advanced · Google Maps. You can also upload a map image.',
+                      ? 'Load again after changing zoom. Using Maps Static '
+                          'API. Switch to browser capture in Advanced · Google '
+                          'Maps.'
+                      : 'Frame the map in the browser and save it as your '
+                          'header. Optional API mode is in Advanced · Google '
+                          'Maps. You can also upload a map image.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     height: 1.5,

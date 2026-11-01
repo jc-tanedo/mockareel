@@ -75,9 +75,8 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Browser search and map capture work without a key. Add your '
-                'own Google Cloud key to use API lookup or automatic static '
-                'map headers.',
+                'Add your own Google Cloud key to use API lookup or '
+                'automatic static map headers.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurfaceVariant,
                   height: 1.45,

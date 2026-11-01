@@ -178,13 +178,55 @@ class MapsPlaceEditor extends StatelessWidget {
                   children: [
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Story controls overlay'),
-                      subtitle: const Text(
-                        'Decorative controls from the reference',
-                      ),
-                      value: project.storyChrome,
+                      title: const Text('Close button'),
+                      value: project.storyChromeClose,
                       onChanged: (v) {
-                        project.storyChrome = v;
+                        project.storyChromeClose = v;
+                        onChanged();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Text tool (Aa)'),
+                      value: project.storyChromeText,
+                      onChanged: (v) {
+                        project.storyChromeText = v;
+                        onChanged();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Stickers & emoji'),
+                      value: project.storyChromeStickers,
+                      onChanged: (v) {
+                        project.storyChromeStickers = v;
+                        onChanged();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Music tool'),
+                      value: project.storyChromeMusic,
+                      onChanged: (v) {
+                        project.storyChromeMusic = v;
+                        onChanged();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Effects & filters'),
+                      value: project.storyChromeEffects,
+                      onChanged: (v) {
+                        project.storyChromeEffects = v;
+                        onChanged();
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Like button'),
+                      value: project.storyChromeLike,
+                      onChanged: (v) {
+                        project.storyChromeLike = v;
                         onChanged();
                       },
                     ),

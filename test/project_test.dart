@@ -97,6 +97,12 @@ void main() {
       expect(imported.heroClipId, imported.clips.single.id);
       expect(imported.storyBadge, 'weekend find');
       expect(imported.storyChrome, true);
+      expect(imported.storyChromeClose, true);
+      expect(imported.storyChromeText, true);
+      expect(imported.storyChromeStickers, true);
+      expect(imported.storyChromeMusic, true);
+      expect(imported.storyChromeEffects, true);
+      expect(imported.storyChromeLike, true);
       expect(imported.slideSeconds, .3);
       expect(imported.clips.single.cardWidth, .6);
       expect(imported.clips.single.cardHeight, .8);

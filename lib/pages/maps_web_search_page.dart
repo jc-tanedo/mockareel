@@ -65,7 +65,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
               TargetPlatform.macOS,
             ].contains(defaultTargetPlatform)) {
           throw const FormatException(
-            'Key-free search needs a supported mobile WebView. '
+            'Map search needs a supported mobile WebView. '
             'You can use API lookup or edit the place manually.',
           );
         }
@@ -299,7 +299,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                   title: _busy ? 'Finding your place' : 'Find a place',
                   description:
                       'Search by name and city, or paste a '
-                      'Google Maps share link. No API key needed.',
+                      'Google Maps share link.',
                 ),
         ),
       ],
@@ -361,7 +361,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'KEY-FREE SEARCH',
+                  'MAP SEARCH',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colors.primary,
                     fontWeight: FontWeight.w700,
