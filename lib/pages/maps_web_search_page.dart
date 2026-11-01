@@ -8,6 +8,7 @@ import '../services/maps_web_session.dart';
 import '../widgets/empty_placeholder.dart';
 import '../widgets/maps_web_place_view.dart';
 import '../widgets/place_search_dialog.dart';
+import '../widgets/skeleton_loader.dart';
 
 class MapsWebSearchPage extends StatefulWidget {
   final String initial;
@@ -230,7 +231,11 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
             ),
           ),
         Expanded(
-          child: _details != null
+          child: _busy && _details == null && _results.isEmpty
+              ? const LocationSearchSkeleton()
+              : _busy && _details == null && _status.contains('details')
+              ? const PlaceDetailsSkeleton()
+              : _details != null
               ? _place()
               : _results.isNotEmpty
               ? ListView.builder(

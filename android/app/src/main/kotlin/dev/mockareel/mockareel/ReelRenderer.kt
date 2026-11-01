@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import androidx.media3.effect.Crop
 import java.security.MessageDigest
 import kotlin.math.*
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -113,20 +115,63 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
 
     private fun inspect(path: String): Map<String, Any> {
         require(File(path).isFile) { "File is missing" }
+        var width = 0
+        var height = 0
+        var rotation = 0
+        var durationSec = 0.0
+        var hasAudio = false
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(path)
-            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-            return mapOf(
-                "duration" to ((retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull() ?: 0.0) / 1000.0),
-                "width" to if (rotation % 180 == 0) width else height,
-                "height" to if (rotation % 180 == 0) height else width,
-                "hasAudio" to (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"),
-                "size" to File(path).length()
-            )
-        } finally { retriever.release() }
+            width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            durationSec = (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull() ?: 0.0) / 1000.0
+            val rawAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
+            hasAudio = rawAudio != null && (rawAudio == "yes" || rawAudio == "true" || rawAudio == "1")
+        } catch (_: Exception) {
+            // MediaMetadataRetriever can fail on unusual audio streams or MP4 headers
+        } finally {
+            try { retriever.release() } catch (_: Exception) {}
+        }
+
+        if (!hasAudio || durationSec <= 0.0 || (width == 0 && height == 0)) {
+            val extractor = MediaExtractor()
+            try {
+                extractor.setDataSource(path)
+                for (i in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                    if (mime.startsWith("audio/")) {
+                        hasAudio = true
+                        if (durationSec <= 0.0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                            durationSec = format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0
+                        }
+                    } else if (mime.startsWith("video/")) {
+                        if (durationSec <= 0.0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                            durationSec = format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0
+                        }
+                        if (width == 0 && format.containsKey(MediaFormat.KEY_WIDTH)) {
+                            width = format.getInteger(MediaFormat.KEY_WIDTH)
+                        }
+                        if (height == 0 && format.containsKey(MediaFormat.KEY_HEIGHT)) {
+                            height = format.getInteger(MediaFormat.KEY_HEIGHT)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                try { extractor.release() } catch (_: Exception) {}
+            }
+        }
+
+        return mapOf(
+            "duration" to durationSec,
+            "width" to if (rotation % 180 == 0) width else height,
+            "height" to if (rotation % 180 == 0) height else width,
+            "hasAudio" to hasAudio,
+            "size" to File(path).length()
+        )
     }
 
     private fun buildFeedItems(

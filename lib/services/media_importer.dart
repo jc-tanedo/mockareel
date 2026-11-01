@@ -75,11 +75,28 @@ class MediaImporter {
     return (clips: clips, failures: failures);
   }
 
+  static const audioExtensions = [
+    'mp3',
+    'm4a',
+    'aac',
+    'wav',
+    'ogg',
+    'opus',
+    'flac',
+    'mp4',
+    'm4v',
+    'mov',
+    'wma',
+  ];
+
   static Future<MusicTrack?> pickMusicTrack({
     required ProjectStore store,
     required NativeRenderer renderer,
   }) async {
-    final file = await FilePicker.pickFile(type: FileType.audio);
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: audioExtensions,
+    ).catchError((Object _) => FilePicker.pickFile(type: FileType.audio));
     if (file?.path == null) return null;
     final info = await renderer.inspect(file!.path!);
     final duration = (info['duration'] as num?)?.toDouble() ?? 0;

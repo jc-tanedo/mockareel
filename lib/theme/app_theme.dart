@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const ink = Color(0xff111015),
     panel = Color(0xff1d1b24),
@@ -6,15 +7,95 @@ const ink = Color(0xff111015),
     vividMint = Color(0xff00e5a3),
     vividRose = Color(0xffff6584);
 
-ThemeData buildAppTheme() {
+enum AppThemePreset {
+  electricMint(
+    id: 'electricMint',
+    label: 'Electric Mint',
+    subtitle: 'Mint · Lavender · Coral',
+    primary: Color(0xff00e5a3),
+    secondary: Color(0xffb29eff),
+    tertiary: Color(0xffff6584),
+  ),
+  sunsetEmber(
+    id: 'sunsetEmber',
+    label: 'Sunset Ember',
+    subtitle: 'Coral · Amber · Azure',
+    primary: Color(0xffff6e40),
+    secondary: Color(0xffffd166),
+    tertiary: Color(0xff00d2ff),
+  ),
+  oceanBreeze(
+    id: 'oceanBreeze',
+    label: 'Ocean Breeze',
+    subtitle: 'Cyan · Lime · Magenta',
+    primary: Color(0xff00d2ff),
+    secondary: Color(0xff70e000),
+    tertiary: Color(0xffff007f),
+  ),
+  cyberpunk(
+    id: 'cyberpunk',
+    label: 'Cyber Violet',
+    subtitle: 'Lavender · Turquoise · Rose',
+    primary: Color(0xffb29eff),
+    secondary: Color(0xff00e5a3),
+    tertiary: Color(0xffff6584),
+  ),
+  solarFlare(
+    id: 'solarFlare',
+    label: 'Solar Flare',
+    subtitle: 'Sunlight · Indigo · Crimson',
+    primary: Color(0xffffc837),
+    secondary: Color(0xff818cf8),
+    tertiary: Color(0xfff43f5e),
+  );
+
+  final String id;
+  final String label;
+  final String subtitle;
+  final Color primary;
+  final Color secondary;
+  final Color tertiary;
+  const AppThemePreset({
+    required this.id,
+    required this.label,
+    required this.subtitle,
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+  });
+}
+
+class AppThemeController extends ValueNotifier<AppThemePreset> {
+  static final instance = AppThemeController._();
+  AppThemeController._() : super(AppThemePreset.electricMint);
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id =
+        prefs.getString('app_theme_preset') ?? AppThemePreset.electricMint.id;
+    value = AppThemePreset.values.firstWhere(
+      (p) => p.id == id,
+      orElse: () => AppThemePreset.electricMint,
+    );
+  }
+
+  Future<void> setPreset(AppThemePreset preset) async {
+    value = preset;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_theme_preset', preset.id);
+  }
+}
+
+ThemeData buildAppTheme([AppThemePreset? preset]) {
+  final current = preset ?? AppThemeController.instance.value;
   final baseScheme = ColorScheme.fromSeed(
-    seedColor: mint,
+    seedColor: current.primary,
     brightness: Brightness.dark,
   );
   final colorScheme = baseScheme.copyWith(
-    primary: mint,
-    secondary: vividMint,
-    tertiary: vividRose,
+    primary: current.primary,
+    secondary: current.secondary,
+    tertiary: current.tertiary,
     surface: ink,
     surfaceDim: const Color(0xff0d0c11),
     surfaceBright: const Color(0xff363442),

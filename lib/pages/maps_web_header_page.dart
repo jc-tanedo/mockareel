@@ -8,6 +8,7 @@ import '../model/project.dart';
 import '../services/maps_web_header_session.dart';
 import '../model/map_capture_viewport.dart';
 import '../widgets/map_attribution.dart';
+import '../widgets/skeleton_loader.dart';
 import '../theme/app_theme.dart';
 
 /// A visible, hardware-composited map viewport: PixelCopy includes GPU map
@@ -182,7 +183,12 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
           fit: StackFit.expand,
           children: [
             _controller == null && widget.browserOverride == null
-                ? ColoredBox(color: colors.surface)
+                ? const SkeletonShimmer(
+                    child: SkeletonBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  )
                 : LayoutBuilder(
                     builder: (context, bounds) {
                       final viewport = MapCaptureViewport(widget.aspectRatio);

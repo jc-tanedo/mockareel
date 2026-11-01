@@ -19,12 +19,16 @@ class TimelinePreview extends StatefulWidget {
   final int selected;
   final double maxHeight;
   final bool startAtBeginning;
+  final bool loop;
+  final bool autoPlay;
   const TimelinePreview({
     super.key,
     required this.project,
     this.selected = 0,
     this.startAtBeginning = false,
     this.maxHeight = 420,
+    this.loop = true,
+    this.autoPlay = true,
   });
   @override
   State<TimelinePreview> createState() => _TimelinePreviewState();
@@ -34,6 +38,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final Ticker _ticker;
   double _base = 0, _position = 0;
+  bool _userPaused = false;
+  int _lastClipsCount = 0;
   bool get _playing => _ticker.isActive;
   double get _duration => widget.project.isFeed
       ? FeedTimeline.duration(widget.project)
@@ -56,19 +62,30 @@ class _TimelinePreviewState extends State<TimelinePreview>
 
   void _play() {
     if (widget.project.clips.isEmpty) return;
+    _userPaused = false;
     if (_position >= _duration - .03) _position = 0;
     _base = _position;
+    if (_ticker.isActive) _ticker.stop();
     _ticker.start();
     setState(() {});
   }
 
   void _tick(Duration elapsed) {
     if (!mounted) return;
-    final position = min(_duration, _base + elapsed.inMicroseconds / 1000000);
-    // Stop the clock before rebuilding the final frame, so every child receives
-    // paused playback in the same update as the exact end position.
-    if (position >= _duration) _ticker.stop();
-    setState(() => _position = position);
+    if (_duration <= 0) {
+      _ticker.stop();
+      setState(() => _position = 0);
+      return;
+    }
+    final raw = _base + elapsed.inMicroseconds / 1000000;
+    if (widget.loop) {
+      final position = raw % _duration;
+      setState(() => _position = position);
+    } else {
+      final position = min(_duration, raw);
+      if (position >= _duration) _ticker.stop();
+      setState(() => _position = position);
+    }
   }
 
   @override
@@ -77,18 +94,60 @@ class _TimelinePreviewState extends State<TimelinePreview>
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_tick);
     _position = _selectedStart;
+    _lastClipsCount = widget.project.clips.length;
+    if (widget.autoPlay && widget.project.clips.isNotEmpty && !_userPaused) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            widget.project.clips.isNotEmpty &&
+            !_userPaused &&
+            !_playing) {
+          _play();
+        }
+      });
+    }
   }
 
   @override
   void didUpdateWidget(TimelinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selected != widget.selected ||
-        oldWidget.project.id != widget.project.id) {
+    final clipsCount = widget.project.clips.length;
+    final mediaAdded = clipsCount > _lastClipsCount ||
+        (oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty);
+    _lastClipsCount = clipsCount;
+
+    if (oldWidget.project.id != widget.project.id) {
+      _userPaused = false;
       _pause();
       _position = _selectedStart;
+    } else if (oldWidget.selected != widget.selected) {
+      if (_playing) {
+        _position = _selectedStart;
+        _base = _selectedStart;
+        _ticker.stop();
+        _ticker.start();
+        setState(() {});
+      } else if (widget.autoPlay &&
+          !_userPaused &&
+          widget.project.clips.isNotEmpty) {
+        _position = _selectedStart;
+        _play();
+      } else {
+        _pause();
+        _position = _selectedStart;
+      }
+    } else if (mediaAdded) {
+      if (widget.autoPlay &&
+          !_userPaused &&
+          !_playing &&
+          widget.project.clips.isNotEmpty) {
+        _play();
+      }
     }
-    _position = _position.clamp(0, _duration);
-    if (_position >= _duration && _ticker.isActive) _pause();
+
+    _position = _duration > 0 ? (_position.clamp(0, _duration)) : 0;
+    if (_position >= _duration && _ticker.isActive && !widget.loop) {
+      _pause();
+    }
   }
 
   @override
@@ -151,8 +210,14 @@ class _TimelinePreviewState extends State<TimelinePreview>
               onPressed: p.clips.isEmpty
                   ? null
                   : () {
-                      _pause();
-                      setState(() => _position = 0);
+                      if (_playing) {
+                        _base = 0;
+                        _ticker.stop();
+                        _ticker.start();
+                        setState(() => _position = 0);
+                      } else {
+                        setState(() => _position = 0);
+                      }
                     },
               icon: const Icon(Icons.replay, size: 18),
             ),
@@ -161,7 +226,15 @@ class _TimelinePreviewState extends State<TimelinePreview>
               color: colors.primary,
               onPressed: p.clips.isEmpty
                   ? null
-                  : () => _playing ? _pause() : _play(),
+                  : () {
+                      if (_playing) {
+                        _userPaused = true;
+                        _pause();
+                      } else {
+                        _userPaused = false;
+                        _play();
+                      }
+                    },
               icon: Icon(
                 _playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
               ),
@@ -176,7 +249,10 @@ class _TimelinePreviewState extends State<TimelinePreview>
                 child: Slider(
                   value: min(_position, _duration),
                   max: max(.01, _duration),
-                  onChangeStart: (_) => _pause(),
+                  onChangeStart: (_) {
+                    _userPaused = true;
+                    _pause();
+                  },
                   onChanged: p.clips.isEmpty
                       ? null
                       : (v) => setState(() => _position = v),

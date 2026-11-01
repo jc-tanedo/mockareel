@@ -214,7 +214,13 @@ void main() {
       try {
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(body: TimelinePreview(project: project)),
+            home: Scaffold(
+              body: TimelinePreview(
+                project: project,
+                loop: false,
+                autoPlay: false,
+              ),
+            ),
           ),
         );
         await Future<void>.delayed(Duration.zero);

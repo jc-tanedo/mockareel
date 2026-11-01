@@ -6,7 +6,9 @@ import '../model/project.dart';
 import '../services/project_store.dart';
 import '../widgets/reel_preview.dart';
 import '../widgets/empty_placeholder.dart';
+import '../widgets/skeleton_loader.dart';
 import 'feed_editor_page.dart';
+import 'settings_page.dart';
 import 'template_picker_page.dart';
 export 'template_picker_page.dart';
 
@@ -127,6 +129,13 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Settings',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+            ),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          IconButton(
             tooltip: 'Import project backup',
             onPressed: _import,
             icon: const Icon(Icons.file_open_outlined),
@@ -140,7 +149,7 @@ class _LibraryPageState extends State<LibraryPage> {
         label: const Text('New project'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LibrarySkeleton()
           : _error != null
           ? Center(
               child: Padding(
