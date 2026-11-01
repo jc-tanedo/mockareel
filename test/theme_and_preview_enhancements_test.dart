@@ -19,10 +19,7 @@ void main() {
       await AppThemeController.instance.load();
 
       await tester.pumpWidget(
-        MaterialApp(
-          theme: buildAppTheme(),
-          home: const SettingsPage(),
-        ),
+        MaterialApp(theme: buildAppTheme(), home: const SettingsPage()),
       );
       await tester.pumpAndSettle();
 
@@ -36,10 +33,7 @@ void main() {
       await tester.tap(find.text('Sunset Ember'));
       await tester.pumpAndSettle();
 
-      expect(
-        AppThemeController.instance.value,
-        AppThemePreset.sunsetEmber,
-      );
+      expect(AppThemeController.instance.value, AppThemePreset.sunsetEmber);
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('app_theme_preset'), 'sunsetEmber');
@@ -47,10 +41,7 @@ void main() {
       await tester.tap(find.text('Ocean Breeze'));
       await tester.pumpAndSettle();
 
-      expect(
-        AppThemeController.instance.value,
-        AppThemePreset.oceanBreeze,
-      );
+      expect(AppThemeController.instance.value, AppThemePreset.oceanBreeze);
       expect(prefs.getString('app_theme_preset'), 'oceanBreeze');
     });
   });
@@ -100,9 +91,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: TimelinePreview(project: project),
-          ),
+          home: Scaffold(body: TimelinePreview(project: project)),
         ),
       );
       await tester.pumpAndSettle();
@@ -119,9 +108,7 @@ void main() {
       final updatedProject = ReelProject(clips: [clip1, clip2]);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: TimelinePreview(project: updatedProject),
-          ),
+          home: Scaffold(body: TimelinePreview(project: updatedProject)),
         ),
       );
       await tester.pumpAndSettle();
@@ -135,9 +122,7 @@ void main() {
       expect(find.byTooltip('Pause preview'), findsOneWidget);
     });
 
-    testWidgets('loops smoothly across duration when playing', (
-      tester,
-    ) async {
+    testWidgets('loops smoothly across duration when playing', (tester) async {
       final clip = ReelClip(
         id: 'clip1',
         path: 'photo.jpg',
@@ -148,9 +133,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: TimelinePreview(project: project, loop: true),
-          ),
+          home: Scaffold(body: TimelinePreview(project: project, loop: true)),
         ),
       );
       await tester.pumpAndSettle();

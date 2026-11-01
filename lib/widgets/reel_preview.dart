@@ -111,7 +111,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
   void didUpdateWidget(TimelinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     final clipsCount = widget.project.clips.length;
-    final mediaAdded = clipsCount > _lastClipsCount ||
+    final mediaAdded =
+        clipsCount > _lastClipsCount ||
         (oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty);
     _lastClipsCount = clipsCount;
 

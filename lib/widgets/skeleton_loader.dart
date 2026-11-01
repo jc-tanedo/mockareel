@@ -60,12 +60,7 @@ class SkeletonBox extends StatelessWidget {
   final double? height;
   final BorderRadius? borderRadius;
 
-  const SkeletonBox({
-    super.key,
-    this.width,
-    this.height,
-    this.borderRadius,
-  });
+  const SkeletonBox({super.key, this.width, this.height, this.borderRadius});
 
   @override
   Widget build(BuildContext context) {

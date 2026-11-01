@@ -245,11 +245,7 @@ class _ThemePresetTile extends StatelessWidget {
                   color: colors.primary,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.check,
-                  size: 16,
-                  color: colors.onPrimary,
-                ),
+                child: Icon(Icons.check, size: 16, color: colors.onPrimary),
               )
             else
               Container(
