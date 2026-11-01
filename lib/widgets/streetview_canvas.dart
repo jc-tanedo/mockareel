@@ -6,6 +6,7 @@ import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
+import 'streetview_3d_widgets.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
 
@@ -33,7 +34,8 @@ class StreetviewCanvas extends StatelessWidget {
     final clip = project.clips[i], settings = clip.streetview;
     final elapsed = scene.elapsed(position);
     final map = scene.kind == 'map' || scene.kind == 'ending-map',
-        movement = scene.kind == 'arrow';
+        movement = scene.kind == 'arrow',
+        isSwoop = scene.kind == 'swoop';
     final ripple = scene.kind == 'back' || (map && scene.kind != 'ending-map')
         ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
               StreetviewTimeline.rippleSeconds
@@ -47,20 +49,18 @@ class StreetviewCanvas extends StatelessWidget {
         : 0.0;
     final direction = settings.arrow == 'left' ? -1.0 : 1.0;
 
-    // Transition timing:
-    // Classic Streetview uses 100ms thumbnail zoom.
-    // Streetview 3D uses 350ms 3D dive / swoop from aerial map into first clip.
-    final transitionSec = is3d ? 0.35 : 0.1;
+    // Classic Streetview thumbnail zoom (100ms)
+    const transitionSec = 0.1;
     final isMedia = scene.kind == 'media';
     final isBack = scene.kind == 'back';
-    final isExpanding = isMedia && elapsed < transitionSec;
+    final isExpanding = !is3d && isMedia && elapsed < transitionSec;
     final expandProgress = isExpanding
         ? (elapsed / transitionSec).clamp(0.0, 1.0)
         : 1.0;
     final expandT = Curves.easeInOut.transform(expandProgress);
 
     final backStart = max(0.0, scene.duration - transitionSec);
-    final isShrinking = isBack && elapsed >= backStart;
+    final isShrinking = !is3d && isBack && elapsed >= backStart;
     final shrinkProgress = isShrinking
         ? ((elapsed - backStart) / transitionSec).clamp(0.0, 1.0)
         : 0.0;
@@ -71,61 +71,37 @@ class StreetviewCanvas extends StatelessWidget {
 
     const thumbOffset = Offset(-127.0, 191.0);
     const thumbScale = 82.0 / 360.0;
-    final activeScale = is3d
-        ? (isExpanding
-              ? ui.lerpDouble(0.65, 1.0, expandT)!
-              : isShrinking
-              ? ui.lerpDouble(1.0, 0.65, shrinkT)!
-              : 1.0)
-        : (isExpanding
-              ? ui.lerpDouble(thumbScale, 1.0, expandT)!
-              : isShrinking
-              ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
-              : 1.0);
-    final activeOffset = is3d
-        ? Offset.zero
-        : (isExpanding
-              ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
-              : isShrinking
-              ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
-              : Offset.zero);
-    final activeRadius = is3d
-        ? 0.0
-        : (isExpanding
-              ? ui.lerpDouble(48.29, 0.0, expandT)!
-              : isShrinking
-              ? ui.lerpDouble(0.0, 48.29, shrinkT)!
-              : 0.0);
-
-    // Aerial dive 3D parameters for Streetview 3D
-    final aerialDiveProgress = isExpanding
-        ? expandT
+    final activeScale = isExpanding
+        ? ui.lerpDouble(thumbScale, 1.0, expandT)!
         : isShrinking
-        ? (1.0 - shrinkT)
+        ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
+        : 1.0;
+    final activeOffset = isExpanding
+        ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
+        : isShrinking
+        ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
+        : Offset.zero;
+    final activeRadius = isExpanding
+        ? ui.lerpDouble(48.29, 0.0, expandT)!
+        : isShrinking
+        ? ui.lerpDouble(0.0, 48.29, shrinkT)!
         : 0.0;
-    final Matrix4 aerialPerspective = Matrix4.identity();
-    if (is3d && hasCardTransition) {
-      aerialPerspective
-        ..setEntry(3, 2, 0.0015)
-        ..rotateX(0.55 * aerialDiveProgress);
-    }
 
-    // Motion blur and camera rush:
-    // On-rails forward rush in 3D, lateral arrow blur in classic streetview
-    final blurX = is3d ? sin(t * pi) * 14.0 : sin(t * pi) * 36.0;
-    final blurY = is3d ? sin(t * pi) * 32.0 : sin(t * pi) * 8.0;
-    final outgoingScale = is3d
-        ? (1.0 + pow(t, 1.25) * 1.15).toDouble()
-        : (1.0 + pow(t, 1.3) * 0.9).toDouble();
+    // Classic motion blur and camera pan
+    final blurX = sin(t * pi) * 36.0;
+    final blurY = sin(t * pi) * 8.0;
+    final outgoingScale = (1.0 + pow(t, 1.3) * 0.9).toDouble();
     final outgoingProgress = pow(t, 1.2).toDouble();
-    final outgoingOffset = is3d
-        ? Offset(0.0, -35 * outgoingProgress)
-        : Offset(-direction * 180 * outgoingProgress, -25 * outgoingProgress);
+    final outgoingOffset = Offset(
+      -direction * 180 * outgoingProgress,
+      -25 * outgoingProgress,
+    );
     final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0).toDouble();
-    final incomingScale = is3d ? 0.72 + 0.28 * t : 1.0 + (1.0 - t) * 0.35;
-    final incomingOffset = is3d
-        ? Offset(0.0, -28 * (1.0 - t))
-        : Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
+    final incomingScale = 1.0 + (1.0 - t) * 0.35;
+    final incomingOffset = Offset(
+      direction * 150 * (1.0 - t),
+      20 * (1.0 - t),
+    );
     final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
 
     Widget image(ReelClip c, double seconds) => ClipPoster(
@@ -156,7 +132,7 @@ class StreetviewCanvas extends StatelessWidget {
                             c.id == clip.id &&
                             position < project.duration,
                       ),
-              if (c.streetview.showArrows)
+              if (c.streetview.showArrows && !movement)
                 is3d
                     ? Streetview3dRailOverlay(settings: c.streetview)
                     : const StreetviewArrows(),
@@ -164,7 +140,7 @@ class StreetviewCanvas extends StatelessWidget {
           ),
         );
 
-    Widget transition() => ColoredBox(
+    Widget classicTransition() => ColoredBox(
       color: Colors.black,
       child: ClipRect(
         child: ImageFiltered(
@@ -199,10 +175,7 @@ class StreetviewCanvas extends StatelessWidget {
     );
 
     final arrow = is3d
-        ? StreetviewMotion.at(
-            clip,
-            clip.duration,
-          ).project(180.0, settings.railStop == 'far' ? 365.0 : 430.0)
+        ? Offset.zero
         : StreetviewMotion.at(clip, clip.duration).project(
             settings.arrow == 'left'
                 ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
@@ -210,18 +183,6 @@ class StreetviewCanvas extends StatelessWidget {
                       StreetviewLayout.arrowLeft -
                       StreetviewLayout.arrowWidth / 2,
             StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
-          );
-
-    Widget aerialOrMapScene({Widget? thumb}) => is3d
-        ? Streetview3dAerialScene(
-            settings: settings,
-            dark: project.darkOutput,
-            thumbnail: thumb,
-          )
-        : StreetviewMapScene(
-            settings: settings,
-            dark: project.darkOutput,
-            thumbnail: thumb ?? const SizedBox(),
           );
 
     return FittedBox(
@@ -233,151 +194,216 @@ class StreetviewCanvas extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              if (!overlayOnly) ...[
+              // 1. Streetview 3D Swoop Dive
+              if (is3d && isSwoop)
                 Positioned.fill(
-                  child: ColoredBox(
-                    color: movement ? Colors.black : Colors.transparent,
+                  child: Streetview3dAerialSwoopScene(
+                    progress: elapsed / max(0.001, scene.duration),
+                    settings: settings,
+                    streetClip: media(clip, 0, pixels: !overlayOnly),
+                    dark: project.darkOutput,
                   ),
-                ),
-                if (hasCardTransition)
+                )
+              // 2. Streetview 3D On-Rails Forward Movement
+              else if (is3d && movement) ...[
+                if (elapsed < StreetviewTimeline.rippleSeconds) ...[
                   Positioned.fill(
-                    child: is3d
-                        ? Opacity(
-                            opacity: (1.0 - cardT).clamp(0.0, 1.0),
-                            child: Transform.translate(
-                              offset: Offset(0.0, -120 * aerialDiveProgress),
-                              child: Transform.scale(
-                                scale: 1.0 + 0.85 * aerialDiveProgress,
-                                child: Transform(
-                                  transform: aerialPerspective,
-                                  alignment: Alignment.center,
-                                  child: aerialOrMapScene(),
-                                ),
-                              ),
-                            ),
-                          )
-                        : aerialOrMapScene(),
+                    child: media(clip, clip.duration, pixels: !overlayOnly),
                   ),
-                Positioned.fill(
-                  key: const ValueKey('streetview-media-players'),
-                  child: ClipRect(
-                    child: ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(
-                        sigmaX: movement ? blurX : 0,
-                        sigmaY: movement ? blurY : 0,
+                  Positioned.fill(
+                    child: Streetview3dTapDisc(
+                      progress: elapsed / StreetviewTimeline.rippleSeconds,
+                      railStop: settings.railStop,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: StreetviewChrome(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      is3d: true,
+                    ),
+                  ),
+                ] else ...[
+                  Positioned.fill(
+                    child: Streetview3dDollyScene(
+                      progress: t,
+                      outgoingMedia: media(
+                        clip,
+                        clip.duration,
+                        pixels: !overlayOnly,
                       ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          for (
-                            var j = max(0, i - 1);
-                            j <= min(project.clips.length - 1, i + 1);
-                            j++
-                          )
-                            Positioned.fill(
-                              key: ValueKey(
-                                'streetview-player-${project.clips[j].id}',
-                              ),
-                              child: Opacity(
-                                opacity: map
-                                    ? 0
-                                    : movement
-                                    ? (j == i
-                                          ? outgoingOpacity
-                                          : j == i + 1
-                                          ? incomingOpacity
-                                          : 0)
-                                    : j == i
-                                    ? (hasCardTransition && is3d ? cardT : 1.0)
-                                    : 0,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    hasCardTransition && j == i
-                                        ? activeRadius
-                                        : 0.0,
-                                  ),
-                                  child: Transform.translate(
-                                    offset: hasCardTransition && j == i
-                                        ? activeOffset
+                      incomingMedia: media(
+                        project.clips[i + 1],
+                        0,
+                        pixels: !overlayOnly,
+                      ),
+                      settings: settings,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: StreetviewChrome(
+                      settings: project.clips[i + 1].streetview,
+                      dark: project.darkOutput,
+                      is3d: true,
+                    ),
+                  ),
+                ],
+              ]
+              // 3. Regular rendering (Classic Streetview or Streetview 3D at rest / aerial hold)
+              else ...[
+                if (!overlayOnly) ...[
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: movement ? Colors.black : Colors.transparent,
+                    ),
+                  ),
+                  if (hasCardTransition)
+                    Positioned.fill(
+                      child: StreetviewMapScene(
+                        settings: settings,
+                        dark: project.darkOutput,
+                        thumbnail: const SizedBox(),
+                      ),
+                    ),
+                  Positioned.fill(
+                    key: const ValueKey('streetview-media-players'),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        for (
+                          var j = max(0, i - 1);
+                          j <= min(project.clips.length - 1, i + 1);
+                          j++
+                        )
+                          Positioned.fill(
+                            key: ValueKey(
+                              'streetview-player-${project.clips[j].id}',
+                            ),
+                            child: Opacity(
+                              opacity: map
+                                  ? 0
+                                  : movement
+                                  ? (j == i
+                                        ? outgoingOpacity
+                                        : j == i + 1
+                                        ? incomingOpacity
+                                        : 0)
+                                  : j == i
+                                  ? 1.0
+                                  : 0,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  hasCardTransition && j == i
+                                      ? activeRadius
+                                      : 0.0,
+                                ),
+                                child: Transform.translate(
+                                  offset: hasCardTransition && j == i
+                                      ? activeOffset
+                                      : movement
+                                      ? (j == i
+                                            ? outgoingOffset
+                                            : incomingOffset)
+                                      : Offset.zero,
+                                  child: Transform.scale(
+                                    scale: hasCardTransition && j == i
+                                        ? activeScale
                                         : movement
                                         ? (j == i
-                                              ? outgoingOffset
-                                              : incomingOffset)
-                                        : Offset.zero,
-                                    child: Transform.scale(
-                                      scale: hasCardTransition && j == i
-                                          ? activeScale
-                                          : movement
-                                          ? (j == i
-                                                ? outgoingScale
-                                                : incomingScale)
-                                          : 1.0,
-                                      child: media(
-                                        project.clips[j],
-                                        j < i
-                                            ? project.clips[j].duration
-                                            : j > i || map
-                                            ? 0
-                                            : isMedia
-                                            ? elapsed
-                                            : clip.duration,
-                                      ),
+                                              ? outgoingScale
+                                              : incomingScale)
+                                        : 1.0,
+                                    child: media(
+                                      project.clips[j],
+                                      j < i
+                                          ? project.clips[j].duration
+                                          : j > i || map
+                                          ? 0
+                                          : isMedia
+                                          ? elapsed
+                                          : clip.duration,
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                        ],
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (map)
+                    Positioned.fill(
+                      child: is3d
+                          ? Streetview3dAerialScene(
+                              settings: settings,
+                              dark: project.darkOutput,
+                              thumbnail: image(clip, 0),
+                            )
+                          : StreetviewMapScene(
+                              settings: settings,
+                              dark: project.darkOutput,
+                              thumbnail: image(clip, 0),
+                            ),
+                    ),
+                ],
+                if (overlayOnly) ...[
+                  if (map)
+                    Positioned.fill(
+                      child: is3d
+                          ? Streetview3dAerialScene(
+                              settings: settings,
+                              dark: project.darkOutput,
+                              thumbnail: image(clip, 0),
+                            )
+                          : StreetviewMapScene(
+                              settings: settings,
+                              dark: project.darkOutput,
+                              thumbnail: image(clip, 0),
+                            ),
+                    )
+                  else
+                    Positioned.fill(
+                      child: movement
+                          ? classicTransition()
+                          : media(
+                              clip,
+                              isBack ? clip.duration : elapsed,
+                              pixels: isBack,
+                            ),
+                    ),
+                ],
+                if (!map)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: hasCardTransition ? cardT : 1.0,
+                      child: StreetviewChrome(
+                        settings: settings,
+                        dark: project.darkOutput,
+                        is3d: is3d,
                       ),
                     ),
                   ),
-                ),
-                if (map)
-                  Positioned.fill(
-                    child: aerialOrMapScene(thumb: image(clip, 0)),
+                if (ripple >= 0 && ripple < 1 && !is3d)
+                  Positioned(
+                    left: map
+                        ? StreetviewLayout.thumbnailLeft + 41.0
+                        : scene.kind == 'back'
+                        ? 333
+                        : arrow.dx,
+                    top: map
+                        ? StreetviewLayout.thumbnailTop + 27.0
+                        : scene.kind == 'back'
+                        ? 35
+                        : arrow.dy,
+                    child: _Ripple(progress: ripple),
+                  ),
+                if (ripple >= 0 && ripple < 1 && is3d && map)
+                  Positioned(
+                    left: 45,
+                    top: 625,
+                    child: _Ripple(progress: ripple),
                   ),
               ],
-              if (overlayOnly) ...[
-                if (map)
-                  Positioned.fill(
-                    child: aerialOrMapScene(thumb: image(clip, 0)),
-                  )
-                else
-                  Positioned.fill(
-                    child: movement
-                        ? transition()
-                        : media(
-                            clip,
-                            isBack ? clip.duration : elapsed,
-                            pixels: isBack,
-                          ),
-                  ),
-              ],
-              if (!map)
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: hasCardTransition ? cardT : 1.0,
-                    child: StreetviewChrome(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      is3d: is3d,
-                    ),
-                  ),
-                ),
-              if (ripple >= 0 && ripple < 1)
-                Positioned(
-                  left: map
-                      ? (is3d ? 50.0 : StreetviewLayout.thumbnailLeft + 41.0)
-                      : scene.kind == 'back'
-                      ? 333
-                      : arrow.x,
-                  top: map
-                      ? (is3d ? 610.0 : StreetviewLayout.thumbnailTop + 27.0)
-                      : scene.kind == 'back'
-                      ? 35
-                      : arrow.y,
-                  child: _Ripple(progress: ripple),
-                ),
             ],
           ),
         ),

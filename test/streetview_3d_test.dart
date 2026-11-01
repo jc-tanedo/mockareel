@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/streetview_timeline.dart';
 import 'package:mockareel/pages/template_picker_page.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/widgets/streetview_3d_widgets.dart';
@@ -43,6 +44,7 @@ void main() {
               address: '296 Keilor Rd, Essendon',
             ),
             roadLabel: 'Keilor Rd',
+            crossStreetLabel: 'Ogilvie St',
             railStop: 'near',
             date: 'Dec 2025',
           ),
@@ -58,6 +60,7 @@ void main() {
     final json = p.toJson();
     expect(json['template'], 'streetview-3d');
     expect(json['clips'][0]['streetview']['roadLabel'], 'Keilor Rd');
+    expect(json['clips'][0]['streetview']['crossStreetLabel'], 'Ogilvie St');
     expect(json['clips'][0]['streetview']['railStop'], 'near');
 
     final restored = ReelProject.fromJson(json);
@@ -65,7 +68,32 @@ void main() {
     expect(restored.isStreetview, isTrue);
     expect(restored.isStreetview3d, isTrue);
     expect(restored.clips[0].streetview.roadLabel, 'Keilor Rd');
+    expect(restored.clips[0].streetview.crossStreetLabel, 'Ogilvie St');
     expect(restored.clips[0].streetview.railStop, 'near');
+  });
+
+  test('StreetviewTimeline includes dedicated 3D swoop scene', () {
+    final p = ReelProject(
+      template: 'streetview-3d',
+      clips: [
+        ReelClip(
+          id: 'c1',
+          name: 'Clip 1',
+          path: photo,
+          isVideo: false,
+          duration: 3,
+        ),
+      ],
+    );
+
+    final scenes = StreetviewTimeline.scenes(p);
+    expect(scenes.length, 3);
+    expect(scenes[0].kind, 'map');
+    expect(scenes[0].duration, 2.0);
+    expect(scenes[1].kind, 'swoop');
+    expect(scenes[1].duration, 1.35);
+    expect(scenes[2].kind, 'media');
+    expect(scenes[2].duration, 3.0);
   });
 
   test('Streetview3dRailOverlay extracts clean road label fallback', () {
@@ -90,7 +118,7 @@ void main() {
   });
 
   testWidgets(
-    'Streetview 3D canvas renders aerial scene on opening map and compact sheet on media',
+    'Streetview 3D canvas renders aerial hold, 3D swoop, and media stop',
     (tester) async {
       final p = ReelProject(
         template: 'streetview-3d',
@@ -103,8 +131,20 @@ void main() {
             duration: 3,
             streetview: StreetviewMedia(
               place: PlaceDetails(name: '296 Keilor Rd'),
+              crossStreetLabel: 'Ogilvie St',
               mapPath: photo,
               date: '11 months ago',
+            ),
+          ),
+          ReelClip(
+            id: 'c2',
+            path: photo,
+            name: 'C2',
+            isVideo: false,
+            duration: 3,
+            streetview: StreetviewMedia(
+              place: PlaceDetails(name: '417 Keilor Rd'),
+              mapPath: photo,
             ),
           ),
         ],
@@ -122,19 +162,33 @@ void main() {
         ),
       );
 
-      // Opening map scene (position 0)
+      // 1. Opening map scene (position 0)
       await render(0);
       expect(find.byType(Streetview3dAerialScene), findsOneWidget);
       expect(find.text('Street'), findsOneWidget);
       expect(find.byIcon(Icons.directions_walk), findsOneWidget);
 
-      // Media scene (position = openingMapSeconds + 0.5s = 2.5s)
+      // 2. Aerial swoop dive (position 2.5: within swoop duration 2.0 .. 3.35)
       await render(2.5);
+      expect(find.byType(Streetview3dAerialSwoopScene), findsOneWidget);
+
+      // 3. Media scene (position 3.5: within clip 0 duration 3.35 .. 6.35)
+      await render(3.5);
       expect(find.byType(Streetview3dPlaceSheet), findsOneWidget);
       expect(find.text('296 Keilor Rd'), findsOneWidget);
       expect(find.text('11 months ago'), findsOneWidget);
       expect(find.text('See more dates >'), findsOneWidget);
       expect(find.byType(Streetview3dRailOverlay), findsOneWidget);
+      expect(find.text('Ogilvie St'), findsWidgets);
+
+      // 4. On-rails transition between stop 0 and stop 1 (clip 0 transition at 6.35 .. 6.80)
+      // At start of movement (elapsed < rippleSeconds 0.2), tap disc appears
+      await render(6.40);
+      expect(find.byType(Streetview3dTapDisc), findsOneWidget);
+
+      // During forward camera rush (elapsed >= rippleSeconds 0.2), dolly scene appears
+      await render(6.65);
+      expect(find.byType(Streetview3dDollyScene), findsOneWidget);
     },
   );
 

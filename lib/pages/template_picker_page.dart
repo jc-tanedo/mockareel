@@ -190,21 +190,23 @@ class TemplatePickerPage extends StatelessWidget {
                                 color: Colors.black45,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.threesixty,
+                                    is3d
+                                        ? Icons.view_in_ar
+                                        : Icons.threesixty,
                                     size: 12,
                                     color: Colors.white70,
                                   ),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
-                                      'Street View',
+                                      is3d ? 'Street View 3D' : 'Street View',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 9),
+                                      style: const TextStyle(fontSize: 9),
                                     ),
                                   ),
                                 ],
@@ -213,7 +215,35 @@ class TemplatePickerPage extends StatelessWidget {
                           ),
                           Positioned.fill(
                             child: Center(
-                              child: Icon(icon, size: 42, color: accent),
+                              child: is3d
+                                  ? Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.keyboard_arrow_up,
+                                          size: 18,
+                                          color: Colors.white70,
+                                        ),
+                                        RotatedBox(
+                                          quarterTurns: 3,
+                                          child: Text(
+                                            'KEILOR RD',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              color: accent,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.keyboard_arrow_down,
+                                          size: 18,
+                                          color: Colors.white70,
+                                        ),
+                                      ],
+                                    )
+                                  : Icon(icon, size: 42, color: accent),
                             ),
                           ),
                           Positioned(
@@ -234,7 +264,7 @@ class TemplatePickerPage extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    is3d ? '296 Keilor Rd' : 'Dropped pin',
+                                    is3d ? '417 Keilor Rd' : 'Dropped pin',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(

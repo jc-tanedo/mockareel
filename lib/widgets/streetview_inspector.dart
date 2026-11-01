@@ -168,21 +168,22 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           _field('Address', _s.place.address, (v) => _s.place.address = v),
         ],
       ),
-      EditorSectionCard(
-        title: const Text('Map place details and buttons'),
-        subtitle: const Text('Place information and rendered actions'),
-        children: [
-          _field('Category', _s.place.category, (v) => _s.place.category = v),
-          _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
-          PlaceActionsEditor(
-            key: ValueKey(_revision),
-            place: _s.place,
-            embedded: true,
-            suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
-            onChanged: widget.onChanged,
-          ),
-        ],
-      ),
+      if (!widget.project.isStreetview3d)
+        EditorSectionCard(
+          title: const Text('Map place details and buttons'),
+          subtitle: const Text('Place information and rendered actions'),
+          children: [
+            _field('Category', _s.place.category, (v) => _s.place.category = v),
+            _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
+            PlaceActionsEditor(
+              key: ValueKey(_revision),
+              place: _s.place,
+              embedded: true,
+              suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
+              onChanged: widget.onChanged,
+            ),
+          ],
+        ),
       MediaEditsEditor(
         key: ValueKey('effects-${widget.clip.id}'),
         clip: widget.clip,
@@ -327,10 +328,17 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             _s.streetviewTitle,
             (v) => _s.streetviewTitle = v,
           ),
-          if (widget.project.isStreetview3d)
+          if (widget.project.isStreetview3d) ...[
             _field('Road surface label', _s.roadLabel, (v) => _s.roadLabel = v),
-          _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
-          _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
+            _field(
+              'Cross-street label',
+              _s.crossStreetLabel,
+              (v) => _s.crossStreetLabel = v,
+            ),
+          ] else ...[
+            _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
+            _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
+          ],
 
           _field(
             'Source attribution',

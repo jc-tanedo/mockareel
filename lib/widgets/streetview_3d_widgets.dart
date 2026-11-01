@@ -1,77 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import 'streetview_map_scene.dart';
 
-/// Full-bleed opening aerial map scene for Streetview 3D.
-class Streetview3dAerialScene extends StatelessWidget {
-  final StreetviewMedia settings;
-  final bool dark;
-  final Widget? thumbnail;
-  final VoidCallback? onStreetTap;
-
-  const Streetview3dAerialScene({
-    super.key,
-    required this.settings,
-    required this.dark,
-    this.thumbnail,
-    this.onStreetTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: ColoredBox(
-            color: dark ? const Color(0xff15222e) : const Color(0xff233a54),
-          ),
-        ),
-        if (settings.mapPath != null)
-          Positioned.fill(
-            child: Image.file(File(settings.mapPath!), fit: BoxFit.cover),
-          ),
-        // Top right close button
-        Positioned(
-          right: 14,
-          top: 20,
-          child: streetviewRoundButton(Icons.close, 'Close aerial view'),
-        ),
-        // Bottom left "Street" pill button
-        Positioned(
-          left: 14,
-          bottom: 24,
-          child: GestureDetector(
-            onTap: onStreetTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xcc000000),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white24, width: 0.5),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.directions_walk, color: Colors.white, size: 15),
-                  SizedBox(width: 6),
-                  Text(
-                    'Street',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+export 'streetview_3d_scenes.dart';
 
 /// Compact 3D Street View bottom sheet matching Google Maps 3D Immersive View.
 class Streetview3dPlaceSheet extends StatelessWidget {
@@ -204,10 +134,57 @@ class Streetview3dPlaceSheet extends StatelessWidget {
   }
 }
 
-/// Perspective-rendered 3D on-rails road chevrons and street name label.
+/// Solid translucent circular tap disc on road surface.
+class Streetview3dTapDisc extends StatelessWidget {
+  final double progress; // 0.0 .. 1.0 fade/expand progress
+  final String railStop;
+
+  const Streetview3dTapDisc({
+    super.key,
+    required this.progress,
+    this.railStop = 'near',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final alpha = (1.0 - progress).clamp(0.0, 1.0) * 0.52;
+    final isFar = railStop == 'far';
+    final center = isFar ? const Offset(185, 345) : const Offset(172, 448);
+    final discW = isFar ? 58.0 : 74.0;
+    final discH = discW * 0.74;
+
+    return Positioned(
+      left: center.dx - discW / 2,
+      top: center.dy - discH / 2,
+      child: Container(
+        width: discW,
+        height: discH,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: alpha),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.white.withValues(alpha: alpha * 0.6),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Perspective-rendered 3D on-rails road chevrons, vertical outlined street name,
+/// and underfoot camera rush animation.
 class Streetview3dRailOverlay extends StatelessWidget {
   final StreetviewMedia settings;
-  const Streetview3dRailOverlay({super.key, required this.settings});
+  final double transitionProgress; // 0.0 at rest, 0.0..1.0 during forward rush
+
+  const Streetview3dRailOverlay({
+    super.key,
+    required this.settings,
+    this.transitionProgress = 0.0,
+  });
 
   static String resolveRoadName(StreetviewMedia settings) {
     if (settings.roadLabel.trim().isNotEmpty) {
@@ -219,7 +196,6 @@ class Streetview3dRailOverlay extends StatelessWidget {
         ? settings.place.name
         : settings.place.address;
     if (source.isEmpty) return '';
-    // Strip leading numbers if present (e.g. "296 Keilor Rd" -> "Keilor Rd")
     final cleaned = source.replaceFirst(RegExp(r'^\d+[\w-]*\s+'), '');
     return cleaned.split(',').first.trim();
   }
@@ -227,82 +203,235 @@ class Streetview3dRailOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roadName = resolveRoadName(settings);
+    final crossStreet = settings.crossStreetLabel.trim();
+    final t = transitionProgress.clamp(0.0, 1.0);
+
+    final isMoving = t > 0.0;
+    final roadOpacity = !isMoving
+        ? 1.0
+        : t <= 0.45
+        ? (1.0 - (t / 0.45) * (t / 0.45)).clamp(0.0, 1.0)
+        : t >= 0.82
+        ? ((t - 0.82) / 0.18).clamp(0.0, 1.0)
+        : 0.0;
+
+    final roadTranslateY = !isMoving
+        ? 0.0
+        : t <= 0.45
+        ? Curves.easeIn.transform(t / 0.45) * 160.0
+        : 0.0;
+    final roadTranslateX = !isMoving
+        ? 0.0
+        : t <= 0.45
+        ? Curves.easeIn.transform(t / 0.45) * 26.0
+        : 0.0;
+    final roadScale = !isMoving
+        ? 1.0
+        : t <= 0.45
+        ? 1.0 + (t / 0.45) * 0.65
+        : 1.0;
+
+    final chevronsVisible = !isMoving || t >= 0.85;
+    final chevronOpacity = !isMoving
+        ? 1.0
+        : t >= 0.85
+        ? ((t - 0.85) / 0.15).clamp(0.0, 1.0)
+        : 0.0;
+
+    final Matrix4 roadPerspective = Matrix4.identity()
+      ..setEntry(3, 2, 0.0026)
+      ..rotateX(1.08);
+
     return Stack(
       children: [
-        // Road surface canvas (chevrons and street name)
-        Positioned.fill(
-          child: CustomPaint(painter: _RailPainter(roadName: roadName)),
+        // 3D Extruded Chevrons
+        if (chevronsVisible)
+          Positioned.fill(
+            child: Opacity(
+              opacity: chevronOpacity,
+              child: const CustomPaint(painter: _ExtrudedRoadChevronPainter()),
+            ),
+          ),
+        // Optional outlined cross-street name
+        if (crossStreet.isNotEmpty && chevronsVisible)
+          Positioned(
+            right: 18,
+            top: 410,
+            child: Opacity(
+              opacity: chevronOpacity,
+              child: _OutlinedLabel(text: crossStreet, fontSize: 15),
+            ),
+          ),
+        // Giant vertical outlined road name along the lane
+        if (roadName.isNotEmpty && roadOpacity > 0)
+          Positioned(
+            left: 175 + roadTranslateX,
+            top: 360 + roadTranslateY,
+            child: Opacity(
+              opacity: roadOpacity,
+              child: Transform.scale(
+                scale: roadScale,
+                child: Transform(
+                  transform: roadPerspective,
+                  alignment: Alignment.center,
+                  child: RotatedBox(
+                    quarterTurns: 3,
+                    child: _OutlinedLabel(
+                      text: roadName,
+                      fontSize: 42,
+                      letterSpacing: -0.8,
+                      strokeWidth: 4.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _OutlinedLabel extends StatelessWidget {
+  final String text;
+  final double fontSize;
+  final double letterSpacing;
+  final double strokeWidth;
+
+  const _OutlinedLabel({
+    required this.text,
+    this.fontSize = 15,
+    this.letterSpacing = 0.0,
+    this.strokeWidth = 3.5,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Text(
+          text,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..color = const Color(0xdd1b1b1b),
+          ),
+        ),
+        Text(
+          text,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            letterSpacing: letterSpacing,
+            color: const Color(0xf5ffffff),
+          ),
         ),
       ],
     );
   }
 }
 
-class _RailPainter extends CustomPainter {
-  final String roadName;
-  const _RailPainter({required this.roadName});
+/// Custom painter for authentic 3D extruded road chevrons with drop shadow,
+/// dark slate-gray bottom bevel, and crisp white top face.
+class _ExtrudedRoadChevronPainter extends CustomPainter {
+  const _ExtrudedRoadChevronPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.88)
-      ..style = PaintingStyle.fill;
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.35)
+      ..color = const Color(0x66000000)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+    final bevelPaint = Paint()
+      ..color = const Color(0xff686a70)
+      ..style = PaintingStyle.fill;
+    final facePaint = Paint()
+      ..color = const Color(0xfff5f6f8)
       ..style = PaintingStyle.fill;
 
-    void drawChevron(Offset center, double width, double height, bool forward) {
+    void drawChevron({
+      required Offset center,
+      required double width,
+      required double height,
+      required double armThickness,
+      required double bevelDepth,
+      required bool forward,
+    }) {
       final sign = forward ? -1.0 : 1.0;
-      final path = Path()
-        ..moveTo(center.dx - width / 2, center.dy + sign * height / 2)
-        ..lineTo(center.dx, center.dy - sign * height / 2)
-        ..lineTo(center.dx + width / 2, center.dy + sign * height / 2)
-        ..lineTo(center.dx + width / 2 - 4, center.dy + sign * height / 2 + 3)
-        ..lineTo(center.dx, center.dy - sign * height / 2 + 5)
-        ..lineTo(center.dx - width / 2 + 4, center.dy + sign * height / 2 + 3)
+      final apexY = center.dy - sign * height / 2;
+      final wingY = center.dy + sign * height / 2;
+      final notchY = apexY + sign * armThickness * 1.15;
+      final leftWingX = center.dx - width / 2;
+      final rightWingX = center.dx + width / 2;
+      final innerLeftX = leftWingX + armThickness * 0.75;
+      final innerRightX = rightWingX - armThickness * 0.75;
+
+      final topFace = Path()
+        ..moveTo(leftWingX, wingY)
+        ..lineTo(center.dx, apexY)
+        ..lineTo(rightWingX, wingY)
+        ..lineTo(innerRightX, wingY)
+        ..lineTo(center.dx, notchY)
+        ..lineTo(innerLeftX, wingY)
         ..close();
 
-      // Shadow shifted down slightly
-      canvas.drawPath(path.shift(const Offset(0, 2)), shadowPaint);
-      canvas.drawPath(path, paint);
-    }
-
-    // Midground forward chevron (∧)
-    drawChevron(const Offset(180, 430), 38, 16, true);
-    // Foreground backward chevron (∨)
-    drawChevron(const Offset(180, 512), 48, 20, false);
-
-    // Street name text in perspective on the road surface
-    if (roadName.isNotEmpty) {
-      final span = TextSpan(
-        text: roadName,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.85),
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1.2,
-          shadows: const [
-            Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1)),
-          ],
-        ),
+      canvas.drawPath(
+        topFace.shift(Offset(0, bevelDepth + 1.5)),
+        shadowPaint,
       );
-      final tp = TextPainter(text: span, textDirection: TextDirection.ltr)
-        ..layout();
 
-      canvas.save();
-      // Translate to middle road position
-      canvas.translate(180, 465);
-      // Perspective tilt to lay flat on the road
-      final matrix = Matrix4.identity()
-        ..setEntry(3, 2, 0.002)
-        ..rotateX(0.75);
-      canvas.transform(matrix.storage);
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
+      final bevelPath = Path();
+      if (!forward) {
+        bevelPath
+          ..moveTo(leftWingX, wingY)
+          ..lineTo(center.dx, apexY)
+          ..lineTo(rightWingX, wingY)
+          ..lineTo(rightWingX, wingY + bevelDepth)
+          ..lineTo(center.dx, apexY + bevelDepth)
+          ..lineTo(leftWingX, wingY + bevelDepth)
+          ..close();
+      } else {
+        bevelPath
+          ..moveTo(innerLeftX, wingY)
+          ..lineTo(center.dx, notchY)
+          ..lineTo(innerRightX, wingY)
+          ..lineTo(innerRightX, wingY + bevelDepth)
+          ..lineTo(center.dx, notchY + bevelDepth)
+          ..lineTo(innerLeftX, wingY + bevelDepth)
+          ..close();
+      }
+      canvas.drawPath(bevelPath, bevelPaint);
+      canvas.drawPath(topFace, facePaint);
     }
+
+    // Midground forward chevron (∧) at (172, 448)
+    drawChevron(
+      center: const Offset(172, 448),
+      width: 58,
+      height: 14,
+      armThickness: 6.5,
+      bevelDepth: 3.0,
+      forward: true,
+    );
+
+    // Foreground backward chevron (∨) at (162, 538)
+    drawChevron(
+      center: const Offset(162, 538),
+      width: 86,
+      height: 28,
+      armThickness: 12,
+      bevelDepth: 5.0,
+      forward: false,
+    );
   }
 
   @override
-  bool shouldRepaint(_RailPainter oldDelegate) =>
-      roadName != oldDelegate.roadName;
+  bool shouldRepaint(_ExtrudedRoadChevronPainter oldDelegate) => false;
 }

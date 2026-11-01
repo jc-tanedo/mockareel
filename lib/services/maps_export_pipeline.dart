@@ -202,7 +202,9 @@ class MapsExportPipeline {
       for (var i = 0; i < scenes.length; i++) {
         final scene = scenes[i];
         final clip = project.clips[scene.mediaIndex];
-        if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+        if ((scene.kind == 'map' ||
+                scene.kind == 'ending-map' ||
+                scene.kind == 'swoop') &&
             clip.streetview.mapPath == null) {
           throw FormatException(
             'Capture a map for “${clip.name}” before exporting.',
