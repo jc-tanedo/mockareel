@@ -272,6 +272,7 @@ class ReelProject {
     storyChromeEffects = val;
     storyChromeLike = val;
   }
+
   bool darkOutput;
   double slideSeconds, sheetIntroSeconds;
   String headerMode;
@@ -393,18 +394,18 @@ class ReelProject {
     music: json['music'] == null
         ? null
         : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
-    storyChromeClose: json['storyChromeClose'] as bool? ??
-        (json['storyChrome'] == true),
-    storyChromeText: json['storyChromeText'] as bool? ??
-        (json['storyChrome'] == true),
-    storyChromeStickers: json['storyChromeStickers'] as bool? ??
-        (json['storyChrome'] == true),
-    storyChromeMusic: json['storyChromeMusic'] as bool? ??
-        (json['storyChrome'] == true),
-    storyChromeEffects: json['storyChromeEffects'] as bool? ??
-        (json['storyChrome'] == true),
-    storyChromeLike: json['storyChromeLike'] as bool? ??
-        (json['storyChrome'] == true),
+    storyChromeClose:
+        json['storyChromeClose'] as bool? ?? (json['storyChrome'] == true),
+    storyChromeText:
+        json['storyChromeText'] as bool? ?? (json['storyChrome'] == true),
+    storyChromeStickers:
+        json['storyChromeStickers'] as bool? ?? (json['storyChrome'] == true),
+    storyChromeMusic:
+        json['storyChromeMusic'] as bool? ?? (json['storyChrome'] == true),
+    storyChromeEffects:
+        json['storyChromeEffects'] as bool? ?? (json['storyChrome'] == true),
+    storyChromeLike:
+        json['storyChromeLike'] as bool? ?? (json['storyChrome'] == true),
     darkOutput: json['darkOutput'] == true,
     heroClipId: json['heroClipId'] as String?,
     headerMode: json['headerMode'] as String? ?? 'photo',
