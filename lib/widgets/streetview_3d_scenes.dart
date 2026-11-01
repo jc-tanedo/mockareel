@@ -105,10 +105,6 @@ class Streetview3dAerialSwoopScene extends StatelessWidget {
     final sheetT = ((u - 0.75) / 0.25).clamp(0.0, 1.0);
     final sheetSlideY = (1.0 - Curves.easeOutCubic.transform(sheetT)) * 95.0;
 
-    // Pill position moves from bottom: 24 to bottom: 98
-    final pillBottom = ui.lerpDouble(24.0, 98.0, sheetT)!;
-    final pillLabel = sheetT >= 0.5 ? 'Aerial' : 'Street';
-
     final Matrix4 groundPitch = Matrix4.identity()
       ..setEntry(3, 2, 0.0024)
       ..rotateX(pitchT * 1.22);
