@@ -206,11 +206,9 @@ class StreetviewCanvas extends StatelessWidget {
                   Positioned.fill(
                     child: media(clip, clip.duration, pixels: !overlayOnly),
                   ),
-                  Positioned.fill(
-                    child: Streetview3dTapDisc(
-                      progress: elapsed / StreetviewTimeline.rippleSeconds,
-                      railStop: settings.railStop,
-                    ),
+                  Streetview3dTapDisc(
+                    progress: elapsed / StreetviewTimeline.rippleSeconds,
+                    railStop: settings.railStop,
                   ),
                   Positioned.fill(
                     child: StreetviewChrome(
