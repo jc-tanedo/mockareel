@@ -8,6 +8,7 @@ import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
+import 'streetview_map_scene.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -173,76 +174,105 @@ class StreetviewCanvas extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              if (map || hasCardTransition)
+              if (!overlayOnly) ...[
                 Positioned.fill(
-                  child: StreetviewMapScene(
-                    settings: settings,
-                    dark: project.darkOutput,
-                    thumbnail: hasCardTransition
-                        ? const SizedBox()
-                        : image(clip, 0),
+                  child: ColoredBox(
+                    color: movement ? Colors.black : Colors.transparent,
                   ),
                 ),
-              if (hasCardTransition)
-                Positioned.fromRect(
-                  rect: activeRect,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(activeRadius),
-                      border: Border.all(
-                        color: Colors.white.withValues(
-                          alpha: 0.6 * (1.0 - cardT),
-                        ),
-                        width: 1,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(activeRadius),
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: 360,
-                          height: 640,
-                          child: media(
-                            clip,
-                            isBack ? clip.duration : elapsed,
-                            pixels: true,
-                          ),
-                        ),
-                      ),
+                if (map || hasCardTransition)
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: hasCardTransition
+                          ? const SizedBox()
+                          : image(clip, 0),
                     ),
                   ),
-                )
-              else if (!map) ...[
-                if (!overlayOnly)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: movement ? Colors.black : Colors.transparent,
-                    ),
-                  ),
-                if (!overlayOnly)
-                  Positioned.fill(
-                    key: const ValueKey('streetview-media-players'),
-                    child: ClipRect(
-                      child: ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(
-                          sigmaX: movement ? blurX : 0,
-                          sigmaY: movement ? blurY : 0,
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            for (
-                              var j = max(0, i - 1);
-                              j <= min(project.clips.length - 1, i + 1);
-                              j++
-                            )
-                              Positioned.fill(
-                                key: ValueKey(
-                                  'streetview-player-${project.clips[j].id}',
-                                ),
-                                child: movement
+                Positioned.fill(
+                  key: const ValueKey('streetview-media-players'),
+                  child: ClipRect(
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(
+                        sigmaX: movement ? blurX : 0,
+                        sigmaY: movement ? blurY : 0,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          for (
+                            var j = max(0, i - 1);
+                            j <= min(project.clips.length - 1, i + 1);
+                            j++
+                          )
+                            Positioned.fill(
+                              key: ValueKey(
+                                'streetview-player-${project.clips[j].id}',
+                              ),
+                              child: Opacity(
+                                opacity: map
+                                    ? 0
+                                    : movement
+                                    ? (j == i
+                                          ? outgoingOpacity
+                                          : j == i + 1
+                                          ? incomingOpacity
+                                          : 0)
+                                    : j == i
+                                    ? 1
+                                    : 0,
+                                child: hasCardTransition && j == i
+                                    ? Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Transform.translate(
+                                          offset: Offset(
+                                            activeRect.left,
+                                            activeRect.top,
+                                          ),
+                                          child: SizedBox(
+                                            width: activeRect.width,
+                                            height: activeRect.height,
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                  activeRadius,
+                                                ),
+                                                border: Border.all(
+                                                  color: Colors.white
+                                                      .withValues(
+                                                        alpha:
+                                                            0.6 * (1.0 - cardT),
+                                                      ),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                  activeRadius,
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.cover,
+                                                  alignment: Alignment.center,
+                                                  child: SizedBox(
+                                                    width: 360,
+                                                    height: 640,
+                                                    child: media(
+                                                      project.clips[j],
+                                                      isBack
+                                                          ? clip.duration
+                                                          : elapsed,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : movement
                                     ? (j == i
                                           ? Opacity(
                                               opacity: outgoingOpacity,
@@ -275,16 +305,29 @@ class StreetviewCanvas extends StatelessWidget {
                                     : (j == i
                                           ? media(
                                               project.clips[j],
-                                              isBack ? clip.duration : elapsed,
+                                              isBack
+                                                  ? clip.duration
+                                                  : elapsed,
                                             )
                                           : const SizedBox()),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                if (overlayOnly)
+                ),
+              ],
+              if (overlayOnly) ...[
+                if (map)
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: image(clip, 0),
+                    ),
+                  )
+                else
                   Positioned.fill(
                     child: movement
                         ? transition()
