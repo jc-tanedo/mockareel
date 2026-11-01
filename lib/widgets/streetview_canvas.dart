@@ -128,7 +128,7 @@ class StreetviewCanvas extends StatelessWidget {
                             c.id == clip.id &&
                             position < project.duration,
                       ),
-              if (c.streetview.showArrows && !movement)
+              if (c.id == clip.id && c.streetview.showArrows && !movement)
                 is3d
                     ? Streetview3dRailOverlay(settings: c.streetview)
                     : const StreetviewArrows(),
