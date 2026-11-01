@@ -95,16 +95,6 @@ class _TimelinePreviewState extends State<TimelinePreview>
     _ticker = createTicker(_tick);
     _position = _selectedStart;
     _lastClipsCount = widget.project.clips.length;
-    if (widget.autoPlay && widget.project.clips.isNotEmpty && !_userPaused) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            widget.project.clips.isNotEmpty &&
-            !_userPaused &&
-            !_playing) {
-          _play();
-        }
-      });
-    }
   }
 
   @override

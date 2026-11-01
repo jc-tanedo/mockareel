@@ -89,21 +89,34 @@ void main() {
         duration: 2.0,
       );
 
-      final project = ReelProject(clips: [clip1]);
+      final emptyProject = ReelProject(clips: const []);
 
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: TimelinePreview(project: emptyProject)),
+        ),
+      );
+      await tester.pump();
+
+      // At start with no media, preview is idle
+      expect(find.byTooltip('Play preview'), findsOneWidget);
+
+      // Media gets selected / added
+      final project = ReelProject(clips: [clip1]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: project)),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
 
-      // Check play/pause state
+      // Autoplay activates
       expect(find.byTooltip('Pause preview'), findsOneWidget);
 
       // User explicitly pauses the preview
       await tester.tap(find.byTooltip('Pause preview'));
-      await tester.pumpAndSettle();
+      await tester.pump();
       expect(find.byTooltip('Play preview'), findsOneWidget);
 
       // Add a second media clip while paused
@@ -113,15 +126,21 @@ void main() {
           home: Scaffold(body: TimelinePreview(project: updatedProject)),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
 
-      // Must respect user pause and NOT autoplay
+      // Must respect user pause and NOT autoplay on additional media import
       expect(find.byTooltip('Play preview'), findsOneWidget);
 
       // User explicitly plays
       await tester.tap(find.byTooltip('Play preview'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
       expect(find.byTooltip('Pause preview'), findsOneWidget);
+
+      // Cleanup
+      await tester.tap(find.byTooltip('Pause preview'));
+      await tester.pump();
     });
 
     testWidgets('loops smoothly across duration when playing', (tester) async {
@@ -132,14 +151,24 @@ void main() {
         isVideo: false,
         duration: 1.0,
       );
-      final project = ReelProject(clips: [clip]);
+      final emptyProject = ReelProject(clips: const []);
 
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TimelinePreview(project: emptyProject, loop: true),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final project = ReelProject(clips: [clip]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: project, loop: true)),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       // Let ticker advance past duration
       await tester.pump(const Duration(milliseconds: 1500));
@@ -150,6 +179,10 @@ void main() {
       expect(canvas.position, closeTo(0.5, 0.2));
       expect(canvas.playing, isTrue);
       expect(find.byTooltip('Pause preview'), findsOneWidget);
+
+      // Cleanup
+      await tester.tap(find.byTooltip('Pause preview'));
+      await tester.pump();
     });
   });
 
