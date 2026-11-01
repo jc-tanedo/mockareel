@@ -100,14 +100,26 @@ internal class MediaEditsProcessor(private val context: Context) {
     }
     private fun dimensions(path: String, video: Boolean): Pair<Int, Int> {
         if (!video) return PosterCache().dimensions(path)
+        val file = File(path)
         val reader = MediaMetadataRetriever()
         try {
-            reader.setDataSource(path)
-            val w = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)!!.toInt()
-            val h = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)!!.toInt()
-            val rotation = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toInt() ?: 0
-            return if (rotation % 180 == 0) w to h else h to w
-        } finally { reader.release() }
+            try {
+                java.io.FileInputStream(file).use { reader.setDataSource(it.fd) }
+            } catch (_: Exception) {
+                reader.setDataSource(path)
+            }
+            val w = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rotation = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            if (w > 0 && h > 0) {
+                return if (rotation % 180 == 0) w to h else h to w
+            }
+            return 1080 to 1920
+        } catch (_: Exception) {
+            return 1080 to 1920
+        } finally {
+            try { reader.release() } catch (_: Exception) {}
+        }
     }
     private fun finish(result: MethodChannel.Result) {
         val path = output!!.path

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../model/project.dart';
 import 'gif_media.dart';
 import 'native_renderer.dart';
@@ -31,7 +32,17 @@ class MediaImporter {
     final info = video
         ? await renderer.inspect(file.path)
         : <String, dynamic>{};
-    final length = (info['duration'] as num?)?.toDouble() ?? 0;
+    var length = (info['duration'] as num?)?.toDouble() ?? 0;
+    if (video && length <= 0) {
+      try {
+        final player = VideoPlayerController.file(File(file.path));
+        await player.initialize();
+        if (player.value.duration > Duration.zero) {
+          length = player.value.duration.inMicroseconds / 1000000.0;
+        }
+        await player.dispose();
+      } catch (_) {}
+    }
     if (video && length <= 0) {
       throw const FormatException('Video duration is unavailable');
     }
@@ -96,11 +107,37 @@ class MediaImporter {
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: audioExtensions,
-    ).catchError((Object _) => FilePicker.pickFile(type: FileType.audio));
+    ).catchError(
+      (Object _) => FilePicker.pickFile(
+        type: FileType.any,
+      ),
+    ).catchError(
+      (Object _) => FilePicker.pickFile(
+        type: FileType.audio,
+      ),
+    );
     if (file?.path == null) return null;
     final info = await renderer.inspect(file!.path!);
-    final duration = (info['duration'] as num?)?.toDouble() ?? 0;
-    if (info['hasAudio'] != true || duration <= 0) {
+    var duration = (info['duration'] as num?)?.toDouble() ?? 0;
+    var hasAudio = info['hasAudio'] == true;
+    if (!hasAudio) {
+      final ext = file.name.split('.').last.toLowerCase();
+      if (audioExtensions.contains(ext)) {
+        hasAudio = true;
+      }
+    }
+    if (!hasAudio || duration <= 0) {
+      try {
+        final player = VideoPlayerController.file(File(file.path!));
+        await player.initialize();
+        if (player.value.duration > Duration.zero) {
+          duration = player.value.duration.inMicroseconds / 1000000.0;
+          hasAudio = true;
+        }
+        await player.dispose();
+      } catch (_) {}
+    }
+    if (!hasAudio || duration <= 0) {
       throw const FormatException('Choose an audio file your device can play.');
     }
     final path = await store.retainMedia(file.path!, file.name);

@@ -187,6 +187,7 @@ void main() {
       expect(MediaImporter.audioExtensions, contains('aac'));
       expect(MediaImporter.audioExtensions, contains('m4a'));
       expect(MediaImporter.audioExtensions, contains('mp3'));
+      expect(MediaImporter.videoExtensions, contains('mp4'));
     });
   });
 }
