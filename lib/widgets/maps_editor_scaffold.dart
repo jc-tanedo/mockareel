@@ -121,9 +121,7 @@ class MapsEditorScaffold extends StatelessWidget {
           Scaffold(
             appBar: EditorAppBar(
               title: project.title,
-              formatLabel: project.isStreetview3d
-                  ? 'STREET VIEW 3D · 9:16'
-                  : project.isStreetview
+              formatLabel: project.isStreetview
                   ? 'STREET VIEW JOURNEY · 9:16'
                   : 'MAPS PLACE STORY · 9:16',
               dirty: dirty,

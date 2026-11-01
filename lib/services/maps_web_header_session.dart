@@ -7,7 +7,7 @@ import 'maps_web_session.dart';
 
 abstract interface class MapsHeaderDriver {
   Future<void> initialize();
-  Future<void> load(PlaceDetails place, {bool satellite = false});
+  Future<void> load(PlaceDetails place);
 
   Future<void> zoom(bool inward);
   Future<Uint8List> capture(Rect physicalBounds);
@@ -27,11 +27,9 @@ class MapsWebHeaderSession implements MapsHeaderDriver {
   @override
   Future<void> initialize() => _session.initialize();
   @override
-  Future<void> load(PlaceDetails place, {bool satellite = false}) async {
+  Future<void> load(PlaceDetails place) async {
     final generation = ++_generation;
-    await controller.loadRequest(
-      MapsWebUrls.header(place, satellite: satellite),
-    );
+    await controller.loadRequest(MapsWebUrls.header(place));
     final script = await _script;
     final timer = Stopwatch()..start();
     var stable = 0;

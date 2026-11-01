@@ -63,14 +63,6 @@ class TemplatePickerPage extends StatelessWidget {
                   Icons.streetview,
                   const Color(0xff8bd3dd),
                 ),
-                _template(
-                  context,
-                  'streetview-3d',
-                  'Streetview 3D',
-                  'Aerial dive & on-rails road journey',
-                  Icons.view_in_ar_outlined,
-                  const Color(0xff77a8ff),
-                ),
               ],
             ),
           ),
@@ -90,8 +82,7 @@ class TemplatePickerPage extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final feed = id == 'tiktok-feed';
-    final street = id == 'streetview' || id == 'streetview-3d';
-    final is3d = id == 'streetview-3d';
+    final street = id == 'streetview';
     return Card(
       margin: EdgeInsets.zero,
       color: colors.surfaceContainerLow,
@@ -190,21 +181,21 @@ class TemplatePickerPage extends StatelessWidget {
                                 color: Colors.black45,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Row(
+                              child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    is3d ? Icons.view_in_ar : Icons.threesixty,
+                                    Icons.threesixty,
                                     size: 12,
                                     color: Colors.white70,
                                   ),
-                                  const SizedBox(width: 4),
+                                  SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
-                                      is3d ? 'Street View 3D' : 'Street View',
+                                      'Street View',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 9),
+                                      style: TextStyle(fontSize: 9),
                                     ),
                                   ),
                                 ],
@@ -213,35 +204,7 @@ class TemplatePickerPage extends StatelessWidget {
                           ),
                           Positioned.fill(
                             child: Center(
-                              child: is3d
-                                  ? Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.keyboard_arrow_up,
-                                          size: 18,
-                                          color: Colors.white70,
-                                        ),
-                                        RotatedBox(
-                                          quarterTurns: 3,
-                                          child: Text(
-                                            'KEILOR RD',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w900,
-                                              color: accent,
-                                              letterSpacing: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        const Icon(
-                                          Icons.keyboard_arrow_down,
-                                          size: 18,
-                                          color: Colors.white70,
-                                        ),
-                                      ],
-                                    )
-                                  : Icon(icon, size: 42, color: accent),
+                              child: Icon(icon, size: 42, color: accent),
                             ),
                           ),
                           Positioned(
@@ -261,44 +224,34 @@ class TemplatePickerPage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    is3d ? '417 Keilor Rd' : 'Dropped pin',
+                                  const Text(
+                                    'Dropped pin',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  if (is3d)
-                                    const Text(
-                                      '11 mo ago · See more >',
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: accent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      'Directions',
                                       style: TextStyle(
-                                        fontSize: 7.5,
-                                        color: Color(0xff8ab4f8),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: accent,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        'Directions',
-                                        style: TextStyle(
-                                          fontSize: 8,
-                                          color: Color(0xff00333c),
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                        fontSize: 8,
+                                        color: Color(0xff00333c),
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                  ),
                                 ],
                               ),
                             ),

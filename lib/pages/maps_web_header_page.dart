@@ -19,7 +19,6 @@ class MapsWebHeaderPage extends StatefulWidget {
   final Widget? browserOverride;
   final double aspectRatio;
   final bool showHeaderGuide;
-  final bool initialSatellite;
   const MapsWebHeaderPage({
     super.key,
     required this.place,
@@ -27,7 +26,6 @@ class MapsWebHeaderPage extends StatefulWidget {
     this.browserOverride,
     this.aspectRatio = 1000 / 625,
     this.showHeaderGuide = true,
-    this.initialSatellite = false,
   }) : assert(driver == null || browserOverride != null),
        assert(aspectRatio > 0 && aspectRatio < 10);
   @override
@@ -39,7 +37,6 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
   WebViewController? _controller;
   MapsHeaderDriver? _driver;
   bool _ready = false, _busy = false;
-  late bool _satellite = widget.initialSatellite;
   String _credits = "";
   String _status = 'Loading Google Maps…';
   String? _error;
@@ -89,7 +86,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
       _status = 'Loading Google Maps…';
     });
     try {
-      await _driver!.load(widget.place, satellite: _satellite);
+      await _driver!.load(widget.place);
       if (!mounted || generation != _generation) return;
       if (mounted && generation == _generation) {
         setState(() {
@@ -275,19 +272,6 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
             tooltip: 'Zoom in',
             onPressed: _ready && !_busy ? () => _zoom(true) : null,
             icon: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filledTonal(
-            tooltip: _satellite ? 'Map view' : 'Satellite / aerial view',
-            onPressed: _ready && !_busy
-                ? () {
-                    setState(() => _satellite = !_satellite);
-                    _load();
-                  }
-                : null,
-            icon: Icon(
-              _satellite ? Icons.map_outlined : Icons.satellite_alt_outlined,
-            ),
           ),
           const Spacer(),
           TextButton.icon(
