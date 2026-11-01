@@ -39,7 +39,6 @@ class _TimelinePreviewState extends State<TimelinePreview>
   late final Ticker _ticker;
   double _base = 0, _position = 0;
   bool _userPaused = false;
-  int _lastClipsCount = 0;
   bool get _playing => _ticker.isActive;
   double get _duration => widget.project.isFeed
       ? FeedTimeline.duration(widget.project)
@@ -94,16 +93,13 @@ class _TimelinePreviewState extends State<TimelinePreview>
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_tick);
     _position = _selectedStart;
-    _lastClipsCount = widget.project.clips.length;
   }
 
   @override
   void didUpdateWidget(TimelinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final clipsCount = widget.project.clips.length;
     final mediaSelected =
         oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty;
-    _lastClipsCount = clipsCount;
 
     if (oldWidget.project.id != widget.project.id) {
       _userPaused = false;
