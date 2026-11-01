@@ -328,11 +328,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             (v) => _s.streetviewTitle = v,
           ),
           if (widget.project.isStreetview3d)
-            _field(
-              'Road surface label',
-              _s.roadLabel,
-              (v) => _s.roadLabel = v,
-            ),
+            _field('Road surface label', _s.roadLabel, (v) => _s.roadLabel = v),
           _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
           _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
 

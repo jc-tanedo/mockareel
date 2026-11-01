@@ -29,19 +29,13 @@ class Streetview3dAerialScene extends StatelessWidget {
         ),
         if (settings.mapPath != null)
           Positioned.fill(
-            child: Image.file(
-              File(settings.mapPath!),
-              fit: BoxFit.cover,
-            ),
+            child: Image.file(File(settings.mapPath!), fit: BoxFit.cover),
           ),
         // Top right close button
         Positioned(
           right: 14,
           top: 20,
-          child: streetviewRoundButton(
-            Icons.close,
-            'Close aerial view',
-          ),
+          child: streetviewRoundButton(Icons.close, 'Close aerial view'),
         ),
         // Bottom left "Street" pill button
         Positioned(
@@ -59,11 +53,7 @@ class Streetview3dAerialScene extends StatelessWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.directions_walk,
-                    color: Colors.white,
-                    size: 15,
-                  ),
+                  Icon(Icons.directions_walk, color: Colors.white, size: 15),
                   SizedBox(width: 6),
                   Text(
                     'Street',
@@ -101,10 +91,10 @@ class Streetview3dPlaceSheet extends StatelessWidget {
     final title = settings.streetviewTitle.isNotEmpty
         ? settings.streetviewTitle
         : settings.place.name.isEmpty
-            ? (settings.place.address.isNotEmpty
-                ? settings.place.address
-                : 'Dropped pin')
-            : settings.place.name;
+        ? (settings.place.address.isNotEmpty
+              ? settings.place.address
+              : 'Dropped pin')
+        : settings.place.name;
     final dateSubtitle = settings.date.isNotEmpty
         ? settings.date
         : '11 months ago';
@@ -203,11 +193,7 @@ class Streetview3dPlaceSheet extends StatelessWidget {
                         : Colors.black.withValues(alpha: 0.05),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.share_outlined,
-                    size: 18,
-                    color: ink,
-                  ),
+                  child: Icon(Icons.share_outlined, size: 18, color: ink),
                 ),
               ],
             ),
@@ -230,8 +216,8 @@ class Streetview3dRailOverlay extends StatelessWidget {
     final source = settings.streetviewTitle.isNotEmpty
         ? settings.streetviewTitle
         : settings.place.name.isNotEmpty
-            ? settings.place.name
-            : settings.place.address;
+        ? settings.place.name
+        : settings.place.address;
     if (source.isEmpty) return '';
     // Strip leading numbers if present (e.g. "296 Keilor Rd" -> "Keilor Rd")
     final cleaned = source.replaceFirst(RegExp(r'^\d+[\w-]*\s+'), '');
@@ -245,9 +231,7 @@ class Streetview3dRailOverlay extends StatelessWidget {
       children: [
         // Road surface canvas (chevrons and street name)
         Positioned.fill(
-          child: CustomPaint(
-            painter: _RailPainter(roadName: roadName),
-          ),
+          child: CustomPaint(painter: _RailPainter(roadName: roadName)),
         ),
       ],
     );
@@ -302,10 +286,8 @@ class _RailPainter extends CustomPainter {
           ],
         ),
       );
-      final tp = TextPainter(
-        text: span,
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final tp = TextPainter(text: span, textDirection: TextDirection.ltr)
+        ..layout();
 
       canvas.save();
       // Translate to middle road position

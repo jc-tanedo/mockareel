@@ -121,10 +121,7 @@ class StreetviewChrome extends StatelessWidget {
           right: 0,
           bottom: 0,
           child: is3d
-              ? Streetview3dPlaceSheet(
-                  settings: settings,
-                  dark: dark,
-                )
+              ? Streetview3dPlaceSheet(settings: settings, dark: dark)
               : StreetviewPlaceSheet(
                   settings: settings,
                   dark: dark,

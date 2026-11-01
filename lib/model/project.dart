@@ -371,11 +371,12 @@ class ReelProject {
   factory ReelProject.fromJson(Map<String, dynamic> json) => ReelProject(
     id: json['id'] as String?,
     title: json['title'] as String? ?? 'My place reel',
-    template: const {
-      'tiktok-feed',
-      'streetview',
-      'streetview-3d',
-    }.contains(json['template'])
+    template:
+        const {
+          'tiktok-feed',
+          'streetview',
+          'streetview-3d',
+        }.contains(json['template'])
         ? json['template'] as String
         : 'maps-place',
     streetview: StreetviewSettings.fromJson(

@@ -260,8 +260,7 @@ class TemplatePickerPage extends StatelessWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: accent,
-                                        borderRadius:
-                                            BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Text(
                                         'Directions',

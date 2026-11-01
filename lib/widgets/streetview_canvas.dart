@@ -74,29 +74,29 @@ class StreetviewCanvas extends StatelessWidget {
     const thumbScale = 82.0 / 360.0;
     final activeScale = is3d
         ? (isExpanding
-            ? ui.lerpDouble(0.65, 1.0, expandT)!
-            : isShrinking
-            ? ui.lerpDouble(1.0, 0.65, shrinkT)!
-            : 1.0)
+              ? ui.lerpDouble(0.65, 1.0, expandT)!
+              : isShrinking
+              ? ui.lerpDouble(1.0, 0.65, shrinkT)!
+              : 1.0)
         : (isExpanding
-            ? ui.lerpDouble(thumbScale, 1.0, expandT)!
-            : isShrinking
-            ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
-            : 1.0);
+              ? ui.lerpDouble(thumbScale, 1.0, expandT)!
+              : isShrinking
+              ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
+              : 1.0);
     final activeOffset = is3d
         ? Offset.zero
         : (isExpanding
-            ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
-            : isShrinking
-            ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
-            : Offset.zero);
+              ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
+              : isShrinking
+              ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
+              : Offset.zero);
     final activeRadius = is3d
         ? 0.0
         : (isExpanding
-            ? ui.lerpDouble(48.29, 0.0, expandT)!
-            : isShrinking
-            ? ui.lerpDouble(0.0, 48.29, shrinkT)!
-            : 0.0);
+              ? ui.lerpDouble(48.29, 0.0, expandT)!
+              : isShrinking
+              ? ui.lerpDouble(0.0, 48.29, shrinkT)!
+              : 0.0);
 
     // Aerial dive 3D matrix for Streetview 3D
     final aerialDiveProgress = isExpanding
@@ -202,10 +202,10 @@ class StreetviewCanvas extends StatelessWidget {
     );
 
     final arrow = is3d
-        ? StreetviewMotion.at(clip, clip.duration).project(
-            180.0,
-            settings.railStop == 'far' ? 365.0 : 430.0,
-          )
+        ? StreetviewMotion.at(
+            clip,
+            clip.duration,
+          ).project(180.0, settings.railStop == 'far' ? 365.0 : 430.0)
         : StreetviewMotion.at(clip, clip.duration).project(
             settings.arrow == 'left'
                 ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2

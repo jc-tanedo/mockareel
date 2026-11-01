@@ -39,7 +39,10 @@ void main() {
           path: photo,
           duration: 3,
           streetview: StreetviewMedia(
-            place: PlaceDetails(name: '296 Keilor Rd', address: '296 Keilor Rd, Essendon'),
+            place: PlaceDetails(
+              name: '296 Keilor Rd',
+              address: '296 Keilor Rd, Essendon',
+            ),
             roadLabel: 'Keilor Rd',
             railStop: 'near',
             date: 'Dec 2025',
@@ -81,64 +84,62 @@ void main() {
       roadLabel: 'Custom Highway',
       streetviewTitle: '10 Main St',
     );
-    expect(Streetview3dRailOverlay.resolveRoadName(settings3), 'Custom Highway');
+    expect(
+      Streetview3dRailOverlay.resolveRoadName(settings3),
+      'Custom Highway',
+    );
   });
 
-  testWidgets('Streetview 3D canvas renders aerial scene on opening map and compact sheet on media', (tester) async {
-    final p = ReelProject(
-      template: 'streetview-3d',
-      clips: [
-        ReelClip(
-          id: 'c1',
-          path: photo,
-          name: 'C1',
-          duration: 3,
-          streetview: StreetviewMedia(
-            place: PlaceDetails(name: '296 Keilor Rd'),
-            mapPath: photo,
-            date: '11 months ago',
+  testWidgets(
+    'Streetview 3D canvas renders aerial scene on opening map and compact sheet on media',
+    (tester) async {
+      final p = ReelProject(
+        template: 'streetview-3d',
+        clips: [
+          ReelClip(
+            id: 'c1',
+            path: photo,
+            name: 'C1',
+            duration: 3,
+            streetview: StreetviewMedia(
+              place: PlaceDetails(name: '296 Keilor Rd'),
+              mapPath: photo,
+              date: '11 months ago',
+            ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
 
-    Future<void> render(double time) => tester.pumpWidget(
-      MaterialApp(
-        home: Center(
-          child: SizedBox(
-            width: 360,
-            height: 640,
-            child: ReelCanvas(
-              project: p,
-              position: time,
-              posterOnly: true,
+      Future<void> render(double time) => tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 360,
+              height: 640,
+              child: ReelCanvas(project: p, position: time, posterOnly: true),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    // Opening map scene (position 0)
-    await render(0);
-    expect(find.byType(Streetview3dAerialScene), findsOneWidget);
-    expect(find.text('Street'), findsOneWidget);
-    expect(find.byIcon(Icons.directions_walk), findsOneWidget);
+      // Opening map scene (position 0)
+      await render(0);
+      expect(find.byType(Streetview3dAerialScene), findsOneWidget);
+      expect(find.text('Street'), findsOneWidget);
+      expect(find.byIcon(Icons.directions_walk), findsOneWidget);
 
-    // Media scene (position = openingMapSeconds + 0.5s = 2.5s)
-    await render(2.5);
-    expect(find.byType(Streetview3dPlaceSheet), findsOneWidget);
-    expect(find.text('296 Keilor Rd'), findsOneWidget);
-    expect(find.text('11 months ago'), findsOneWidget);
-    expect(find.text('See more dates >'), findsOneWidget);
-    expect(find.byType(Streetview3dRailOverlay), findsOneWidget);
-  });
+      // Media scene (position = openingMapSeconds + 0.5s = 2.5s)
+      await render(2.5);
+      expect(find.byType(Streetview3dPlaceSheet), findsOneWidget);
+      expect(find.text('296 Keilor Rd'), findsOneWidget);
+      expect(find.text('11 months ago'), findsOneWidget);
+      expect(find.text('See more dates >'), findsOneWidget);
+      expect(find.byType(Streetview3dRailOverlay), findsOneWidget);
+    },
+  );
 
   testWidgets('Template picker displays Streetview 3D card', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: TemplatePickerPage(),
-      ),
-    );
+    await tester.pumpWidget(const MaterialApp(home: TemplatePickerPage()));
 
     expect(find.text('Streetview 3D'), findsOneWidget);
     expect(find.text('Aerial dive & on-rails road journey'), findsOneWidget);
