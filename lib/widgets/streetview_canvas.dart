@@ -8,7 +8,6 @@ import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
-import 'streetview_map_scene.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
