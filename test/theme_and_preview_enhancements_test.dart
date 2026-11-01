@@ -121,10 +121,7 @@ void main() {
       expect(find.byTooltip('Play preview'), findsOneWidget);
 
       // Add a second media clip while paused
-      final updatedProject = ReelProject(
-        id: projectId,
-        clips: [clip1, clip2],
-      );
+      final updatedProject = ReelProject(id: projectId, clips: [clip1, clip2]);
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: TimelinePreview(project: updatedProject)),
