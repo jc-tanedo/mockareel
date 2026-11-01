@@ -3,9 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/project.dart';
-import 'package:mockareel/model/streetview_timeline.dart';
 import 'package:mockareel/pages/template_picker_page.dart';
-import 'package:mockareel/pages/library_page.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/widgets/streetview_3d_widgets.dart';
 
@@ -37,6 +35,7 @@ void main() {
           id: 'clip1',
           name: 'Clip 1',
           path: photo,
+          isVideo: false,
           duration: 3,
           streetview: StreetviewMedia(
             place: PlaceDetails(
@@ -100,6 +99,7 @@ void main() {
             id: 'c1',
             path: photo,
             name: 'C1',
+            isVideo: false,
             duration: 3,
             streetview: StreetviewMedia(
               place: PlaceDetails(name: '296 Keilor Rd'),

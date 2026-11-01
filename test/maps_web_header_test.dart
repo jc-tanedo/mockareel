@@ -21,7 +21,7 @@ class HeaderFixture implements MapsHeaderDriver {
   @override
   Future<void> initialize() async {}
   @override
-  Future<void> load(PlaceDetails place) async {}
+  Future<void> load(PlaceDetails place, {bool satellite = false}) async {}
   @override
   Future<void> zoom(bool inward) async {}
   @override

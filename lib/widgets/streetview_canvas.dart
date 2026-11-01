@@ -8,7 +8,6 @@ import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
-import 'streetview_3d_widgets.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -108,8 +107,8 @@ class StreetviewCanvas extends StatelessWidget {
     if (is3d && hasCardTransition) {
       aerialTransform
         ..setEntry(3, 2, 0.0015)
-        ..translate(0.0, -120 * aerialDiveProgress)
-        ..scale(1.0 + 0.85 * aerialDiveProgress)
+        ..translateByDouble(0.0, -120 * aerialDiveProgress, 0.0)
+        ..scaleByDouble(1.0 + 0.85 * aerialDiveProgress)
         ..rotateX(0.55 * aerialDiveProgress);
     }
 
