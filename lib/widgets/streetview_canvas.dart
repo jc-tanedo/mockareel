@@ -237,8 +237,8 @@ class StreetviewCanvas extends StatelessWidget {
                                               decoration: BoxDecoration(
                                                 borderRadius:
                                                     BorderRadius.circular(
-                                                  activeRadius,
-                                                ),
+                                                      activeRadius,
+                                                    ),
                                                 border: Border.all(
                                                   color: Colors.white
                                                       .withValues(
@@ -251,8 +251,8 @@ class StreetviewCanvas extends StatelessWidget {
                                               child: ClipRRect(
                                                 borderRadius:
                                                     BorderRadius.circular(
-                                                  activeRadius,
-                                                ),
+                                                      activeRadius,
+                                                    ),
                                                 child: FittedBox(
                                                   fit: BoxFit.cover,
                                                   alignment: Alignment.center,
@@ -305,9 +305,7 @@ class StreetviewCanvas extends StatelessWidget {
                                     : (j == i
                                           ? media(
                                               project.clips[j],
-                                              isBack
-                                                  ? clip.duration
-                                                  : elapsed,
+                                              isBack ? clip.duration : elapsed,
                                             )
                                           : const SizedBox()),
                               ),
