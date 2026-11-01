@@ -104,18 +104,15 @@ class MediaImporter {
     required ProjectStore store,
     required NativeRenderer renderer,
   }) async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: audioExtensions,
-    ).catchError(
-      (Object _) => FilePicker.pickFile(
-        type: FileType.any,
-      ),
-    ).catchError(
-      (Object _) => FilePicker.pickFile(
-        type: FileType.audio,
-      ),
-    );
+    final file =
+        await FilePicker.pickFile(
+              type: FileType.custom,
+              allowedExtensions: audioExtensions,
+            )
+            .catchError((Object _) => FilePicker.pickFile(type: FileType.any))
+            .catchError(
+              (Object _) => FilePicker.pickFile(type: FileType.audio),
+            );
     if (file?.path == null) return null;
     final info = await renderer.inspect(file!.path!);
     var duration = (info['duration'] as num?)?.toDouble() ?? 0;
