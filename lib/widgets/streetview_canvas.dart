@@ -8,7 +8,6 @@ import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
-import 'streetview_map_scene.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -80,15 +79,19 @@ class StreetviewCanvas extends StatelessWidget {
     // Dramatic motion blur and streetview camera rush
     final blurX = sin(t * pi) * 36.0;
     final blurY = sin(t * pi) * 8.0;
-    final outgoingScale = 1.0 + pow(t, 1.3) * 0.9;
+    final outgoingScale = (1.0 + pow(t, 1.3) * 0.9).toDouble();
+    final outgoingProgress = pow(t, 1.2).toDouble();
     final outgoingOffset = Offset(
-      -direction * 180 * pow(t, 1.2),
-      -25 * pow(t, 1.2),
+      -direction * 180 * outgoingProgress,
+      -25 * outgoingProgress,
     );
-    final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0);
+    final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0).toDouble();
     final incomingScale = 1.0 + (1.0 - t) * 0.35;
-    final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
-    final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0);
+    final incomingOffset = Offset(
+      direction * 150 * (1.0 - t),
+      20 * (1.0 - t),
+    );
+    final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
 
     Widget image(ReelClip c, double seconds) => ClipPoster(
       clip: c,
