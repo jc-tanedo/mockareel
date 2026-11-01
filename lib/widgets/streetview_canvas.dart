@@ -271,42 +271,30 @@ class StreetviewCanvas extends StatelessWidget {
                                           ),
                                         ),
                                       )
-                                    : movement
-                                    ? (j == i
-                                          ? Opacity(
-                                              opacity: outgoingOpacity,
-                                              child: Transform.translate(
-                                                offset: outgoingOffset,
-                                                child: Transform.scale(
-                                                  scale: outgoingScale,
-                                                  child: media(
-                                                    project.clips[j],
-                                                    clip.duration,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                          : j == i + 1
-                                          ? Opacity(
-                                              opacity: incomingOpacity,
-                                              child: Transform.translate(
-                                                offset: incomingOffset,
-                                                child: Transform.scale(
-                                                  scale: incomingScale,
-                                                  child: media(
-                                                    project.clips[j],
-                                                    0,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                          : const SizedBox())
-                                    : (j == i
-                                          ? media(
-                                              project.clips[j],
-                                              isBack ? clip.duration : elapsed,
-                                            )
-                                          : const SizedBox()),
+                                    : Transform.translate(
+                                        offset: movement
+                                            ? (j == i
+                                                  ? outgoingOffset
+                                                  : incomingOffset)
+                                            : Offset.zero,
+                                        child: Transform.scale(
+                                          scale: movement
+                                              ? (j == i
+                                                    ? outgoingScale
+                                                    : incomingScale)
+                                              : 1.0,
+                                          child: media(
+                                            project.clips[j],
+                                            j < i
+                                                ? project.clips[j].duration
+                                                : j > i || map
+                                                ? 0
+                                                : isMedia
+                                                ? elapsed
+                                                : clip.duration,
+                                          ),
+                                        ),
+                                      ),
                               ),
                             ),
                         ],
