@@ -66,15 +66,23 @@ class StreetviewCanvas extends StatelessWidget {
     final hasCardTransition = isExpanding || isShrinking;
     final cardT = isExpanding ? expandT : (1.0 - shrinkT);
 
-    const thumbRect = Rect.fromLTWH(
-      StreetviewLayout.thumbnailLeft,
-      StreetviewLayout.thumbnailTop,
-      StreetviewLayout.thumbnailWidth,
-      StreetviewLayout.thumbnailHeight,
-    );
-    const fullRect = Rect.fromLTWH(0, 0, 360, 640);
-    final activeRect = Rect.lerp(thumbRect, fullRect, cardT)!;
-    final activeRadius = ui.lerpDouble(11.0, 0.0, cardT)!;
+    const thumbOffset = Offset(-127.0, 191.0);
+    const thumbScale = 82.0 / 360.0;
+    final activeScale = isExpanding
+        ? ui.lerpDouble(thumbScale, 1.0, expandT)!
+        : isShrinking
+        ? ui.lerpDouble(1.0, thumbScale, shrinkT)!
+        : 1.0;
+    final activeOffset = isExpanding
+        ? Offset.lerp(thumbOffset, Offset.zero, expandT)!
+        : isShrinking
+        ? Offset.lerp(Offset.zero, thumbOffset, shrinkT)!
+        : Offset.zero;
+    final activeRadius = isExpanding
+        ? ui.lerpDouble(48.29, 0.0, expandT)!
+        : isShrinking
+        ? ui.lerpDouble(0.0, 48.29, shrinkT)!
+        : 0.0;
 
     // Dramatic motion blur and streetview camera rush
     final blurX = sin(t * pi) * 36.0;
@@ -179,14 +187,12 @@ class StreetviewCanvas extends StatelessWidget {
                     color: movement ? Colors.black : Colors.transparent,
                   ),
                 ),
-                if (map || hasCardTransition)
+                if (hasCardTransition)
                   Positioned.fill(
                     child: StreetviewMapScene(
                       settings: settings,
                       dark: project.darkOutput,
-                      thumbnail: hasCardTransition
-                          ? const SizedBox()
-                          : image(clip, 0),
+                      thumbnail: const SizedBox(),
                     ),
                   ),
                 Positioned.fill(
@@ -221,80 +227,41 @@ class StreetviewCanvas extends StatelessWidget {
                                     : j == i
                                     ? 1
                                     : 0,
-                                child: hasCardTransition && j == i
-                                    ? Align(
-                                        alignment: Alignment.topLeft,
-                                        child: Transform.translate(
-                                          offset: Offset(
-                                            activeRect.left,
-                                            activeRect.top,
-                                          ),
-                                          child: SizedBox(
-                                            width: activeRect.width,
-                                            height: activeRect.height,
-                                            child: DecoratedBox(
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                      activeRadius,
-                                                    ),
-                                                border: Border.all(
-                                                  color: Colors.white
-                                                      .withValues(
-                                                        alpha:
-                                                            0.6 * (1.0 - cardT),
-                                                      ),
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                      activeRadius,
-                                                    ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.cover,
-                                                  alignment: Alignment.center,
-                                                  child: SizedBox(
-                                                    width: 360,
-                                                    height: 640,
-                                                    child: media(
-                                                      project.clips[j],
-                                                      isBack
-                                                          ? clip.duration
-                                                          : elapsed,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    : Transform.translate(
-                                        offset: movement
-                                            ? (j == i
-                                                  ? outgoingOffset
-                                                  : incomingOffset)
-                                            : Offset.zero,
-                                        child: Transform.scale(
-                                          scale: movement
-                                              ? (j == i
-                                                    ? outgoingScale
-                                                    : incomingScale)
-                                              : 1.0,
-                                          child: media(
-                                            project.clips[j],
-                                            j < i
-                                                ? project.clips[j].duration
-                                                : j > i || map
-                                                ? 0
-                                                : isMedia
-                                                ? elapsed
-                                                : clip.duration,
-                                          ),
-                                        ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    hasCardTransition && j == i
+                                        ? activeRadius
+                                        : 0.0,
+                                  ),
+                                  child: Transform.translate(
+                                    offset: hasCardTransition && j == i
+                                        ? activeOffset
+                                        : movement
+                                        ? (j == i
+                                              ? outgoingOffset
+                                              : incomingOffset)
+                                        : Offset.zero,
+                                    child: Transform.scale(
+                                      scale: hasCardTransition && j == i
+                                          ? activeScale
+                                          : movement
+                                          ? (j == i
+                                                ? outgoingScale
+                                                : incomingScale)
+                                          : 1.0,
+                                      child: media(
+                                        project.clips[j],
+                                        j < i
+                                            ? project.clips[j].duration
+                                            : j > i || map
+                                            ? 0
+                                            : isMedia
+                                            ? elapsed
+                                            : clip.duration,
                                       ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                         ],
@@ -302,6 +269,14 @@ class StreetviewCanvas extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (map)
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: image(clip, 0),
+                    ),
+                  ),
               ],
               if (overlayOnly) ...[
                 if (map)
