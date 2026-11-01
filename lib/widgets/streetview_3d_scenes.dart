@@ -3,9 +3,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import 'streetview_3d_widgets.dart';
 import 'streetview_chrome.dart';
-import 'streetview_map_scene.dart';
 
 /// Full-bleed opening aerial map hold for Streetview 3D (0.0s .. 1.25s).
 class Streetview3dAerialScene extends StatelessWidget {
@@ -176,78 +174,65 @@ class Streetview3dAerialSwoopScene extends StatelessWidget {
               ),
             ),
           ),
-        // Top right close button
-        Positioned(
-          right: 14,
-          top: 20,
-          child: streetviewRoundButton(Icons.close, 'Close aerial view'),
-        ),
-        // Top left Google pill & options fade in at end
+        // Full Street View 3D Chrome fading in and bottom sheet sliding up
         if (sheetT > 0)
-          Positioned(
-            left: 14,
-            top: 20,
+          Positioned.fill(
             child: Opacity(
               opacity: sheetT,
-              child: StreetviewTopLeftPill(settings: settings, dark: dark),
-            ),
-          ),
-        if (sheetT > 0)
-          Positioned(
-            right: 14,
-            top: 68,
-            child: Opacity(
-              opacity: sheetT,
-              child: streetviewRoundButton(
-                Icons.more_vert,
-                'More options',
-                mini: true,
+              child: Transform.translate(
+                offset: Offset(0, sheetSlideY),
+                child: StreetviewChrome(
+                  settings: settings,
+                  dark: dark,
+                  is3d: true,
+                ),
               ),
             ),
           ),
-        // Bottom left pill button transitioning from Street -> Aerial
-        Positioned(
-          left: 14,
-          bottom: pillBottom,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xcc000000),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white24, width: 0.5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.directions_walk,
-                  color: Colors.white,
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  pillLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Bottom sheet sliding up
-        if (sheetT > 0)
+        // During early swoop, keep the simple aerial close and street pill
+        if (sheetT < 1.0) ...[
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Transform.translate(
-              offset: Offset(0, sheetSlideY),
-              child: Streetview3dPlaceSheet(settings: settings, dark: dark),
+            right: 14,
+            top: 20,
+            child: Opacity(
+              opacity: 1.0 - sheetT,
+              child: streetviewRoundButton(Icons.close, 'Close aerial view'),
             ),
           ),
+          Positioned(
+            left: 14,
+            bottom: 24,
+            child: Opacity(
+              opacity: 1.0 - sheetT,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xcc000000),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 0.5),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.directions_walk, color: Colors.white, size: 15),
+                    SizedBox(width: 6),
+                    Text(
+                      'Street',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

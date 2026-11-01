@@ -6,7 +6,6 @@ import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
-import 'streetview_3d_widgets.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
 
@@ -172,7 +171,7 @@ class StreetviewCanvas extends StatelessWidget {
     );
 
     final arrow = is3d
-        ? Offset.zero
+        ? const Point<double>(0, 0)
         : StreetviewMotion.at(clip, clip.duration).project(
             settings.arrow == 'left'
                 ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
@@ -386,12 +385,12 @@ class StreetviewCanvas extends StatelessWidget {
                         ? StreetviewLayout.thumbnailLeft + 41.0
                         : scene.kind == 'back'
                         ? 333
-                        : arrow.dx,
+                        : arrow.x,
                     top: map
                         ? StreetviewLayout.thumbnailTop + 27.0
                         : scene.kind == 'back'
                         ? 35
-                        : arrow.dy,
+                        : arrow.y,
                     child: _Ripple(progress: ripple),
                   ),
                 if (ripple >= 0 && ripple < 1 && is3d && map)
