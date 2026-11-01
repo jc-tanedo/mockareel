@@ -97,18 +97,16 @@ class StreetviewCanvas extends StatelessWidget {
               ? ui.lerpDouble(0.0, 48.29, shrinkT)!
               : 0.0);
 
-    // Aerial dive 3D matrix for Streetview 3D
+    // Aerial dive 3D parameters for Streetview 3D
     final aerialDiveProgress = isExpanding
         ? expandT
         : isShrinking
         ? (1.0 - shrinkT)
         : 0.0;
-    final Matrix4 aerialTransform = Matrix4.identity();
+    final Matrix4 aerialPerspective = Matrix4.identity();
     if (is3d && hasCardTransition) {
-      aerialTransform
+      aerialPerspective
         ..setEntry(3, 2, 0.0015)
-        ..translateByDouble(0.0, -120 * aerialDiveProgress, 0.0)
-        ..scaleByDouble(1.0 + 0.85 * aerialDiveProgress)
         ..rotateX(0.55 * aerialDiveProgress);
     }
 
@@ -246,10 +244,16 @@ class StreetviewCanvas extends StatelessWidget {
                     child: is3d
                         ? Opacity(
                             opacity: (1.0 - cardT).clamp(0.0, 1.0),
-                            child: Transform(
-                              transform: aerialTransform,
-                              alignment: Alignment.center,
-                              child: aerialOrMapScene(),
+                            child: Transform.translate(
+                              offset: Offset(0.0, -120 * aerialDiveProgress),
+                              child: Transform.scale(
+                                scale: 1.0 + 0.85 * aerialDiveProgress,
+                                child: Transform(
+                                  transform: aerialPerspective,
+                                  alignment: Alignment.center,
+                                  child: aerialOrMapScene(),
+                                ),
+                              ),
                             ),
                           )
                         : aerialOrMapScene(),
