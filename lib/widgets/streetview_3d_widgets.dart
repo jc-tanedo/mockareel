@@ -382,10 +382,7 @@ class _ExtrudedRoadChevronPainter extends CustomPainter {
         ..lineTo(innerLeftX, wingY)
         ..close();
 
-      canvas.drawPath(
-        topFace.shift(Offset(0, bevelDepth + 1.5)),
-        shadowPaint,
-      );
+      canvas.drawPath(topFace.shift(Offset(0, bevelDepth + 1.5)), shadowPaint);
 
       final bevelPath = Path();
       if (!forward) {

@@ -194,9 +194,7 @@ class TemplatePickerPage extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    is3d
-                                        ? Icons.view_in_ar
-                                        : Icons.threesixty,
+                                    is3d ? Icons.view_in_ar : Icons.threesixty,
                                     size: 12,
                                     color: Colors.white70,
                                   ),

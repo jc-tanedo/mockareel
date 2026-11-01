@@ -310,10 +310,7 @@ class Streetview3dDollyScene extends StatelessWidget {
             ),
           ),
         // Road text sliding underfoot during camera rush
-        Streetview3dRailOverlay(
-          settings: settings,
-          transitionProgress: t,
-        ),
+        Streetview3dRailOverlay(settings: settings, transitionProgress: t),
       ],
     );
   }

@@ -179,7 +179,10 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
               key: ValueKey(_revision),
               place: _s.place,
               embedded: true,
-              suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
+              suggestedActions: StreetviewPlaceSheet.actions(
+                _s.place,
+                map: true,
+              ),
               onChanged: widget.onChanged,
             ),
           ],
