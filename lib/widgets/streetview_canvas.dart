@@ -50,7 +50,11 @@ class StreetviewCanvas extends StatelessWidget {
     const transitionSec = 0.1;
     final isMedia = scene.kind == 'media';
     final isBack = scene.kind == 'back';
-    final isExpanding = isMedia && elapsed < transitionSec;
+    // Arrow handoffs already arrive at full size. Only a map thumbnail
+    // should expand into the next media scene.
+    final followsMap =
+        i == 0 || project.clips[i - 1].streetview.transition == 'map';
+    final isExpanding = isMedia && followsMap && elapsed < transitionSec;
     final expandProgress = isExpanding
         ? (elapsed / transitionSec).clamp(0.0, 1.0)
         : 1.0;
@@ -253,7 +257,10 @@ class StreetviewCanvas extends StatelessWidget {
                                         project.clips[j],
                                         j < i
                                             ? project.clips[j].duration
-                                            : j > i || map
+                                            : j > i ||
+                                                  (map &&
+                                                      scene.kind !=
+                                                          'ending-map')
                                             ? 0
                                             : isMedia
                                             ? elapsed
@@ -274,7 +281,10 @@ class StreetviewCanvas extends StatelessWidget {
                     child: StreetviewMapScene(
                       settings: settings,
                       dark: project.darkOutput,
-                      thumbnail: image(clip, 0),
+                      thumbnail: image(
+                        clip,
+                        scene.kind == 'ending-map' ? clip.duration : 0,
+                      ),
                     ),
                   ),
               ],
@@ -284,7 +294,10 @@ class StreetviewCanvas extends StatelessWidget {
                     child: StreetviewMapScene(
                       settings: settings,
                       dark: project.darkOutput,
-                      thumbnail: image(clip, 0),
+                      thumbnail: image(
+                        clip,
+                        scene.kind == 'ending-map' ? clip.duration : 0,
+                      ),
                     ),
                   )
                 else

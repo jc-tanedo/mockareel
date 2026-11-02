@@ -88,6 +88,7 @@ void main() {
         final platform = PreviewVideoPlatform();
         VideoPlayerPlatform.instance = platform;
         final p = project(video: true);
+        p.streetview.endOnMap = true;
         Future<void> show(double time) async {
           await tester.pumpWidget(
             MaterialApp(
@@ -128,11 +129,33 @@ void main() {
           await show(p.startOf(1) - .1);
           expect(first.value.isPlaying, false);
           expect(next.value.isPlaying, false);
-          await show(p.startOf(1) + .1);
+          await show(p.startOf(1) + .01);
+          // An arrow transition arrives full screen, without restarting the
+          // thumbnail expansion used when coming from a map.
+          final incoming = find.byKey(const ValueKey('streetview-player-1'));
+          expect(
+            tester
+                .widget<ClipRRect>(
+                  find
+                      .descendant(
+                        of: incoming,
+                        matching: find.byType(ClipRRect),
+                      )
+                      .first,
+                )
+                .borderRadius,
+            BorderRadius.zero,
+          );
           expect(player('1'), same(next));
           expect(next.value.isPlaying, true);
           await show(p.duration);
           expect(next.value.isPlaying, false);
+          expect(next.value.position.inMilliseconds, 2999);
+          final thumbnail = tester
+              .widgetList<ClipPoster>(find.byType(ClipPoster))
+              .last;
+          expect(thumbnail.clip.id, '1');
+          expect(thumbnail.position, p.clips.last.duration);
           expect(platform.created, 2);
           expect(tester.takeException(), isNull);
         } finally {

@@ -126,6 +126,63 @@ void main() {
       });
     },
   );
+  testWidgets('activating a preloaded player retains its decoded frame', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      final previous = VideoPlayerPlatform.instance;
+      final platform = PreviewVideoPlatform();
+      VideoPlayerPlatform.instance = platform;
+      final clip = ReelClip(
+        id: 'video',
+        path: 'video.mp4',
+        name: 'Video',
+        isVideo: true,
+        sourceDuration: 10,
+        duration: 3,
+        trimStart: 1,
+      );
+      Future<void> show(bool playing) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaFrame(clip: clip, position: 0, playing: playing),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        await tester.pump();
+      }
+
+      try {
+        await show(false);
+        final controller = tester
+            .widget<VideoPlayer>(find.byType(VideoPlayer))
+            .controller;
+        final seeks = platform.commands
+            .where((c) => c.startsWith('seek:'))
+            .length;
+        expect(seeks, 1);
+        for (final playing in [true, false, true]) {
+          await show(playing);
+          expect(
+            tester.widget<VideoPlayer>(find.byType(VideoPlayer)).controller,
+            same(controller),
+          );
+          expect(controller.value.isPlaying, playing);
+          expect(
+            platform.commands.where((c) => c.startsWith('seek:')).length,
+            seeks,
+            reason: 'Play/pause must preserve an already decoded frame',
+          );
+        }
+        expect(platform.created, 1);
+      } finally {
+        await tester.pumpWidget(const SizedBox());
+        await Future<void>.delayed(Duration.zero);
+        VideoPlayerPlatform.instance = previous;
+      }
+    });
+  });
   testWidgets('preview final pause wins over a late native play command', (
     tester,
   ) async {

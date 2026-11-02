@@ -176,7 +176,10 @@ class _MediaFrameState extends State<MediaFrame> {
             _loadedStamp != _gifStamp)) {
       _load();
     } else {
-      _sync(force: oldWidget.playing != widget.playing);
+      // A play/pause change does not invalidate the decoded frame. Seeking
+      // again here can blank an already preloaded texture during a handoff.
+      // _sync still seeks when the timeline position actually changes.
+      _sync();
     }
   }
 
