@@ -126,8 +126,9 @@ class _AndroidHome extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withValues(alpha: .14),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: .12)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

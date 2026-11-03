@@ -123,12 +123,15 @@ class _BlurSpotPreviewState extends State<BlurSpotPreview> {
             clipBehavior: Clip.antiAlias,
             focalPointOffset:
                 focal - Offset(left + size.width / 2, top + size.height / 2),
-            decoration: const MagnifierDecoration(
+            decoration: MagnifierDecoration(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(16)),
-                side: BorderSide(color: Color(0xffb1a6ff), width: 2),
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
+                side: BorderSide(
+                  color: Theme.of(this.context).colorScheme.primary,
+                  width: 2,
+                ),
               ),
-              shadows: [
+              shadows: const [
                 BoxShadow(
                   color: Colors.black54,
                   blurRadius: 10,
@@ -222,7 +225,7 @@ class _BlurSpotPreviewState extends State<BlurSpotPreview> {
                     color: Colors.white.withValues(alpha: .06),
                     border: Border.all(
                       color: spot.id == widget.selected
-                          ? const Color(0xffb1a6ff)
+                          ? Theme.of(context).colorScheme.primary
                           : Colors.white,
                       width: 2,
                     ),

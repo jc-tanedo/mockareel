@@ -77,6 +77,8 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final selected = widget.clip.supportsBlur
         ? edits.spots.where((s) => s.id == _selected).firstOrNull
         : null;
@@ -113,6 +115,9 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
           ),
           Text(
             '${edits.lens == 'pincushion' ? 'Pincushion' : 'Fisheye'} strength · ${(edits.strength * 100).round()}%',
+            style: textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
           Slider(
             value: edits.strength,
@@ -123,8 +128,14 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
           ),
         ],
         if (_showPreview)
-          SizedBox(
+          Container(
             height: 260,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            clipBehavior: Clip.antiAlias,
             child: FutureBuilder<Size>(
               future: _size,
               builder: (context, snapshot) {
@@ -218,8 +229,11 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
             ),
           if (selected != null) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Drag the circle to position the blur. Adjust its size below.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
             ),
             Slider(
               value: selected.radius,
@@ -234,9 +248,14 @@ class _MediaEditsEditorState extends State<MediaEditsEditor> {
             ),
           ],
         ] else
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Blur spots are available for photos.'),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Blur spots are available for photos.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
           ),
       ],
     );

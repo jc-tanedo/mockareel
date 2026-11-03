@@ -52,95 +52,163 @@ class _ExportedVideoPageState extends State<ExportedVideoPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Your reel is ready')),
-    body: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: _error != null
-                    ? Text(_error!)
-                    : !_controller.value.isInitialized
-                    ? const CircularProgressIndicator()
-                    : GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _controller.value.isPlaying
-                                ? _controller.pause()
-                                : _controller.play();
-                          });
-                        },
-                        child: AspectRatio(
-                          aspectRatio: _controller.value.aspectRatio,
-                          child: VideoPlayer(_controller),
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () async {
-                try {
-                  await SharePlus.instance.share(
-                    ShareParams(
-                      files: [XFile(widget.path, mimeType: 'video/mp4')],
-                      subject: 'My Mockareel',
-                    ),
-                  );
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Could not open the share sheet. Try saving to gallery.',
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.share),
-              label: const Text('Share video'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _saving || _saved
-                  ? null
-                  : () async {
-                      setState(() => _saving = true);
-                      try {
-                        await widget.renderer.saveToGallery(widget.path);
-                        if (mounted) setState(() => _saved = true);
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                e is PlatformException
-                                    ? e.message ?? 'Save failed'
-                                    : e.toString(),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Your reel is ready')),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: _error != null
+                      ? Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  size: 40,
+                                  color: colors.primary,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _error!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : !_controller.value.isInitialized
+                      ? const CircularProgressIndicator()
+                      : GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _controller.value.isPlaying
+                                  ? _controller.pause()
+                                  : _controller.play();
+                            });
+                          },
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: colors.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
                             ),
-                          );
-                        }
-                      } finally {
-                        if (mounted) setState(() => _saving = false);
-                      }
-                    },
-              icon: const Icon(Icons.save_alt),
-              label: Text(
-                _saved
-                    ? 'Saved to Movies/Mockareel'
-                    : _saving
-                    ? 'Saving…'
-                    : 'Save to gallery',
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: AspectRatio(
+                                aspectRatio: _controller.value.aspectRatio,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    VideoPlayer(_controller),
+                                    if (!_controller.value.isPlaying)
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          color: colors.surface.withValues(
+                                            alpha: 0.75,
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.play_arrow_rounded,
+                                          size: 34,
+                                          color: colors.onSurface,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    try {
+                      await SharePlus.instance.share(
+                        ShareParams(
+                          files: [XFile(widget.path, mimeType: 'video/mp4')],
+                          subject: 'My Mockareel',
+                        ),
+                      );
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not open the share sheet. Try saving to gallery.',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.share_outlined),
+                  label: const Text('Share video'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _saving || _saved
+                      ? null
+                      : () async {
+                          setState(() => _saving = true);
+                          try {
+                            await widget.renderer.saveToGallery(widget.path);
+                            if (mounted) setState(() => _saved = true);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e is PlatformException
+                                        ? e.message ?? 'Save failed'
+                                        : e.toString(),
+                                  ),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
+                  icon: Icon(_saved ? Icons.check : Icons.save_alt),
+                  label: Text(
+                    _saved
+                        ? 'Saved to Movies/Mockareel'
+                        : _saving
+                        ? 'Saving…'
+                        : 'Save to gallery',
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

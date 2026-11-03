@@ -8,7 +8,7 @@ The app opens to a grid of saved projects with previews of their output. **New p
 
 ## TikTok FYP scroll
 
-Four suggested steps use the same pinned-preview workspace and charcoal/violet editor design: **Sequence → Posts → Audio (optional) → Export**.
+Four suggested steps use the same pinned-preview Material Design 3 workspace: **Sequence → Posts → Audio (optional) → Export**.
 
 1. **Sequence:** open with a typed search, a home-screen app launch, or directly in the feed. A blank search skips the search scene. Set typing time, loading time and vertical swipe duration. Optionally close the app back to the home screen.
 2. **Home screen & status bar:** choose the output OS and a photo/video wallpaper. Customize its date, status bar and available widgets. Short video wallpapers loop. App launch (460 ms) and close (360 ms) use spring easing, a brief icon fade and a rounded window that preserves the content’s proportions. Preview playback follows the display refresh rate; export remains 30 fps. The exported launch/close animation uses a still of the first/last post. See the home-screen controls below.
@@ -40,7 +40,7 @@ Create a simulated Street View journey from ordinary photos, videos and supporte
 
 ## Maps place story
 
-The template follows the supplied screen recording: a map header (or optional photo), a white place sheet with editable details and teal action chips, and a horizontal gallery of rounded cards that scrolls left, snaps a card fully into view, then holds. Tabs, a place-specific footer button and hours stay fixed beneath the gallery. Movable text layers and decorative story controls can be added. The editor uses charcoal panels, violet selection highlights and a thumbnail timeline with a selected-clip inspector.
+The template follows the supplied screen recording: a map header (or optional photo), a white place sheet with editable details and teal action chips, and a horizontal gallery of rounded cards that scrolls left, snaps a card fully into view, then holds. Tabs, a place-specific footer button and hours stay fixed beneath the gallery. Movable text layers and decorative story controls can be added. The editor uses the selected app color theme and a thumbnail timeline with a selected-clip inspector.
 
 The editor follows five suggested steps: **Place → Timeline → Text (optional) → Audio (optional) → Export**. Numbered navigation and a **Next** action make the sequence explicit; every step remains freely accessible. A pinned preview sits above a focused inspector; expand the preview for a larger view. On wider screens, preview and inspector sit side by side. When typing, the inspector gets the workspace.
 
@@ -60,4 +60,20 @@ During feed export, repeated search-text states and home-screen holds share thei
 
 GIFs animate in preview and export. In **Timing**, choose duration, start offset and **Loop GIF**. Looping is on by default to fill the clip; turn it off to select a single source segment. Existing GIF photos are detected automatically, even with a misleading filename extension. Originals, timing and loop choices remain in project storage and backups. [GIF timing and caching](gifs.md).
 
-The Maps and FYP live previews preload the next card and hold outgoing media on its last frame during a slide. At the end of the reel, playback stays paused on the final frame; use Restart or Play to begin again.
+The Maps and FYP live previews preload the next card and hold outgoing media on its last frame during a slide. By default, preview playback loops. Pause and scrub to inspect a transition, or use Restart to return to the beginning.
+
+## Appearance and background export
+
+Open **Settings** from the project library to choose the editor color scheme.
+The selected preset is saved on the device. It changes the editor's appearance;
+each project's output Light/Dark setting remains independent. Decorative story
+controls in Maps output can be enabled individually.
+
+On Android, MP4 export uses a foreground service during preparation and encoding.
+Allow the notification prompt to see live progress and the completion notification.
+You can switch apps or lock the screen while the job runs; tap the notification
+to return. Denying notification permission hides drawer progress, but does not
+cancel the job. Enable notifications in Android settings to show it again.
+
+Use **Cancel export** in the app to stop the job. Force-stopping the app or an OS
+process termination can interrupt it; interrupted jobs do not automatically resume.

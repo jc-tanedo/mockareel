@@ -1,0 +1,381 @@
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+class TemplatePickerPage extends StatelessWidget {
+  const TemplatePickerPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Choose a template')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            'Familiar screens.\nYour stories.',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -.8,
+              color: colors.onSurface,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Start with a format, then make every detail yours.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, c) => GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: c.maxWidth >= 650 ? 3 : 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 16,
+              childAspectRatio: .51,
+              children: [
+                _template(
+                  context,
+                  'maps-place',
+                  'Maps place story',
+                  'Pins, places & memories',
+                  Icons.map_outlined,
+                  const Color(0xffb2d7cb),
+                ),
+                _template(
+                  context,
+                  'tiktok-feed',
+                  'TikTok FYP scroll',
+                  'Search, swipe & tell a story',
+                  Icons.swipe_up_outlined,
+                  mint,
+                ),
+                _template(
+                  context,
+                  'streetview',
+                  'Streetview journey',
+                  'Maps, moments & movement',
+                  Icons.streetview,
+                  const Color(0xff8bd3dd),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _template(
+    BuildContext context,
+    String id,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color accent,
+  ) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final feed = id == 'tiktok-feed';
+    final street = id == 'streetview';
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.55)),
+      ),
+      child: InkWell(
+        onTap: () => Navigator.pop(context, id),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: AspectRatio(
+                    aspectRatio: 9 / 16,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: feed
+                                    ? [
+                                        const Color(0xff5a3e75),
+                                        const Color(0xff1e3c55),
+                                      ]
+                                    : street
+                                    ? [
+                                        const Color(0xff233a54),
+                                        const Color(0xff15222e),
+                                      ]
+                                    : [
+                                        const Color(0xff80b5a9),
+                                        const Color(0xff364f54),
+                                      ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (feed) ...[
+                          const Positioned(
+                            top: 16,
+                            left: 12,
+                            child: Text(
+                              'Following   For You',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: Center(
+                              child: Icon(icon, size: 44, color: accent),
+                            ),
+                          ),
+                          const Positioned(
+                            bottom: 40,
+                            left: 10,
+                            child: Text(
+                              '@yourstory\nYour moment. Your feed.',
+                              style: TextStyle(fontSize: 10, height: 1.5),
+                            ),
+                          ),
+                          const Positioned(
+                            bottom: 12,
+                            left: 10,
+                            right: 10,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Icon(Icons.home, size: 14),
+                                Icon(Icons.add_box, size: 16),
+                                Icon(Icons.person, size: 14),
+                              ],
+                            ),
+                          ),
+                        ] else if (street) ...[
+                          Positioned(
+                            top: 14,
+                            left: 10,
+                            right: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.threesixty,
+                                    size: 12,
+                                    color: Colors.white70,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'Street View',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: Center(
+                              child: Icon(icon, size: 42, color: accent),
+                            ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: 64,
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: Color(0xff18191c),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(14),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'Dropped pin',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: accent,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      'Directions',
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        color: Color(0xff00333c),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Positioned(
+                            top: 22,
+                            left: 22,
+                            child: Icon(
+                              Icons.location_on,
+                              color: accent,
+                              size: 36,
+                            ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: 140,
+                            child: Container(
+                              padding: const EdgeInsets.all(11),
+                              decoration: const BoxDecoration(
+                                color: Color(0xfff5f6f7),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(15),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Your favorite place',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '4.9 ★',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              color: accent,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xffd0b69b),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'A place worth sharing',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    color: colors.onSurfaceVariant,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

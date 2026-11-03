@@ -57,9 +57,11 @@ void main() {
   testWidgets(
     'fisheye strength and draggable blur spots edit the source recipe',
     (tester) async {
-      late Directory dir;
-      late File photo;
+      // File decoding and edit debounce timers must share one real async clock.
+      // Mixing real I/O with the fake clock can enqueue timers after teardown.
       await tester.runAsync(() async {
+        late Directory dir;
+        late File photo;
         dir = await Directory.systemTemp.createTemp('effects-editor');
         final recorder = ui.PictureRecorder();
         Canvas(recorder).drawColor(Colors.blue, BlendMode.src);
@@ -71,103 +73,102 @@ void main() {
         ).writeAsBytes(png!.buffer.asUint8List());
         image.dispose();
         picture.dispose();
-      });
-      final clip = ReelClip(
-        id: 'photo',
-        path: photo.path,
-        name: 'Photo',
-        isVideo: false,
-      );
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        NativeRenderer.channel,
-        (call) async {
-          if (call.method == 'cancelMediaEdits') return null;
-          final args = call.arguments as Map;
-          await File(
-            args['output'] as String,
-          ).writeAsBytes(await photo.readAsBytes());
-          return args['output'];
-        },
-      );
-      addTearDown(() async {
-        await EditedMedia.instance.cancel();
+        final clip = ReelClip(
+          id: 'photo',
+          path: photo.path,
+          name: 'Photo',
+          isVideo: false,
+        );
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           NativeRenderer.channel,
-          null,
+          (call) async {
+            if (call.method == 'cancelMediaEdits') return null;
+            final args = call.arguments as Map;
+            await File(
+              args['output'] as String,
+            ).writeAsBytes(await photo.readAsBytes());
+            return args['output'];
+          },
         );
-        await dir.delete(recursive: true);
-      });
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, update) => ListView(
-                children: [
-                  MediaEditsEditor(clip: clip, onChanged: () => update(() {})),
-                ],
+        addTearDown(() async {
+          await EditedMedia.instance.cancel();
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            NativeRenderer.channel,
+            null,
+          );
+          await dir.delete(recursive: true);
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, update) => ListView(
+                  children: [
+                    MediaEditsEditor(
+                      clip: clip,
+                      onChanged: () => update(() {}),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      );
-      for (var i = 0; i < 20; i++) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 10)),
         );
-        await tester.pump(const Duration(milliseconds: 30));
-      }
-      await tester.tap(find.text('Lens effect'));
-      await tester.pump();
-      expect(clip.edits.fisheye, true);
-      tester.widget<Slider>(find.byType(Slider).first).onChanged!(.7);
-      await tester.pump();
-      expect(clip.edits.strength, .7);
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text('Pincushion').last);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(clip.edits.lens, 'pincushion');
-      await tester.ensureVisible(find.text('Add blur spot (0/8)'));
-      await tester.pump();
-      await tester.tap(find.text('Add blur spot (0/8)'));
-      await tester.pump();
-      expect(clip.edits.spots.length, 1);
-      final semantics = tester.ensureSemantics();
-      try {
-        final spot = find.bySemanticsLabel('Blur spot 1');
-        await tester.ensureVisible(spot);
-        await tester.pump();
-        expect(spot.hitTestable(), findsOneWidget);
-        final drag = await tester.startGesture(tester.getCenter(spot));
-        await drag.moveBy(const Offset(15, 0));
-        await drag.moveBy(const Offset(25, 0));
-        await drag.up();
-        await tester.pump();
-        expect(clip.edits.spots.single.x, greaterThan(.5));
-        await tester.ensureVisible(find.byTooltip('Remove selected blur spot'));
-        await tester.pump();
-        await tester.tap(find.byTooltip('Remove selected blur spot'));
-        await tester.pump();
-        expect(clip.edits.spots, isEmpty);
-        for (var i = 0; i < 40; i++) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 10)),
-          );
+        for (var i = 0; i < 20; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
           await tester.pump(const Duration(milliseconds: 30));
         }
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox());
-        await EditedMedia.instance.cancel();
-        // Drain queued debounce timers after the editor releases its consumers.
-        for (var i = 0; i < 30; i++) {
-          await tester.pump(const Duration(milliseconds: 400));
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        await tester.tap(find.text('Lens effect'));
+        await tester.pump();
+        expect(clip.edits.fisheye, true);
+        tester.widget<Slider>(find.byType(Slider).first).onChanged!(.7);
+        await tester.pump();
+        expect(clip.edits.strength, .7);
+        await tester.tap(find.byType(DropdownButtonFormField<String>));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.text('Pincushion').last);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(clip.edits.lens, 'pincushion');
+        await tester.ensureVisible(find.text('Add blur spot (0/8)'));
+        await tester.pump();
+        await tester.tap(find.text('Add blur spot (0/8)'));
+        await tester.pump();
+        expect(clip.edits.spots.length, 1);
+        final semantics = tester.ensureSemantics();
+        try {
+          final spot = find.bySemanticsLabel('Blur spot 1');
+          await tester.ensureVisible(spot);
+          await tester.pump();
+          expect(spot.hitTestable(), findsOneWidget);
+          final drag = await tester.startGesture(tester.getCenter(spot));
+          await drag.moveBy(const Offset(15, 0));
+          await drag.moveBy(const Offset(25, 0));
+          await drag.up();
+          await tester.pump();
+          expect(clip.edits.spots.single.x, greaterThan(.5));
+          await tester.ensureVisible(
+            find.byTooltip('Remove selected blur spot'),
           );
+          await tester.pump();
+          await tester.tap(find.byTooltip('Remove selected blur spot'));
+          await tester.pump();
+          expect(clip.edits.spots, isEmpty);
+          for (var i = 0; i < 40; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+            await tester.pump(const Duration(milliseconds: 30));
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          await EditedMedia.instance.cancel();
+          // Drain queued debounce timers after the editor releases its consumers.
+          for (var i = 0; i < 30; i++) {
+            await tester.pump(const Duration(milliseconds: 400));
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+        } finally {
+          semantics.dispose();
         }
-      } finally {
-        semantics.dispose();
-      }
+      });
     },
   );
 }

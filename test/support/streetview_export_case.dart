@@ -1,0 +1,330 @@
+import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'preview_video_platform.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/streetview_layout.dart';
+import 'package:mockareel/pages/maps_editor_page.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
+import 'package:mockareel/services/native_renderer.dart';
+import 'package:mockareel/services/project_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void testStreetviewExport(String transition, {bool smallImageCache = false}) {
+  testWidgets(
+    'Streetview $transition MP4 preserves media (small cache: $smallImageCache)',
+    (tester) async {
+      final cache = PaintingBinding.instance.imageCache;
+      final cacheLimit = cache.maximumSizeBytes;
+      if (smallImageCache) cache.maximumSizeBytes = 1;
+      addTearDown(() => cache.maximumSizeBytes = cacheLimit);
+      final secondMediaIndex = transition == 'map' ? 4 : 3;
+      final returnIndex = secondMediaIndex + 1;
+      final endingMapIndex = returnIndex + 1;
+      SharedPreferences.setMockInitialValues({});
+      final previousVideoPlatform = VideoPlayerPlatform.instance;
+      VideoPlayerPlatform.instance = PreviewVideoPlatform();
+      addTearDown(() => VideoPlayerPlatform.instance = previousVideoPlatform);
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      late Directory dir;
+      late ProjectStore store;
+      late ReelProject p;
+      await tester.runAsync(() async {
+        dir = await Directory.systemTemp.createTemp('streetview-export-');
+        store = ProjectStore(root: dir);
+        await store.initialize();
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawColor(const Color(0xff30ba80), BlendMode.src);
+        final image = await recorder.endRecording().toImage(100, 100);
+        final png = await image.toByteData(format: ui.ImageByteFormat.png);
+        image.dispose();
+        final photo = File('${dir.path}/photo.png');
+        await photo.writeAsBytes(png!.buffer.asUint8List());
+        for (var i = 0; i < 2; i++) {
+          await photo.copy('${dir.path}/source-$i.png');
+        }
+        final mapRecorder = ui.PictureRecorder();
+        Canvas(mapRecorder).drawColor(const Color(0xff2040e0), BlendMode.src);
+        final mapPicture = mapRecorder.endRecording();
+        final mapImage = await mapPicture.toImage(100, 100);
+        final mapPng = await mapImage.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        final mapPhoto = File('${dir.path}/map.png');
+        await mapPhoto.writeAsBytes(mapPng!.buffer.asUint8List());
+        mapImage.dispose();
+        mapPicture.dispose();
+        p = ReelProject(
+          template: 'streetview',
+          streetview: StreetviewSettings(
+            openingMapSeconds: .5,
+            laterMapSeconds: .5,
+            endOnMap: true,
+          ),
+          clips: [
+            for (var i = 0; i < 2; i++)
+              ReelClip(
+                id: '$i',
+                path: '${dir.path}/source-$i.png',
+                name: 'Media $i',
+                isVideo: i == 1,
+                sourceDuration: 3,
+                duration: .5,
+                streetview: StreetviewMedia(
+                  place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
+                  mapPath: mapPhoto.path,
+                  panZoom: i == 1,
+                  turntable: i == 1,
+                  transition: transition,
+                  transitionSeconds: .25,
+                ),
+              ),
+          ],
+        );
+      });
+      p.clips[1].edits = MediaEdits(
+        fisheye: true,
+        strength: .5,
+        spots: [BlurSpot()],
+      );
+      final effectInputs = <Map>[];
+      Map? request;
+      final checks = <String, bool>{};
+      Object? captureError;
+      Future<List<int>> pixel(String path, int x, int y) async {
+        final codec = await ui.instantiateImageCodec(
+          await File(path).readAsBytes(),
+        );
+        try {
+          final frame = await codec.getNextFrame();
+          try {
+            final bytes = await frame.image.toByteData(
+              format: ui.ImageByteFormat.rawRgba,
+            );
+            final offset = (y * frame.image.width + x) * 4;
+            return bytes!.buffer.asUint8List(offset, 4).toList();
+          } finally {
+            frame.image.dispose();
+          }
+        } finally {
+          codec.dispose();
+        }
+      }
+
+      Future<int> alpha(String path, int x, int y) async =>
+          (await pixel(path, x, y))[3];
+
+      Future<bool> hasMedia(String path, {int x = 540, int y = 800}) async {
+        final rgba = await pixel(path, x, y);
+        // Both fixture clips are green; the opaque video placeholder is gray.
+        return rgba[1] > rgba[0] + 30 && rgba[1] > rgba[2] + 30;
+      }
+
+      const progressChannel = MethodChannel('dev.mockareel/render-progress');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        progressChannel,
+        (call) async => null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          progressChannel,
+          null,
+        ),
+      );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        NativeRenderer.channel,
+        (call) async {
+          if (call.method == 'cancel') return null;
+          if (call.method == 'thumbnail') {
+            final path = (call.arguments as Map)['path'] as String;
+            return path.contains('source-edits-v2') ? p.clips[1].path : path;
+          }
+          if (call.method == 'processMedia') {
+            final args = call.arguments as Map;
+            effectInputs.add(args);
+            await File(args['output'] as String).writeAsBytes([1, 2, 3]);
+            return args['output'];
+          }
+          if (call.method != 'export') {
+            throw PlatformException(code: 'UNEXPECTED', message: call.method);
+          }
+          try {
+            final args = call.arguments as Map;
+            final frames = args['sceneFrames'] as List;
+            final overlays = args['overlays'] as List;
+            checks['opening map animated'] = (frames[0] as List).length == 15;
+            checks['static media retains attribution'] =
+                await alpha(overlays[1] as String, 60, 100) > 0;
+            checks['static media retains controls'] =
+                await alpha(overlays[1] as String, 975, 90) > 0;
+            checks['static media retains place sheet'] =
+                await alpha(overlays[1] as String, 540, 1800) > 0;
+            checks['active texture exposed'] =
+                await alpha(overlays[1] as String, 540, 800) == 0;
+            checks['movement composited'] =
+                await alpha(frames[2][4] as String, 540, 800) == 255;
+            for (final index in [2, returnIndex]) {
+              final sceneFrames = frames[index] as List;
+              for (var frame = 0; frame < sceneFrames.length; frame++) {
+                final back = index == returnIndex || transition == 'map';
+                final elapsed = frame / 30;
+                final duration =
+                    p.clips[index == 2 ? 0 : 1].streetview.transitionSeconds;
+                final t = back
+                    ? ((elapsed - duration + .1) / .1).clamp(0.0, 1.0)
+                    : 0.0;
+                final rect = Rect.lerp(
+                  const Rect.fromLTWH(0, 0, 360, 640),
+                  const Rect.fromLTWH(
+                    StreetviewLayout.thumbnailLeft,
+                    StreetviewLayout.thumbnailTop,
+                    StreetviewLayout.thumbnailWidth,
+                    StreetviewLayout.thumbnailHeight,
+                  ),
+                  Curves.easeInOut.transform(t),
+                )!;
+                checks['scene $index frame $frame contains media'] =
+                    await hasMedia(
+                      sceneFrames[frame] as String,
+                      x: (rect.center.dx * 3).round(),
+                      y: (rect.center.dy * 3).round(),
+                    );
+              }
+              if (index == returnIndex || transition == 'map') {
+                final rgba = await pixel(sceneFrames.last as String, 540, 800);
+                checks['scene $index shrinks media to reveal the map'] =
+                    rgba[2] > rgba[1] + 30 && rgba[2] > rgba[0] + 30;
+              }
+            }
+            checks['ending map animated'] =
+                (frames[endingMapIndex] as List).length == 15;
+            final clips = args['clips'] as List;
+            checks['video retained'] =
+                clips[secondMediaIndex]['isVideo'] == true;
+            checks['edited source retained'] =
+                (clips[secondMediaIndex]['path'] as String).contains(
+                  'source-edits-v2',
+                );
+            checks['UI is never source-processed'] =
+                effectInputs.length == 1 &&
+                effectInputs.single['path'] == p.clips[1].path;
+            checks['pan zoom retained'] =
+                clips[secondMediaIndex]['slowPanZoom'] == true;
+            checks['camera plan retained'] =
+                (clips[secondMediaIndex]['cameraMotion'] as Map)['turn'] == 8.0;
+            checks['moving arrows captured'] =
+                (frames[secondMediaIndex] as List).length == 15;
+            checks['video blur ignored'] =
+                ((effectInputs.single['edits'] as Map)['spots'] as List)
+                    .isEmpty;
+            checks['timeline duration'] =
+                ((clips.fold<double>(
+                          0,
+                          (n, c) => n + (c['duration'] as num).toDouble(),
+                        )) -
+                        p.duration)
+                    .abs() <
+                .000001;
+            request = args;
+          } catch (e) {
+            captureError = e;
+            request = {};
+          }
+          throw PlatformException(
+            code: 'TEST_COMPLETE',
+            message: 'Captured native export request',
+          );
+        },
+      );
+      addTearDown(() async {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          NativeRenderer.channel,
+          null,
+        );
+        await dir.delete(recursive: true);
+      });
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: MapsEditorPage(store: store, initialProject: p),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      Future<void> settleMedia() async {
+        // Edited media preparation includes real file I/O and a debounce timer.
+        // Pumping only the fake clock can leave its spinner animating forever.
+        // Wait for the actual player, yielding to real async work each time.
+        for (var i = 0; i < 500; i++) {
+          await tester.pump(const Duration(milliseconds: 30));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          if (find.byType(VideoPlayer).evaluate().length == 1 &&
+              find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+            return;
+          }
+        }
+        expect(
+          find.byType(VideoPlayer),
+          findsOneWidget,
+          reason: 'The edited video must finish preparing before export',
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+      }
+
+      await settleMedia();
+      await tester.tap(find.text('Export').last);
+      await settleMedia();
+      expect(find.byType(TimelinePreview), findsOneWidget);
+      await tester.tap(find.text('Render MP4'));
+      await tester.pump();
+      expect(
+        find.byType(TimelinePreview),
+        findsNothing,
+        reason: 'Release preview video/audio players while encoding',
+      );
+      for (var i = 0; i < 1600 && request == null; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+      }
+      expect(captureError, isNull);
+      expect(
+        request,
+        isNotNull,
+        reason: 'Export must reach the native encoder',
+      );
+      expect(request!['template'], 'tiktok-feed');
+      expect((request!['clips'] as List).length, endingMapIndex + 1);
+      expect(checks.values, everyElement(true), reason: checks.toString());
+      for (
+        var i = 0;
+        i < 100 && find.text('Cancel export').evaluate().isNotEmpty;
+        i++
+      ) {
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+      }
+      await settleMedia();
+      expect(find.text('Cancel export'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+}

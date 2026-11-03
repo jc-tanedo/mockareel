@@ -2,12 +2,12 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import '../model/streetview_timeline.dart';
-import '../model/streetview_motion.dart';
 import '../model/streetview_layout.dart';
+import '../model/streetview_motion.dart';
+import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
-import 'streetview_chrome.dart';
 import 'streetview_camera.dart';
+import 'streetview_chrome.dart';
 
 class StreetviewCanvas extends StatelessWidget {
   final ReelProject project;
@@ -23,6 +23,7 @@ class StreetviewCanvas extends StatelessWidget {
     this.posterOnly = false,
     this.posters = const {},
   });
+
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
@@ -44,6 +45,71 @@ class StreetviewCanvas extends StatelessWidget {
               .clamp(0.0, 1.0)
         : 0.0;
     final direction = settings.arrow == 'left' ? -1.0 : 1.0;
+
+    // 100ms quick transition between map thumbnail and full sized media
+    const transitionSec = 0.1;
+    final isMedia = scene.kind == 'media';
+    final isBack = scene.kind == 'back';
+    // Arrow handoffs already arrive at full size. Only a map thumbnail
+    // should expand into the next media scene.
+    final followsMap =
+        i == 0 || project.clips[i - 1].streetview.transition == 'map';
+    // Export composites native media at full size, so its overlay must be
+    // fully visible even when captured at the first frame of the scene.
+    final isExpanding =
+        !overlayOnly && isMedia && followsMap && elapsed < transitionSec;
+    final expandProgress = isExpanding
+        ? (elapsed / transitionSec).clamp(0.0, 1.0)
+        : 1.0;
+    final expandT = Curves.easeInOut.transform(expandProgress);
+
+    final backStart = max(0.0, scene.duration - transitionSec);
+    final isShrinking = isBack && elapsed >= backStart;
+    final shrinkProgress = isShrinking
+        ? ((elapsed - backStart) / transitionSec).clamp(0.0, 1.0)
+        : 0.0;
+    final shrinkT = Curves.easeInOut.transform(shrinkProgress);
+
+    final hasCardTransition = isExpanding || isShrinking;
+    final cardT = isExpanding ? expandT : (1.0 - shrinkT);
+
+    const fullRect = Rect.fromLTWH(0, 0, 360, 640);
+    const thumbRect = Rect.fromLTWH(
+      StreetviewLayout.thumbnailLeft,
+      StreetviewLayout.thumbnailTop,
+      StreetviewLayout.thumbnailWidth,
+      StreetviewLayout.thumbnailHeight,
+    );
+    final liveMap = map && !posterOnly;
+    final activeRect = liveMap
+        ? thumbRect
+        : isExpanding
+        ? Rect.lerp(thumbRect, fullRect, expandT)!
+        : isShrinking
+        ? Rect.lerp(fullRect, thumbRect, shrinkT)!
+        : fullRect;
+    final activeRadius = liveMap
+        ? 12.0
+        : isExpanding
+        ? ui.lerpDouble(12, 0, expandT)!
+        : isShrinking
+        ? ui.lerpDouble(0, 12, shrinkT)!
+        : 0.0;
+
+    // Dramatic motion blur and streetview camera rush
+    final blurX = sin(t * pi) * 36.0;
+    final blurY = sin(t * pi) * 8.0;
+    final outgoingScale = (1.0 + pow(t, 1.3) * 0.9).toDouble();
+    final outgoingProgress = pow(t, 1.2).toDouble();
+    final outgoingOffset = Offset(
+      -direction * 180 * outgoingProgress,
+      -25 * outgoingProgress,
+    );
+    final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0).toDouble();
+    final incomingScale = 1.0 + (1.0 - t) * 0.35;
+    final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
+    final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
+
     Widget image(ReelClip c, double seconds) => ClipPoster(
       clip: c,
       position: seconds,
@@ -51,6 +117,7 @@ class StreetviewCanvas extends StatelessWidget {
           ? posters['${c.id}:end']
           : posters[c.id],
     );
+
     Widget media(ReelClip c, double seconds, {bool pixels = true}) =>
         StreetviewCamera(
           clip: c,
@@ -71,34 +138,36 @@ class StreetviewCanvas extends StatelessWidget {
                             c.id == clip.id &&
                             position < project.duration,
                       ),
-              if (c.streetview.showArrows) const StreetviewArrows(),
+              if (c.streetview.showArrows)
+                Opacity(opacity: map ? 0 : 1, child: const StreetviewArrows()),
             ],
           ),
         );
+
     Widget transition() => ColoredBox(
       color: Colors.black,
       child: ClipRect(
         child: ImageFiltered(
-          imageFilter: ui.ImageFilter.blur(
-            sigmaX: sin(t * pi) * 10,
-            sigmaY: sin(t * pi) * 2,
-          ),
+          imageFilter: ui.ImageFilter.blur(sigmaX: blurX, sigmaY: blurY),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Transform.translate(
-                offset: Offset(-direction * 130 * t, 0),
-                child: Transform.scale(
-                  scale: 1 + t * .25,
-                  child: media(clip, clip.duration),
+              Opacity(
+                opacity: outgoingOpacity,
+                child: Transform.translate(
+                  offset: outgoingOffset,
+                  child: Transform.scale(
+                    scale: outgoingScale,
+                    child: media(clip, clip.duration),
+                  ),
                 ),
               ),
               Opacity(
-                opacity: t,
+                opacity: incomingOpacity,
                 child: Transform.translate(
-                  offset: Offset(direction * 130 * (1 - t), 0),
+                  offset: incomingOffset,
                   child: Transform.scale(
-                    scale: 1 + (1 - t) * .25,
+                    scale: incomingScale,
                     child: media(project.clips[i + 1], 0),
                   ),
                 ),
@@ -108,12 +177,14 @@ class StreetviewCanvas extends StatelessWidget {
         ),
       ),
     );
+
     final arrow = StreetviewMotion.at(clip, clip.duration).project(
       settings.arrow == 'left'
           ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
           : 360 - StreetviewLayout.arrowLeft - StreetviewLayout.arrowWidth / 2,
       StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
     );
+
     return FittedBox(
       child: SizedBox(
         width: 360,
@@ -123,20 +194,29 @@ class StreetviewCanvas extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              if (!overlayOnly)
+              if (!overlayOnly) ...[
                 Positioned.fill(
                   child: ColoredBox(
                     color: movement ? Colors.black : Colors.transparent,
                   ),
                 ),
-              if (!overlayOnly)
+                if (hasCardTransition || liveMap)
+                  Positioned.fill(
+                    key: const ValueKey('streetview-map-background'),
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: const SizedBox(),
+                      showThumbnail: false,
+                    ),
+                  ),
                 Positioned.fill(
                   key: const ValueKey('streetview-media-players'),
                   child: ClipRect(
                     child: ImageFiltered(
                       imageFilter: ui.ImageFilter.blur(
-                        sigmaX: movement ? sin(t * pi) * 10 : 0,
-                        sigmaY: movement ? sin(t * pi) * 2 : 0,
+                        sigmaX: movement ? blurX : 0,
+                        sigmaY: movement ? blurY : 0,
                       ),
                       child: Stack(
                         fit: StackFit.expand,
@@ -146,44 +226,59 @@ class StreetviewCanvas extends StatelessWidget {
                             j <= min(project.clips.length - 1, i + 1);
                             j++
                           )
-                            Positioned.fill(
+                            Positioned.fromRect(
                               key: ValueKey(
                                 'streetview-player-${project.clips[j].id}',
                               ),
+                              rect: j == i ? activeRect : fullRect,
                               child: Opacity(
                                 opacity: map
-                                    ? 0
+                                    ? (liveMap && j == i ? 1 : 0)
                                     : movement
                                     ? (j == i
-                                          ? 1
+                                          ? outgoingOpacity
                                           : j == i + 1
-                                          ? t
+                                          ? incomingOpacity
                                           : 0)
                                     : j == i
                                     ? 1
                                     : 0,
-                                child: Transform.translate(
-                                  offset: Offset(
-                                    movement
-                                        ? direction *
-                                              130 *
-                                              (j == i ? -t : 1 - t)
-                                        : 0,
-                                    0,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    j == i ? activeRadius : 0.0,
                                   ),
-                                  child: Transform.scale(
-                                    scale: movement
-                                        ? 1 + .25 * (j == i ? t : 1 - t)
-                                        : 1,
-                                    child: media(
-                                      project.clips[j],
-                                      j < i
-                                          ? project.clips[j].duration
-                                          : j > i || map
-                                          ? 0
-                                          : scene.kind == 'media'
-                                          ? elapsed
-                                          : clip.duration,
+                                  child: Transform.translate(
+                                    offset: movement
+                                        ? (j == i
+                                              ? outgoingOffset
+                                              : incomingOffset)
+                                        : Offset.zero,
+                                    child: Transform.scale(
+                                      scale: movement
+                                          ? (j == i
+                                                ? outgoingScale
+                                                : incomingScale)
+                                          : 1.0,
+                                      child: FittedBox(
+                                        fit: BoxFit.cover,
+                                        child: SizedBox(
+                                          width: 360,
+                                          height: 640,
+                                          child: media(
+                                            project.clips[j],
+                                            j < i
+                                                ? project.clips[j].duration
+                                                : j > i ||
+                                                      (map &&
+                                                          scene.kind !=
+                                                              'ending-map')
+                                                ? 0
+                                                : isMedia
+                                                ? elapsed
+                                                : clip.duration,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -194,32 +289,84 @@ class StreetviewCanvas extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (map)
-                Positioned.fill(
-                  child: StreetviewMapScene(
-                    settings: settings,
-                    dark: project.darkOutput,
-                    thumbnail: image(clip, 0),
+                if (liveMap)
+                  const Positioned(
+                    left: StreetviewLayout.thumbnailLeft,
+                    top: StreetviewLayout.thumbnailTop,
+                    width: StreetviewLayout.thumbnailWidth,
+                    height: StreetviewLayout.thumbnailHeight,
+                    child: StreetviewMapThumbnail(thumbnail: SizedBox()),
                   ),
-                )
-              else ...[
-                if (overlayOnly)
+                if (map && !liveMap)
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: image(
+                        clip,
+                        scene.kind == 'ending-map' ? clip.duration : 0,
+                      ),
+                    ),
+                  ),
+              ],
+              if (overlayOnly) ...[
+                if (map)
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: image(
+                        clip,
+                        scene.kind == 'ending-map' ? clip.duration : 0,
+                      ),
+                    ),
+                  )
+                else if (isBack) ...[
+                  // Keep the map and held poster mounted for the whole return
+                  // scene so decoding cannot interrupt the shrinking card.
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: const SizedBox(),
+                      showThumbnail: false,
+                    ),
+                  ),
+                  Positioned.fromRect(
+                    rect: activeRect,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(activeRadius),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: 360,
+                          height: 640,
+                          child: media(clip, clip.duration),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else
                   Positioned.fill(
                     child: movement
                         ? transition()
                         : media(
                             clip,
-                            scene.kind == 'back' ? clip.duration : elapsed,
-                            pixels: scene.kind == 'back',
+                            isBack ? clip.duration : elapsed,
+                            pixels: isBack,
                           ),
                   ),
+              ],
+              if (!map)
                 Positioned.fill(
-                  child: StreetviewChrome(
-                    settings: settings,
-                    dark: project.darkOutput,
+                  child: Opacity(
+                    opacity: hasCardTransition ? cardT : 1.0,
+                    child: StreetviewChrome(
+                      settings: settings,
+                      dark: project.darkOutput,
+                    ),
                   ),
                 ),
-              ],
               if (ripple >= 0 && ripple < 1)
                 Positioned(
                   left: map

@@ -176,7 +176,10 @@ class _MediaFrameState extends State<MediaFrame> {
             _loadedStamp != _gifStamp)) {
       _load();
     } else {
-      _sync(force: oldWidget.playing != widget.playing);
+      // A play/pause change does not invalidate the decoded frame. Seeking
+      // again here can blank an already preloaded texture during a handoff.
+      // _sync still seeks when the timeline position actually changes.
+      _sync();
     }
   }
 
@@ -297,41 +300,51 @@ class _ClipPosterState extends State<ClipPoster> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) => FutureBuilder<String>(
-    future: _path,
-    builder: (context, snapshot) {
-      final fallback = ColoredBox(
-        color: const Color(0xffd9e3e3),
-        child: Center(
-          child: Icon(
-            widget.clip.isTimed
-                ? Icons.videocam_outlined
-                : Icons.image_outlined,
-            color: const Color(0xff7a9294),
-          ),
-        ),
-      );
-      if (!snapshot.hasData ||
-          (widget.clip.effectiveEdits.active &&
-              snapshot.connectionState != ConnectionState.done)) {
-        return fallback;
-      }
-      final pan = widget.applyCrop ? widget.clip.panX : 0.0;
-      return ClipRect(
-        child: Transform.scale(
-          scale: widget.applyCrop ? widget.clip.zoom : 1,
-          alignment: Alignment(pan, 0),
-          child: Image.file(
-            File(snapshot.data!),
-            fit: BoxFit.cover,
-            alignment: Alignment(pan, 0),
-            width: double.infinity,
-            height: double.infinity,
-            errorBuilder: (_, __, ___) => fallback,
-          ),
-        ),
-      );
-    },
+  Widget _fallback() => ColoredBox(
+    color: const Color(0xffd9e3e3),
+    child: Center(
+      child: Icon(
+        widget.clip.isTimed ? Icons.videocam_outlined : Icons.image_outlined,
+        color: const Color(0xff7a9294),
+      ),
+    ),
   );
+
+  Widget _image(String path) {
+    final pan = widget.applyCrop ? widget.clip.panX : 0.0;
+    return ClipRect(
+      child: Transform.scale(
+        scale: widget.applyCrop ? widget.clip.zoom : 1,
+        alignment: Alignment(pan, 0),
+        child: Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          alignment: Alignment(pan, 0),
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => _fallback(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Exports prepare and precache these assets before capturing. A FutureBuilder
+    // still emits a waiting frame for an already-resolved path, which can bake
+    // the video placeholder into a transition PNG when a scene is first mounted.
+    final resolved = widget.resolvedPath;
+    if (resolved != null) return _image(resolved);
+    return FutureBuilder<String>(
+      future: _path,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData ||
+            (widget.clip.effectiveEdits.active &&
+                snapshot.connectionState != ConnectionState.done)) {
+          return _fallback();
+        }
+        return _image(snapshot.data!);
+      },
+    );
+  }
 }

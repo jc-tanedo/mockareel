@@ -33,9 +33,24 @@ integration_test/           # Real-device media flow
 tool/                       # CI helpers, cloud setup and optional visual tools
 ```
 
-Models do not depend on UI. Widgets/pages do not import the entry point. Preview and export share the same output widgets; native Android code keeps active video as a texture and composites captured UI frames. The timeline helpers define motion consistently between preview and export.
+Models do not depend on UI. Widgets/pages do not import the entry point. Preview
+and export share project data, timeline calculations and output widgets, with
+separate rendering paths: preview retains live Flutter players, while export
+captures UI/transition PNGs and composites native video textures through Media3.
+Changes to either path must check the matching behavior in the other path.
 
-The two editor pages still own substantial state, import and export orchestration. When extending them, prefer extracting focused controllers/services and inspectors over adding more responsibilities. A feature-per-template structure may become useful once more templates share these boundaries; avoid moving common preview/storage code into one template.
+Editor pages own selection, autosave and navigation. Focused services handle media
+imports and Maps/FYP export pipelines; shared widgets provide the inspector,
+capture stage and export monitor. On Android, an export session starts a foreground
+service before preparation, requests notification permission and keeps the CPU
+active through encoding. Capture uses warm-up frames when Flutter stops display
+vsync in the background. Session completion, failure and cancellation release the
+service and wake lock.
+
+Export surface tests check actual media pixels in captured transition frames,
+including under image-cache eviction, as well as the full-screen-to-thumbnail
+geometry. A resolved poster path alone does not establish that its image is still
+decoded: required assets are precached again before each Streetview scene.
 
 ## Validation
 

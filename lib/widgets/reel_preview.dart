@@ -11,6 +11,7 @@ import 'media_frame.dart';
 import 'place_overlay.dart';
 import 'music_playback.dart';
 import 'output_palette.dart';
+import 'wavy_slider_track.dart';
 export 'place_overlay.dart';
 
 class TimelinePreview extends StatefulWidget {
@@ -18,12 +19,16 @@ class TimelinePreview extends StatefulWidget {
   final int selected;
   final double maxHeight;
   final bool startAtBeginning;
+  final bool loop;
+  final bool autoPlay;
   const TimelinePreview({
     super.key,
     required this.project,
     this.selected = 0,
     this.startAtBeginning = false,
     this.maxHeight = 420,
+    this.loop = true,
+    this.autoPlay = true,
   });
   @override
   State<TimelinePreview> createState() => _TimelinePreviewState();
@@ -33,6 +38,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final Ticker _ticker;
   double _base = 0, _position = 0;
+  bool _userPaused = false;
   bool get _playing => _ticker.isActive;
   double get _duration => widget.project.isFeed
       ? FeedTimeline.duration(widget.project)
@@ -55,19 +61,30 @@ class _TimelinePreviewState extends State<TimelinePreview>
 
   void _play() {
     if (widget.project.clips.isEmpty) return;
+    _userPaused = false;
     if (_position >= _duration - .03) _position = 0;
     _base = _position;
+    if (_ticker.isActive) _ticker.stop();
     _ticker.start();
     setState(() {});
   }
 
   void _tick(Duration elapsed) {
     if (!mounted) return;
-    final position = min(_duration, _base + elapsed.inMicroseconds / 1000000);
-    // Stop the clock before rebuilding the final frame, so every child receives
-    // paused playback in the same update as the exact end position.
-    if (position >= _duration) _ticker.stop();
-    setState(() => _position = position);
+    if (_duration <= 0) {
+      _ticker.stop();
+      setState(() => _position = 0);
+      return;
+    }
+    final raw = _base + elapsed.inMicroseconds / 1000000;
+    if (widget.loop) {
+      final position = raw % _duration;
+      setState(() => _position = position);
+    } else {
+      final position = min(_duration, raw);
+      if (position >= _duration) _ticker.stop();
+      setState(() => _position = position);
+    }
   }
 
   @override
@@ -81,13 +98,40 @@ class _TimelinePreviewState extends State<TimelinePreview>
   @override
   void didUpdateWidget(TimelinePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selected != widget.selected ||
-        oldWidget.project.id != widget.project.id) {
+    final mediaSelected =
+        oldWidget.project.clips.isEmpty && widget.project.clips.isNotEmpty;
+
+    if (oldWidget.project.id != widget.project.id) {
+      _userPaused = false;
       _pause();
       _position = _selectedStart;
+      if (mediaSelected && widget.autoPlay && !_userPaused && !_playing) {
+        _play();
+      }
+    } else if (oldWidget.selected != widget.selected) {
+      if (_playing) {
+        _position = _selectedStart;
+        _base = _selectedStart;
+        _ticker.stop();
+        _ticker.start();
+        setState(() {});
+      } else {
+        _pause();
+        _position = _selectedStart;
+      }
+    } else if (mediaSelected) {
+      if (widget.autoPlay &&
+          !_userPaused &&
+          !_playing &&
+          widget.project.clips.isNotEmpty) {
+        _play();
+      }
     }
-    _position = _position.clamp(0, _duration);
-    if (_position >= _duration && _ticker.isActive) _pause();
+
+    _position = _duration > 0 ? (_position.clamp(0, _duration)) : 0;
+    if (_position >= _duration && _ticker.isActive && !widget.loop) {
+      _pause();
+    }
   }
 
   @override
@@ -105,6 +149,8 @@ class _TimelinePreviewState extends State<TimelinePreview>
   @override
   Widget build(BuildContext context) {
     final p = widget.project;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -120,12 +166,20 @@ class _TimelinePreviewState extends State<TimelinePreview>
             constraints: BoxConstraints(maxHeight: widget.maxHeight),
             child: AspectRatio(
               aspectRatio: 9 / 16,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: ReelCanvas(
-                  project: p,
-                  position: _position,
-                  playing: _playing,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: colors.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: ReelCanvas(
+                    project: p,
+                    position: _position,
+                    playing: _playing,
+                  ),
                 ),
               ),
             ),
@@ -136,36 +190,67 @@ class _TimelinePreviewState extends State<TimelinePreview>
             IconButton(
               tooltip: 'Restart preview',
               visualDensity: VisualDensity.compact,
+              color: colors.onSurfaceVariant,
               onPressed: p.clips.isEmpty
                   ? null
                   : () {
-                      _pause();
-                      setState(() => _position = 0);
+                      if (_playing) {
+                        _base = 0;
+                        _ticker.stop();
+                        _ticker.start();
+                        setState(() => _position = 0);
+                      } else {
+                        setState(() => _position = 0);
+                      }
                     },
               icon: const Icon(Icons.replay, size: 18),
             ),
             IconButton(
               tooltip: _playing ? 'Pause preview' : 'Play preview',
+              color: colors.primary,
               onPressed: p.clips.isEmpty
                   ? null
-                  : () => _playing ? _pause() : _play(),
+                  : () {
+                      if (_playing) {
+                        _userPaused = true;
+                        _pause();
+                      } else {
+                        _userPaused = false;
+                        _play();
+                      }
+                    },
               icon: Icon(
                 _playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
               ),
             ),
             Expanded(
-              child: Slider(
-                value: min(_position, _duration),
-                max: max(.01, _duration),
-                onChangeStart: (_) => _pause(),
-                onChanged: p.clips.isEmpty
-                    ? null
-                    : (v) => setState(() => _position = v),
+              child: SliderTheme(
+                data: theme.sliderTheme.copyWith(
+                  trackShape: WavySliderTrackShape(
+                    phase: _playing ? (_position * 3.5 * pi) : 0.0,
+                  ),
+                ),
+                child: Slider(
+                  value: min(_position, _duration),
+                  max: max(.01, _duration),
+                  onChangeStart: (_) {
+                    _userPaused = true;
+                    _pause();
+                  },
+                  onChanged: p.clips.isEmpty
+                      ? null
+                      : (v) => setState(() => _position = v),
+                ),
               ),
             ),
             Text(
-              '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / ${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
-              style: const TextStyle(fontSize: 11),
+              '${_position.toStringAsFixed(p.isStreetview ? 2 : 1)} / '
+              '${_duration.toStringAsFixed(p.isStreetview ? 2 : 1)}s',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: colors.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),
@@ -248,8 +333,9 @@ class ReelCanvas extends StatelessWidget {
             height: height,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(TemplateLayout.radius),
-              // Live cards keep one stable player as they move from upcoming
-              // to active to outgoing. Capture/poster mode retains still images.
+              // Live cards keep one stable player as they move from
+              // upcoming to active to outgoing. Capture/poster mode retains
+              // still images.
               child: !posterOnly
                   ? MediaFrame(
                       key: ValueKey(clip.id),

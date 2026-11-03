@@ -57,9 +57,11 @@ class _HomeAppsEditorState extends State<HomeAppsEditor> {
           },
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Moves the feed app to this tile; the opening and closing animations follow it.',
-          style: TextStyle(fontSize: 11, color: Colors.white54),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         SegmentedButton<bool>(
@@ -142,11 +144,13 @@ class _HomeAppsEditorState extends State<HomeAppsEditor> {
           },
         ),
         if (!_dock)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
               'Leave a label blank to hide a grid tile. The launch tile stays visible.',
-              style: TextStyle(fontSize: 11, color: Colors.white54),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         const SizedBox(height: 8),

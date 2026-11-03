@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import androidx.media3.effect.Crop
 import java.security.MessageDigest
 import kotlin.math.*
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -50,6 +52,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             val holder = ProgressHolder()
             if (active.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
                 events?.success(holder.progress / 100.0)
+                ExportService.progress("Encoding video…", .35 + .65 * holder.progress / 100.0)
             }
             handler.postDelayed(this, 250)
         }
@@ -98,8 +101,29 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         if (target.isFile) return target.path
         val retriever = MediaMetadataRetriever()
         try {
-            retriever.setDataSource(path)
-            val bitmap = requireNotNull(retriever.getFrameAtTime((max(0.0, seconds) * 1_000_000).toLong(), MediaMetadataRetriever.OPTION_CLOSEST)) { "No frame was decoded" }
+            try {
+                java.io.FileInputStream(source).use { fis ->
+                    retriever.setDataSource(fis.fd)
+                }
+            } catch (_: Exception) {
+                retriever.setDataSource(path)
+            }
+            val timeUs = (max(0.0, seconds) * 1_000_000).toLong()
+            var bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+            if (bitmap == null) {
+                bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            }
+            if (bitmap == null) {
+                bitmap = retriever.getFrameAtTime(timeUs)
+            }
+            if (bitmap == null) {
+                bitmap = retriever.frameAtTime
+            }
+            if (bitmap == null) {
+                bitmap = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.rgb(24, 28, 32))
+                }
+            }
             try {
                 val factor = min(1f, 1080f / max(bitmap.width, bitmap.height))
                 val scaled = if (factor < 1) Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * factor).roundToInt()), max(1, (bitmap.height * factor).roundToInt()), true) else bitmap
@@ -108,25 +132,230 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             } finally { bitmap.recycle() }
             return target.path
         } catch (e: Exception) { target.delete(); throw e }
-        finally { retriever.release() }
+        finally { try { retriever.release() } catch (_: Exception) {} }
+    }
+
+    private fun parseMp4(file: File): Triple<Double, Boolean, Pair<Int, Int>> {
+        var durationSec = 0.0
+        var hasAudio = false
+        var width = 0
+        var height = 0
+        try {
+            java.io.RandomAccessFile(file, "r").use { raf ->
+                val len = raf.length()
+                var pos = 0L
+                while (pos + 8 <= len) {
+                    raf.seek(pos)
+                    val sizeInt = raf.readInt()
+                    val type = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.ISO_8859_1)
+                    val boxSize = when {
+                        sizeInt == 1 && pos + 16 <= len -> raf.readLong()
+                        sizeInt == 0 -> len - pos
+                        sizeInt > 0 -> sizeInt.toLong()
+                        else -> break
+                    }
+                    if (boxSize < 8 || pos + boxSize > len) break
+                    val headerSize = if (sizeInt == 1) 16L else 8L
+                    if (type == "moov") {
+                        var moovPos = pos + headerSize
+                        val moovEnd = pos + boxSize
+                        while (moovPos + 8 <= moovEnd) {
+                            raf.seek(moovPos)
+                            val subSizeInt = raf.readInt()
+                            val subType = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.ISO_8859_1)
+                            val subBoxSize = when {
+                                subSizeInt == 1 && moovPos + 16 <= moovEnd -> raf.readLong()
+                                subSizeInt == 0 -> moovEnd - moovPos
+                                subSizeInt > 0 -> subSizeInt.toLong()
+                                else -> break
+                            }
+                            if (subBoxSize < 8 || moovPos + subBoxSize > moovEnd) break
+                            val subHeaderSize = if (subSizeInt == 1) 16L else 8L
+                            if (subType == "mvhd" && durationSec <= 0.0) {
+                                raf.seek(moovPos + subHeaderSize)
+                                val version = raf.readByte().toInt()
+                                raf.skipBytes(3)
+                                if (version == 0 && subBoxSize >= subHeaderSize + 20) {
+                                    raf.skipBytes(8)
+                                    val timescale = raf.readInt().toLong() and 0xFFFFFFFFL
+                                    val duration = raf.readInt().toLong() and 0xFFFFFFFFL
+                                    if (timescale > 0) durationSec = duration.toDouble() / timescale
+                                } else if (version == 1 && subBoxSize >= subHeaderSize + 32) {
+                                    raf.skipBytes(16)
+                                    val timescale = raf.readInt().toLong() and 0xFFFFFFFFL
+                                    val duration = raf.readLong()
+                                    if (timescale > 0) durationSec = duration.toDouble() / timescale
+                                }
+                            } else if (subType == "trak") {
+                                var trakPos = moovPos + subHeaderSize
+                                val trakEnd = moovPos + subBoxSize
+                                while (trakPos + 8 <= trakEnd) {
+                                    raf.seek(trakPos)
+                                    val tSize = raf.readInt().toLong() and 0xFFFFFFFFL
+                                    val tType = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.ISO_8859_1)
+                                    if (tSize < 8 || trakPos + tSize > trakEnd) break
+                                    if (tType == "tkhd" && (width == 0 || height == 0)) {
+                                        raf.seek(trakPos + 8)
+                                        val v = raf.readByte().toInt()
+                                        val skip = if (v == 0) 76 else 88
+                                        if (tSize >= 8 + skip + 8) {
+                                            raf.skipBytes(skip)
+                                            val wFixed = raf.readInt()
+                                            val hFixed = raf.readInt()
+                                            val w = wFixed shr 16
+                                            val h = hFixed shr 16
+                                            if (w > 0 && h > 0) {
+                                                width = w
+                                                height = h
+                                            }
+                                        }
+                                    } else if (tType == "mdia") {
+                                        var mdiaPos = trakPos + 8
+                                        val mdiaEnd = trakPos + tSize
+                                        while (mdiaPos + 8 <= mdiaEnd) {
+                                            raf.seek(mdiaPos)
+                                            val mSize = raf.readInt().toLong() and 0xFFFFFFFFL
+                                            val mType = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.ISO_8859_1)
+                                            if (mSize < 8 || mdiaPos + mSize > mdiaEnd) break
+                                            if (mType == "hdlr" && mSize >= 16) {
+                                                raf.seek(mdiaPos + 16)
+                                                val handler = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.ISO_8859_1)
+                                                if (handler == "soun") {
+                                                    hasAudio = true
+                                                }
+                                                break
+                                            }
+                                            mdiaPos += mSize
+                                        }
+                                    }
+                                    trakPos += tSize
+                                }
+                            }
+                            moovPos += subBoxSize
+                        }
+                        break
+                    }
+                    pos += boxSize
+                }
+            }
+        } catch (_: Exception) {}
+        return Triple(durationSec, hasAudio, width to height)
+    }
+
+    private fun isAdtsAac(file: File): Boolean {
+        return try {
+            java.io.FileInputStream(file).use { fis ->
+                val b0 = fis.read()
+                val b1 = fis.read()
+                b0 == 0xFF && (b1 and 0xF6) == 0xF0
+            }
+        } catch (_: Exception) { false }
     }
 
     private fun inspect(path: String): Map<String, Any> {
-        require(File(path).isFile) { "File is missing" }
+        val file = File(path)
+        require(file.isFile) { "File is missing" }
+        var width = 0
+        var height = 0
+        var rotation = 0
+        var durationSec = 0.0
+        var hasAudio = false
         val retriever = MediaMetadataRetriever()
         try {
-            retriever.setDataSource(path)
-            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-            return mapOf(
-                "duration" to ((retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull() ?: 0.0) / 1000.0),
-                "width" to if (rotation % 180 == 0) width else height,
-                "height" to if (rotation % 180 == 0) height else width,
-                "hasAudio" to (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"),
-                "size" to File(path).length()
-            )
-        } finally { retriever.release() }
+            try {
+                java.io.FileInputStream(file).use { fis ->
+                    retriever.setDataSource(fis.fd)
+                }
+            } catch (_: Exception) {
+                retriever.setDataSource(path)
+            }
+            width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            durationSec = (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull() ?: 0.0) / 1000.0
+            val rawAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
+            if (rawAudio != null && (rawAudio.equals("yes", ignoreCase = true) || rawAudio == "1" || rawAudio.equals("true", ignoreCase = true) || (rawAudio.isNotEmpty() && !rawAudio.equals("no", ignoreCase = true)))) {
+                hasAudio = true
+            }
+            val mime = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+            if (mime?.startsWith("audio/") == true) {
+                hasAudio = true
+            }
+        } catch (_: Exception) {
+            // MediaMetadataRetriever can fail on unusual audio streams or MP4 headers
+        } finally {
+            try { retriever.release() } catch (_: Exception) {}
+        }
+
+        if (!hasAudio || durationSec <= 0.0 || (width == 0 && height == 0)) {
+            val extractor = MediaExtractor()
+            try {
+                try {
+                    java.io.FileInputStream(file).use { fis ->
+                        extractor.setDataSource(fis.fd)
+                    }
+                } catch (_: Exception) {
+                    extractor.setDataSource(path)
+                }
+                for (i in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                    if (mime.startsWith("audio/") || mime.contains("mp4a") || mime.contains("aac")) {
+                        hasAudio = true
+                        if (durationSec <= 0.0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                            durationSec = format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0
+                        }
+                        if (durationSec <= 0.0) {
+                            try {
+                                extractor.selectTrack(i)
+                                extractor.seekTo(Long.MAX_VALUE, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                                val lastSampleTime = extractor.sampleTime
+                                if (lastSampleTime > 0) {
+                                    durationSec = lastSampleTime / 1_000_000.0
+                                }
+                                extractor.unselectTrack(i)
+                            } catch (_: Exception) {}
+                        }
+                    } else if (mime.startsWith("video/")) {
+                        if (durationSec <= 0.0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                            durationSec = format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0
+                        }
+                        if (width == 0 && format.containsKey(MediaFormat.KEY_WIDTH)) {
+                            width = format.getInteger(MediaFormat.KEY_WIDTH)
+                        }
+                        if (height == 0 && format.containsKey(MediaFormat.KEY_HEIGHT)) {
+                            height = format.getInteger(MediaFormat.KEY_HEIGHT)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                try { extractor.release() } catch (_: Exception) {}
+            }
+        }
+
+        if (!hasAudio || durationSec <= 0.0) {
+            val (mp4Duration, mp4Audio, mp4Dims) = parseMp4(file)
+            if (durationSec <= 0.0 && mp4Duration > 0.0) durationSec = mp4Duration
+            if (!hasAudio && mp4Audio) hasAudio = true
+            if (width == 0 && mp4Dims.first > 0) width = mp4Dims.first
+            if (height == 0 && mp4Dims.second > 0) height = mp4Dims.second
+        }
+
+        if (!hasAudio && isAdtsAac(file)) {
+            hasAudio = true
+            if (durationSec <= 0.0 && file.length() > 0) {
+                durationSec = max(1.0, file.length() / 16000.0)
+            }
+        }
+
+        return mapOf(
+            "duration" to durationSec,
+            "width" to if (rotation % 180 == 0) width else height,
+            "height" to if (rotation % 180 == 0) height else width,
+            "hasAudio" to hasAudio,
+            "size" to file.length()
+        )
     }
 
     private fun buildFeedItems(
@@ -296,6 +525,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     val path = output?.absolutePath
                     events?.success(1.0)
+                    ExportService.progress("Export complete", 1.0)
                     val callback = pending
                     clear(deleteOutput = false)
                     callback?.success(path)
@@ -305,6 +535,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 }
             }).build()
         transformer!!.start(composition, output!!.absolutePath)
+        ExportService.progress("Encoding video…", .35)
         handler.post(progress)
     }
 
@@ -319,9 +550,13 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         transformer = null
         pending = null
         posterCache?.close(); posterCache = null
-        if (deleteOutput) output?.delete()
+        if (deleteOutput) {
+            output?.delete()
+
+        }
         output = null
     }
+
     fun cancel() { mediaEdits.cancel(); if (pending != null) finishError("CANCELLED", "Export cancelled") }
     fun close() { cancel(); mediaEdits.close(); worker.shutdown() }
 

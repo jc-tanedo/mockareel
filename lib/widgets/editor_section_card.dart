@@ -33,8 +33,8 @@ class EditorSectionCard extends StatelessWidget {
       elevation: 0,
       color: colors.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .6)),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .55)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -43,7 +43,7 @@ class EditorSectionCard extends StatelessWidget {
             inputDecorationTheme: theme.inputDecorationTheme.copyWith(
               fillColor: colors.surfaceContainerHigh,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
+                horizontal: 14,
                 vertical: 14,
               ),
             ),
@@ -58,6 +58,7 @@ class EditorSectionCard extends StatelessWidget {
                   style: theme.textTheme.titleSmall!.copyWith(
                     fontWeight: FontWeight.w600,
                     color: colors.onSurface,
+                    letterSpacing: 0.1,
                   ),
                   child: title,
                 ),
@@ -100,33 +101,40 @@ class EditorControlGroup extends StatelessWidget {
     required this.children,
   });
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      DefaultTextStyle.merge(
-        style: Theme.of(context).textTheme.labelLarge!.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        child: title,
-      ),
-      if (subtitle != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: DefaultTextStyle.merge(
-            style: Theme.of(context).textTheme.bodySmall!,
-            child: subtitle!,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DefaultTextStyle.merge(
+          style: theme.textTheme.labelLarge!.copyWith(
+            color: colors.onSurface,
+            fontWeight: FontWeight.w600,
           ),
+          child: title,
         ),
-      const SizedBox(height: 12),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        spacing: 12,
-        children: children,
-      ),
-    ],
-  );
+        if (subtitle != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: DefaultTextStyle.merge(
+              style: theme.textTheme.bodySmall!.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+              child: subtitle!,
+            ),
+          ),
+        const SizedBox(height: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          spacing: 12,
+          children: children,
+        ),
+      ],
+    );
+  }
 }
 
 class EditorSlider extends StatelessWidget {
@@ -143,30 +151,49 @@ class EditorSlider extends StatelessWidget {
     required this.onChanged,
   });
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Row(
-        children: [
-          Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            valueLabel,
-            style: Theme.of(context).textTheme.labelMedium!.copyWith(
-              color: Theme.of(context).colorScheme.primary,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-      Slider(
-        value: value.clamp(min, max),
-        min: min,
-        max: max,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        onChanged: onChanged,
-      ),
-    ],
-  );
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.secondaryContainer.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                valueLabel,
+                style: theme.textTheme.labelMedium!.copyWith(
+                  color: colors.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: value.clamp(min, max),
+          min: min,
+          max: max,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
 }

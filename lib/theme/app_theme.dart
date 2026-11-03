@@ -1,37 +1,314 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-const ink = Color(0xff171719),
-    panel = Color(0xff232326),
-    mint = Color(0xffb1a6ff);
+const ink = Color(0xff111015),
+    panel = Color(0xff1d1b24),
+    mint = Color(0xffb29eff),
+    vividMint = Color(0xff00e5a3),
+    vividRose = Color(0xffff6584);
 
-ThemeData buildAppTheme() => ThemeData(
-  brightness: Brightness.dark,
-  appBarTheme: const AppBarTheme(
-    backgroundColor: Color(0xff202023),
-    surfaceTintColor: Colors.transparent,
+enum AppThemePreset {
+  electricMint(
+    id: 'electricMint',
+    label: 'Electric Mint',
+    subtitle: 'Mint · Lavender · Coral',
+    primary: Color(0xff00e5a3),
+    secondary: Color(0xffb29eff),
+    tertiary: Color(0xffff6584),
   ),
-  navigationBarTheme: const NavigationBarThemeData(
-    backgroundColor: Color(0xff202023),
-    indicatorColor: Color(0xff39334f),
-    height: 68,
+  sunsetEmber(
+    id: 'sunsetEmber',
+    label: 'Sunset Ember',
+    subtitle: 'Coral · Amber · Azure',
+    primary: Color(0xffff6e40),
+    secondary: Color(0xffffd166),
+    tertiary: Color(0xff00d2ff),
   ),
-  dividerTheme: const DividerThemeData(color: Color(0xff38383d), thickness: 1),
-  sliderTheme: const SliderThemeData(
-    trackHeight: 2,
-    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+  oceanBreeze(
+    id: 'oceanBreeze',
+    label: 'Ocean Breeze',
+    subtitle: 'Cyan · Lime · Magenta',
+    primary: Color(0xff00d2ff),
+    secondary: Color(0xff70e000),
+    tertiary: Color(0xffff007f),
   ),
-  scaffoldBackgroundColor: ink,
-  useMaterial3: true,
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: mint,
+  cyberpunk(
+    id: 'cyberpunk',
+    label: 'Cyber Violet',
+    subtitle: 'Lavender · Turquoise · Rose',
+    primary: Color(0xffb29eff),
+    secondary: Color(0xff00e5a3),
+    tertiary: Color(0xffff6584),
+  ),
+  solarFlare(
+    id: 'solarFlare',
+    label: 'Solar Flare',
+    subtitle: 'Sunlight · Indigo · Crimson',
+    primary: Color(0xffffc837),
+    secondary: Color(0xff818cf8),
+    tertiary: Color(0xfff43f5e),
+  );
+
+  final String id;
+  final String label;
+  final String subtitle;
+  final Color primary;
+  final Color secondary;
+  final Color tertiary;
+  const AppThemePreset({
+    required this.id,
+    required this.label,
+    required this.subtitle,
+    required this.primary,
+    required this.secondary,
+    required this.tertiary,
+  });
+}
+
+class AppThemeController extends ValueNotifier<AppThemePreset> {
+  static final instance = AppThemeController._();
+  AppThemeController._() : super(AppThemePreset.electricMint);
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id =
+        prefs.getString('app_theme_preset') ?? AppThemePreset.electricMint.id;
+    value = AppThemePreset.values.firstWhere(
+      (p) => p.id == id,
+      orElse: () => AppThemePreset.electricMint,
+    );
+  }
+
+  Future<void> setPreset(AppThemePreset preset) async {
+    value = preset;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_theme_preset', preset.id);
+  }
+}
+
+ThemeData buildAppTheme([AppThemePreset? preset]) {
+  final current = preset ?? AppThemeController.instance.value;
+  final baseScheme = ColorScheme.fromSeed(
+    seedColor: current.primary,
     brightness: Brightness.dark,
-  ),
-  inputDecorationTheme: InputDecorationTheme(
-    filled: true,
-    fillColor: panel,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide.none,
+  );
+  final colorScheme = baseScheme.copyWith(
+    primary: current.primary,
+    secondary: current.secondary,
+    tertiary: current.tertiary,
+    surface: ink,
+    surfaceDim: const Color(0xff0d0c11),
+    surfaceBright: const Color(0xff363442),
+    surfaceContainerLowest: const Color(0xff08070b),
+    surfaceContainerLow: const Color(0xff17151e),
+    surfaceContainer: panel,
+    surfaceContainerHigh: const Color(0xff24222d),
+    surfaceContainerHighest: const Color(0xff2e2c3a),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: colorScheme.surface,
+    appBarTheme: AppBarTheme(
+      backgroundColor: colorScheme.surfaceContainerLow,
+      foregroundColor: colorScheme.onSurface,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 2,
+      centerTitle: false,
+      titleTextStyle: TextStyle(
+        color: colorScheme.onSurface,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+      ),
     ),
-  ),
-);
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: colorScheme.secondaryContainer,
+      height: 68,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+    ),
+    dividerTheme: DividerThemeData(
+      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+      thickness: 1,
+      space: 1,
+    ),
+    sliderTheme: SliderThemeData(
+      trackHeight: 4,
+      activeTrackColor: colorScheme.primary,
+      inactiveTrackColor: colorScheme.surfaceContainerHighest,
+      thumbColor: colorScheme.primary,
+      overlayColor: colorScheme.primary.withValues(alpha: 0.12),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: colorScheme.surfaceContainerHigh,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      hintStyle: TextStyle(
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+      ),
+      helperStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        textStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: const StadiumBorder(),
+        side: BorderSide(color: colorScheme.outlineVariant),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        textStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        textStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
+      ),
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: colorScheme.primaryContainer,
+      foregroundColor: colorScheme.onPrimaryContainer,
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: colorScheme.surfaceContainerLow,
+      selectedColor: colorScheme.secondaryContainer,
+      disabledColor: colorScheme.surfaceContainerLowest,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: colorScheme.onSurfaceVariant,
+      ),
+      secondaryLabelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSecondaryContainer,
+      ),
+      side: BorderSide(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      showCheckmark: false,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        side: WidgetStatePropertyAll(
+          BorderSide(color: colorScheme.outlineVariant),
+        ),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return colorScheme.secondaryContainer;
+          }
+          return colorScheme.surfaceContainerLow;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return colorScheme.onSecondaryContainer;
+          }
+          return colorScheme.onSurfaceVariant;
+        }),
+      ),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbIcon: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const Icon(Icons.check, size: 14);
+        }
+        return null;
+      }),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: colorScheme.surfaceContainerHigh,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      titleTextStyle: TextStyle(
+        color: colorScheme.onSurface,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: colorScheme.inverseSurface,
+      contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: colorScheme.surfaceContainerHigh,
+      surfaceTintColor: Colors.transparent,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    listTileTheme: ListTileThemeData(
+      iconColor: colorScheme.onSurfaceVariant,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: colorScheme.primary,
+      linearTrackColor: colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(4),
+    ),
+  );
+}
