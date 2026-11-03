@@ -1,3 +1,4 @@
+import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 import 'support/preview_video_platform.dart';
 import 'dart:io';
@@ -184,13 +185,25 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
       Future<void> settleMedia() async {
-        for (var i = 0; i < 40; i++) {
+        // Edited media preparation includes real file I/O and a debounce timer.
+        // Pumping only the fake clock can leave its spinner animating forever.
+        // Wait for the actual player, yielding to real async work each time.
+        for (var i = 0; i < 500; i++) {
           await tester.pump(const Duration(milliseconds: 30));
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 10)),
           );
+          if (find.byType(VideoPlayer).evaluate().length == 1 &&
+              find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+            return;
+          }
         }
-        await tester.pumpAndSettle();
+        expect(
+          find.byType(VideoPlayer),
+          findsOneWidget,
+          reason: 'The edited video must finish preparing before export',
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
       }
 
       await settleMedia();
