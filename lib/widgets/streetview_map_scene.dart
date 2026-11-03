@@ -21,13 +21,14 @@ Widget streetviewRoundButton(
 
 class StreetviewMapScene extends StatelessWidget {
   final StreetviewMedia settings;
-  final bool dark;
+  final bool dark, showThumbnail;
   final Widget thumbnail;
   const StreetviewMapScene({
     super.key,
     required this.settings,
     required this.dark,
     required this.thumbnail,
+    this.showThumbnail = true,
   });
 
   @override
@@ -127,60 +128,14 @@ class StreetviewMapScene extends StatelessWidget {
             ink: const Color(0xff77a8ff),
           ),
         ),
-        Positioned(
-          left: StreetviewLayout.thumbnailLeft,
-          top: StreetviewLayout.thumbnailTop,
-          width: StreetviewLayout.thumbnailWidth,
-          height: StreetviewLayout.thumbnailHeight,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white60),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  thumbnail,
-                  const Align(
-                    alignment: Alignment.bottomCenter,
-                    child: ColoredBox(
-                      color: Colors.black54,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.threesixty,
-                              color: Colors.white,
-                              size: 10,
-                            ),
-                            SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                'Street View',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        if (showThumbnail)
+          Positioned(
+            left: StreetviewLayout.thumbnailLeft,
+            top: StreetviewLayout.thumbnailTop,
+            width: StreetviewLayout.thumbnailWidth,
+            height: StreetviewLayout.thumbnailHeight,
+            child: StreetviewMapThumbnail(thumbnail: thumbnail),
           ),
-        ),
         Positioned(
           left: 0,
           right: 0,
@@ -194,4 +149,49 @@ class StreetviewMapScene extends StatelessWidget {
       ],
     );
   }
+}
+
+class StreetviewMapThumbnail extends StatelessWidget {
+  final Widget thumbnail;
+  const StreetviewMapThumbnail({super.key, required this.thumbnail});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      border: Border.all(color: Colors.white60),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(11),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          thumbnail,
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: ColoredBox(
+              color: Colors.black54,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.threesixty, color: Colors.white, size: 10),
+                    SizedBox(width: 3),
+                    Flexible(
+                      child: Text(
+                        'Street View',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white, fontSize: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
