@@ -123,6 +123,12 @@ void main() {
             final frames = args['sceneFrames'] as List;
             final overlays = args['overlays'] as List;
             checks['opening map animated'] = (frames[0] as List).length == 15;
+            checks['static media retains attribution'] =
+                await alpha(overlays[1] as String, 60, 100) > 0;
+            checks['static media retains controls'] =
+                await alpha(overlays[1] as String, 975, 90) > 0;
+            checks['static media retains place sheet'] =
+                await alpha(overlays[1] as String, 540, 1800) > 0;
             checks['active texture exposed'] =
                 await alpha(overlays[1] as String, 540, 800) == 0;
             checks['movement composited'] =

@@ -93,8 +93,8 @@ class MapsEditorActions {
     required BuildContext context,
     required ReelProject project,
     required PlaceFormControllers form,
-    required String apiKey,
-    required bool useApiHeaders,
+    required String Function() getApiKey,
+    required bool Function() getUseApiHeaders,
     required Future<void> Function() onRequestApiKey,
     required Future<void> Function() onLoadMap,
     required VoidCallback onChanged,
@@ -103,11 +103,12 @@ class MapsEditorActions {
       context,
       initial: form.name.text,
       requestApiKey: () async {
-        if (apiKey.isEmpty) await onRequestApiKey();
-        return apiKey.isEmpty ? null : apiKey;
+        if (getApiKey().isEmpty) await onRequestApiKey();
+        final key = getApiKey();
+        return key.isEmpty ? null : key;
       },
     );
-    if (imported == null) return;
+    if (imported == null || !context.mounted) return;
     project.place = imported.place;
     project.review = imported.review ?? FeaturedReview(enabled: false);
     project.mapHeaderPath = null;
@@ -116,7 +117,9 @@ class MapsEditorActions {
       project.title = imported.place.name;
     }
     onChanged();
-    if (project.headerMode == 'map' && apiKey.isNotEmpty && useApiHeaders) {
+    if (project.headerMode == 'map' &&
+        getApiKey().isNotEmpty &&
+        getUseApiHeaders()) {
       await onLoadMap();
     }
   }

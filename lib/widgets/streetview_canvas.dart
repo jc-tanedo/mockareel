@@ -54,7 +54,10 @@ class StreetviewCanvas extends StatelessWidget {
     // should expand into the next media scene.
     final followsMap =
         i == 0 || project.clips[i - 1].streetview.transition == 'map';
-    final isExpanding = isMedia && followsMap && elapsed < transitionSec;
+    // Export composites native media at full size, so its overlay must be
+    // fully visible even when captured at the first frame of the scene.
+    final isExpanding =
+        !overlayOnly && isMedia && followsMap && elapsed < transitionSec;
     final expandProgress = isExpanding
         ? (elapsed / transitionSec).clamp(0.0, 1.0)
         : 1.0;

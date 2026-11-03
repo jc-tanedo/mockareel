@@ -142,16 +142,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     _change();
   }
 
-  Future<void> _loadMap() => _runImport(
-    () => MapsEditorActions.loadMap(
-      project: _project,
-      store: _store,
-      useApiHeaders: _useApiHeaders,
-      apiKey: _key,
-      context: context,
-      precache: _precache,
-      onApplyHeader: _applyMapHeader,
-    ),
+  Future<void> _loadMap() => _runImport(_loadMapHeader);
+
+  // The place-import operation already holds the import guard when it requests
+  // its automatic header. Share the work without acquiring that guard twice.
+  Future<void> _loadMapHeader() => MapsEditorActions.loadMap(
+    project: _project,
+    store: _store,
+    useApiHeaders: _useApiHeaders,
+    apiKey: _key,
+    context: context,
+    precache: _precache,
+    onApplyHeader: _applyMapHeader,
   );
 
   Future<void> _uploadMap() => _runImport(
@@ -210,10 +212,10 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       context: context,
       project: _project,
       form: _form,
-      apiKey: _key,
-      useApiHeaders: _useApiHeaders,
+      getApiKey: () => _key,
+      getUseApiHeaders: () => _useApiHeaders,
       onRequestApiKey: _settings,
-      onLoadMap: _loadMap,
+      onLoadMap: _loadMapHeader,
       onChanged: _change,
     ),
   );
