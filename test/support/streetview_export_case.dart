@@ -13,10 +13,14 @@ import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/project_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void testStreetviewExport(String transition) {
+void testStreetviewExport(String transition, {bool smallImageCache = false}) {
   testWidgets(
-    'Streetview $transition MP4 preserves media in every transition frame',
+    'Streetview $transition MP4 preserves media (small cache: $smallImageCache)',
     (tester) async {
+      final cache = PaintingBinding.instance.imageCache;
+      final cacheLimit = cache.maximumSizeBytes;
+      if (smallImageCache) cache.maximumSizeBytes = 1;
+      addTearDown(() => cache.maximumSizeBytes = cacheLimit);
       final secondMediaIndex = transition == 'map' ? 4 : 3;
       final returnIndex = secondMediaIndex + 1;
       final endingMapIndex = returnIndex + 1;
@@ -42,6 +46,9 @@ void testStreetviewExport(String transition) {
         image.dispose();
         final photo = File('${dir.path}/photo.png');
         await photo.writeAsBytes(png!.buffer.asUint8List());
+        for (var i = 0; i < 2; i++) {
+          await photo.copy('${dir.path}/source-$i.png');
+        }
         p = ReelProject(
           template: 'streetview',
           streetview: StreetviewSettings(
@@ -53,7 +60,7 @@ void testStreetviewExport(String transition) {
             for (var i = 0; i < 2; i++)
               ReelClip(
                 id: '$i',
-                path: photo.path,
+                path: '${dir.path}/source-$i.png',
                 name: 'Media $i',
                 isVideo: i == 1,
                 sourceDuration: 3,
@@ -123,7 +130,10 @@ void testStreetviewExport(String transition) {
         NativeRenderer.channel,
         (call) async {
           if (call.method == 'cancel') return null;
-          if (call.method == 'thumbnail') return p.clips.first.path;
+          if (call.method == 'thumbnail') {
+            final path = (call.arguments as Map)['path'] as String;
+            return path.contains('source-edits-v2') ? p.clips[1].path : path;
+          }
           if (call.method == 'processMedia') {
             final args = call.arguments as Map;
             effectInputs.add(args);

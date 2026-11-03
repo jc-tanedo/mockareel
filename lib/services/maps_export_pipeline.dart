@@ -45,7 +45,7 @@ class MapsExportPipeline {
     required this.isCancelled,
   });
 
-  Future<void> prepareCapture({bool snapshot = false}) async {
+  Future<Map<String, String>> prepareCapture({bool snapshot = false}) async {
     final hero = project.headerMode == 'photo' ? project.heroClip : null;
     String? heroPath = project.headerMode == 'map'
         ? project.mapHeaderPath
@@ -83,6 +83,7 @@ class MapsExportPipeline {
     onCaptureHeroPath(heroPath);
     onCaptureSnapshot(snapshot);
     onCapturePosters(paths);
+    return paths;
   }
 
   Future<void> runExportPng({
@@ -122,12 +123,12 @@ class MapsExportPipeline {
         '${store.root!.path}/exports/overlay_${newId()}',
       ).create();
 
-      await prepareCapture(snapshot: true);
+      final posters = await prepareCapture(snapshot: true);
       if (isCancelled()) throw const FormatException('Export cancelled');
       onCaptureSnapshot(false);
 
       if (project.isStreetview) {
-        return await _exportStreetview(temp);
+        return await _exportStreetview(temp, posters);
       }
 
       final overlays = <String>[];
@@ -191,7 +192,10 @@ class MapsExportPipeline {
     }
   }
 
-  Future<String> _exportStreetview(Directory temp) async {
+  Future<String> _exportStreetview(
+    Directory temp,
+    Map<String, String> posters,
+  ) async {
     StreamSubscription<double>? progressSubscription;
     try {
       final scenes = StreetviewTimeline.scenes(project);
@@ -207,6 +211,25 @@ class MapsExportPipeline {
           throw FormatException(
             'Capture a map for “${clip.name}” before exporting.',
           );
+        }
+        // Whole-project precaching can evict early assets on longer reels.
+        // Decode this scene's actual pixels immediately before its first paint;
+        // otherwise a resolved Image.file can still capture a transparent frame.
+        final assets = <String>{
+          if (scene.kind == 'map') posters[clip.id]!,
+          if (scene.kind == 'ending-map' ||
+              scene.kind == 'back' ||
+              scene.kind == 'arrow')
+            posters['${clip.id}:end']!,
+          if (scene.kind == 'arrow')
+            posters[project.clips[scene.mediaIndex + 1].id]!,
+          if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+              clip.streetview.mapPath != null)
+            clip.streetview.mapPath!,
+        };
+        for (final asset in assets) {
+          if (isCancelled()) throw const FormatException('Export cancelled');
+          await onPrecache(asset);
         }
         final media = scene.kind == 'media';
         final animatedArrows =
