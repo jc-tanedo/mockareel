@@ -93,6 +93,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   }
 
   void _change() {
+    if (!mounted) return;
     _form.saveTo(_project.place);
     _editRevision++;
     setState(() => _dirty = true);
@@ -157,6 +158,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Future<void> _uploadMap() => _runImport(
     () => MapsEditorActions.uploadMap(
+      isActive: () => mounted,
       store: _store,
       precache: _precache,
       onApplyHeader: _applyMapHeader,
@@ -165,6 +167,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Future<void> _pickMusic() => _runImport(
     () => MapsEditorActions.pickMusic(
+      isActive: () => mounted,
       project: _project,
       store: _store,
       renderer: _renderer,
@@ -177,6 +180,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Future<void> _pickMedia() => _runImport(
     () => MapsEditorActions.pickMedia(
+      isActive: () => mounted,
       project: _project,
       store: _store,
       renderer: _renderer,

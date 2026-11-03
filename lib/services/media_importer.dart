@@ -117,13 +117,7 @@ class MediaImporter {
     final info = await renderer.inspect(file!.path!);
     var duration = (info['duration'] as num?)?.toDouble() ?? 0;
     var hasAudio = info['hasAudio'] == true;
-    if (!hasAudio) {
-      final ext = file.name.split('.').last.toLowerCase();
-      if (audioExtensions.contains(ext)) {
-        hasAudio = true;
-      }
-    }
-    if (!hasAudio || duration <= 0) {
+    if (hasAudio && duration <= 0) {
       try {
         final player = VideoPlayerController.file(File(file.path!));
         await player.initialize();

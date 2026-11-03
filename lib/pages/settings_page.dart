@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../widgets/maps_key_dialog.dart';
 
@@ -10,6 +11,10 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final Future<String?> _version = const MethodChannel(
+    'dev.mockareel/export-session',
+  ).invokeMethod<String>('version').catchError((Object _) => null);
+
   Future<void> _openMapsSettings() async {
     final current = await MapsAdvancedSettings.load();
     if (!mounted) return;
@@ -150,10 +155,15 @@ class _SettingsPageState extends State<SettingsPage> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Text(
-                                'Version 1.0.0',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colors.onSurfaceVariant,
+                              FutureBuilder<String?>(
+                                future: _version,
+                                builder: (context, snapshot) => Text(
+                                  snapshot.data == null
+                                      ? 'Mockareel'
+                                      : 'Version ${snapshot.data}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                             ],

@@ -12,6 +12,15 @@ class ExportSessionHost(private val activity: Activity) : MethodChannel.MethodCa
     private var pendingStart: (() -> Unit)? = null
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "version" -> {
+                @Suppress("DEPRECATION")
+                val info = activity.packageManager.getPackageInfo(activity.packageName, 0)
+                val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else {
+                    @Suppress("DEPRECATION")
+                    info.versionCode.toLong()
+                }
+                result.success("${info.versionName}+$code")
+            }
             "start" -> {
                 if (pendingStart != null) { result.error("BUSY", "Notification permission is pending", null); return }
                 val begin = {

@@ -30,8 +30,9 @@ class MapsEditorActions {
       apiKey: apiKey,
       context: context,
     );
-    if (path == null) return;
+    if (path == null || !context.mounted) return;
     await precache(path);
+    if (!context.mounted) return;
     onApplyHeader(
       path,
       useApiHeaders && apiKey.isNotEmpty ? 'google' : 'browser',
@@ -42,10 +43,12 @@ class MapsEditorActions {
     required ProjectStore store,
     required Future<void> Function(String) precache,
     required void Function(String path, String source) onApplyHeader,
+    bool Function()? isActive,
   }) async {
     final path = await MapHeaderService.uploadMap(store: store);
-    if (path == null) return;
+    if (path == null || isActive?.call() == false) return;
     await precache(path);
+    if (isActive?.call() == false) return;
     onApplyHeader(path, 'upload');
   }
 
@@ -54,11 +57,13 @@ class MapsEditorActions {
     required ProjectStore store,
     required NativeRenderer renderer,
     required VoidCallback onChanged,
+    bool Function()? isActive,
   }) async {
     final track = await MediaImporter.pickMusicTrack(
       store: store,
       renderer: renderer,
     );
+    if (isActive?.call() == false) return;
     if (track != null) {
       project.music = track;
       onChanged();
@@ -71,12 +76,14 @@ class MapsEditorActions {
     required NativeRenderer renderer,
     required void Function(int newSelectedIndex) onAdded,
     required void Function(String message) onToast,
+    bool Function()? isActive,
   }) async {
     final result = await MediaImporter.pickMultipleClips(
       store: store,
       renderer: renderer,
       defaultDuration: 3.5,
     );
+    if (isActive?.call() == false) return;
     if (result.clips.isNotEmpty) {
       project.clips.addAll(result.clips);
       onAdded(project.clips.length - 1);
