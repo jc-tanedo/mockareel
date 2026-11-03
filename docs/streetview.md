@@ -22,9 +22,11 @@ The opening map uses the first media's location and thumbnail. Choose
 - **Arrow movement:** select left or right and set the movement duration.
   The selected arrow receives a tap ripple, then the outgoing final frame blends
   into the destination's first frame with directional movement and blur.
-- **Return to Maps:** the back control receives a tap ripple, then the next
-  media's map appears. Its thumbnail receives a tap ripple and cuts directly
-  into the media. There is no animated geographic travel or entry zoom.
+- **Return to Maps:** the back control receives a tap ripple and the held final
+  media frame shrinks from full screen into the Street View thumbnail. The next
+  media's map then appears; its thumbnail receives a tap ripple before the next
+  media scene. The return-to-thumbnail animation is included in MP4 exports.
+  There is no animated geographic travel.
 
 Reordering moves the location, map, overlay options and transition with the
 media. Removing an item automatically changes the preceding transition's
@@ -46,7 +48,8 @@ no thumbnail tap to reenter Street View. By default the output ends on media.
 
 Use the **Camera motion** card to enable slow zoom, horizontal pan and a simulated
 turntable independently for each item. Adjust zoom amount, signed pan distance
-and signed turn angle (up to 15°). Turntable applies a gentle perspective yaw to
+and turn angle (up to 15°), with **Reverse turn direction** to change the turn.
+Turntable applies a gentle perspective yaw to
 ordinary media. All three motions carry the navigation arrows with the scene;
 the toolbar and place sheet stay fixed. Default zoom/pan amounts are 6% and eight
 logical pixels. The camera slightly overscans the source to keep edges filled.

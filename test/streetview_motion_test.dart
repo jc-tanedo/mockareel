@@ -18,6 +18,31 @@ void main() {
       turntableDegrees: 12,
     ),
   );
+  test('legacy signed turn angles migrate without losing rotation', () {
+    final legacy = StreetviewMedia.fromJson({
+      'turntable': true,
+      'turntableDegrees': -12,
+    });
+    expect(legacy.turntableDegrees, 12);
+    expect(legacy.turntableReverse, true);
+    final restored = StreetviewMedia.fromJson(legacy.toJson());
+    expect(restored.turntableDegrees, 12);
+    expect(restored.turntableReverse, true);
+    final explicit = StreetviewMedia.fromJson({
+      'turntableDegrees': -12,
+      'turntableReverse': false,
+    });
+    expect(explicit.turntableReverse, false);
+    expect(explicit.turntableDegrees, 12);
+    expect(
+      StreetviewMedia.fromJson({'turntableDegrees': 12}).turntableReverse,
+      false,
+    );
+    expect(
+      StreetviewMedia.fromJson({'turntableDegrees': -30}).turntableDegrees,
+      15,
+    );
+  });
   test(
     'camera projects arrows with the Android homography and holds its last frame',
     () {

@@ -98,10 +98,12 @@ class StreetviewMedia {
     slowZoom: j['slowZoom'] as bool?,
     slowPan: j['slowPan'] as bool?,
     turntable: j['turntable'] == true,
-    turntableReverse: j['turntableReverse'] == true,
+    turntableReverse:
+        j['turntableReverse'] as bool? ??
+        (_seconds(j['turntableDegrees'], 8, -15, 15) < 0),
     zoomAmount: _seconds(j['zoomAmount'], .06, 0, .2),
     panAmount: _seconds(j['panAmount'], 8 / 360, -.08, .08),
-    turntableDegrees: _seconds(j['turntableDegrees'], 8, 0, 15).abs(),
+    turntableDegrees: _seconds(j['turntableDegrees'], 8, -15, 15).abs(),
     aerialLabel: j['aerialLabel'] as String? ?? 'Aerial',
     nearbyLabel: j['nearbyLabel'] as String? ?? 'See nearby attractions',
     streetviewTitle: j['streetviewTitle'] as String? ?? '',

@@ -18,7 +18,7 @@
 
 Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfaces. Choose a template, add your media, customize the UI, and export a reel. Projects save locally and can be shared as portable backups.
 
-> **New in 0.14:** Streetview journeys, fisheye/pincushion effects, photo blur spots, and clearer editor settings cards. [Release notes](docs/releases/v0.14.0.md).
+> **New in 0.15:** Material Design 3 editors, selectable color themes, smoother Streetview transitions, and Android background export with progress notifications. [Release notes](docs/releases/v0.15.0.md).
 
 ## Templates
 
