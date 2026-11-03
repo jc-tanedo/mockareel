@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/services/native_renderer.dart';
@@ -49,6 +50,17 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
         for (var i = 0; i < 2; i++) {
           await photo.copy('${dir.path}/source-$i.png');
         }
+        final mapRecorder = ui.PictureRecorder();
+        Canvas(mapRecorder).drawColor(const Color(0xff2040e0), BlendMode.src);
+        final mapPicture = mapRecorder.endRecording();
+        final mapImage = await mapPicture.toImage(100, 100);
+        final mapPng = await mapImage.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        final mapPhoto = File('${dir.path}/map.png');
+        await mapPhoto.writeAsBytes(mapPng!.buffer.asUint8List());
+        mapImage.dispose();
+        mapPicture.dispose();
         p = ReelProject(
           template: 'streetview',
           streetview: StreetviewSettings(
@@ -67,7 +79,7 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
                 duration: .5,
                 streetview: StreetviewMedia(
                   place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
-                  mapPath: photo.path,
+                  mapPath: mapPhoto.path,
                   panZoom: i == 1,
                   turntable: i == 1,
                   transition: transition,
@@ -109,8 +121,8 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
       Future<int> alpha(String path, int x, int y) async =>
           (await pixel(path, x, y))[3];
 
-      Future<bool> hasMedia(String path) async {
-        final rgba = await pixel(path, 540, 800);
+      Future<bool> hasMedia(String path, {int x = 540, int y = 800}) async {
+        final rgba = await pixel(path, x, y);
         // Both fixture clips are green; the opaque video placeholder is gray.
         return rgba[1] > rgba[0] + 30 && rgba[1] > rgba[2] + 30;
       }
@@ -161,8 +173,34 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
             for (final index in [2, returnIndex]) {
               final sceneFrames = frames[index] as List;
               for (var frame = 0; frame < sceneFrames.length; frame++) {
+                final back = index == returnIndex || transition == 'map';
+                final elapsed = frame / 30;
+                final duration =
+                    p.clips[index == 2 ? 0 : 1].streetview.transitionSeconds;
+                final t = back
+                    ? ((elapsed - duration + .1) / .1).clamp(0.0, 1.0)
+                    : 0.0;
+                final rect = Rect.lerp(
+                  const Rect.fromLTWH(0, 0, 360, 640),
+                  const Rect.fromLTWH(
+                    StreetviewLayout.thumbnailLeft,
+                    StreetviewLayout.thumbnailTop,
+                    StreetviewLayout.thumbnailWidth,
+                    StreetviewLayout.thumbnailHeight,
+                  ),
+                  Curves.easeInOut.transform(t),
+                )!;
                 checks['scene $index frame $frame contains media'] =
-                    await hasMedia(sceneFrames[frame] as String);
+                    await hasMedia(
+                      sceneFrames[frame] as String,
+                      x: (rect.center.dx * 3).round(),
+                      y: (rect.center.dy * 3).round(),
+                    );
+              }
+              if (index == returnIndex || transition == 'map') {
+                final rgba = await pixel(sceneFrames.last as String, 540, 800);
+                checks['scene $index shrinks media to reveal the map'] =
+                    rgba[2] > rgba[1] + 30 && rgba[2] > rgba[0] + 30;
               }
             }
             checks['ending map animated'] =

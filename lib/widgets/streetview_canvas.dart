@@ -321,7 +321,32 @@ class StreetviewCanvas extends StatelessWidget {
                       ),
                     ),
                   )
-                else
+                else if (isBack) ...[
+                  // Keep the map and held poster mounted for the whole return
+                  // scene so decoding cannot interrupt the shrinking card.
+                  Positioned.fill(
+                    child: StreetviewMapScene(
+                      settings: settings,
+                      dark: project.darkOutput,
+                      thumbnail: const SizedBox(),
+                      showThumbnail: false,
+                    ),
+                  ),
+                  Positioned.fromRect(
+                    rect: activeRect,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(activeRadius),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: 360,
+                          height: 640,
+                          child: media(clip, clip.duration),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else
                   Positioned.fill(
                     child: movement
                         ? transition()

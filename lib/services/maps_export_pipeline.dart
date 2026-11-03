@@ -223,7 +223,9 @@ class MapsExportPipeline {
             posters['${clip.id}:end']!,
           if (scene.kind == 'arrow')
             posters[project.clips[scene.mediaIndex + 1].id]!,
-          if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+          if ((scene.kind == 'map' ||
+                  scene.kind == 'ending-map' ||
+                  scene.kind == 'back') &&
               clip.streetview.mapPath != null)
             clip.streetview.mapPath!,
         };
