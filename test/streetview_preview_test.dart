@@ -287,6 +287,83 @@ void main() {
       });
     },
   );
+  testWidgets('prepared export posters render media on their first frame', (
+    tester,
+  ) async {
+    final stage = GlobalKey();
+    await tester.pumpWidget(
+      MaterialApp(home: SizedBox(key: stage, width: 360, height: 640)),
+    );
+    final poster = '${dir.path}/first-paint-poster.png';
+    await tester.runAsync(() async {
+      await File(photo).copy(poster);
+    });
+    var ready = false;
+    final warmup = precacheImage(
+      FileImage(File(poster)),
+      stage.currentContext!,
+    ).then((_) => ready = true);
+    for (var attempt = 0; attempt < 200 && !ready; attempt++) {
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(ready, isTrue, reason: 'The fixture must be decoded before capture');
+    await warmup;
+    final clips = [
+      ReelClip(
+        id: 'video',
+        path: 'video.mp4',
+        name: 'Video',
+        isVideo: true,
+        sourceDuration: 3,
+        duration: 3,
+      ),
+      ReelClip(
+        id: 'edited',
+        path: 'edited.mp4',
+        name: 'Edited',
+        isVideo: true,
+        sourceDuration: 3,
+        duration: 3,
+        edits: MediaEdits(fisheye: true),
+      ),
+      ReelClip(
+        id: 'gif',
+        path: 'source.gif',
+        name: 'GIF',
+        isVideo: false,
+        isGif: true,
+        sourceDuration: 3,
+        duration: 3,
+      ),
+    ];
+    for (final clip in clips) {
+      for (final position in [0.0, 3.0, 0.0]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SizedBox(
+              width: 360,
+              height: 640,
+              child: ClipPoster(
+                key: ValueKey(clip.id),
+                clip: clip,
+                position: position,
+                resolvedPath: poster,
+              ),
+            ),
+          ),
+        );
+        // Do not pump another frame: the encoder captures this first paint.
+        expect(find.byIcon(Icons.videocam_outlined), findsNothing);
+        expect(find.byType(RawImage), findsOneWidget);
+        expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNotNull);
+      }
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets(
     'media UI capture leaves video transparent and renders standalone output',
     (tester) async {
