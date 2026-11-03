@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
+import '../services/export_capture_frame.dart';
 
 class OffscreenCaptureStage extends StatelessWidget {
   final GlobalKey captureKey;
@@ -20,7 +20,7 @@ class OffscreenCaptureStage extends StatelessWidget {
     int settleFrames = 1,
   }) async {
     for (var i = 0; i < settleFrames; i++) {
-      await SchedulerBinding.instance.endOfFrame;
+      await exportCaptureFrame();
     }
     final boundary =
         key.currentContext!.findRenderObject()! as RenderRepaintBoundary;

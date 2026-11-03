@@ -10,9 +10,12 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var gifEncoder: GifVideoEncoder? = null
     private var mapSnapshot: MapSnapshot? = null
+    private var exportSession: ExportSessionHost? = null
     private var renderer: ReelRenderer? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        exportSession = ExportSessionHost(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(exportSession)
         gifEncoder = GifVideoEncoder(applicationContext)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/gif").setMethodCallHandler(gifEncoder)
         mapSnapshot = MapSnapshot(this)
@@ -22,7 +25,14 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/render").setMethodCallHandler(instance)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/render-progress").setStreamHandler(instance)
     }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        exportSession?.onPermissionsResult(requestCode)
+    }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        ExportService.end(applicationContext, false)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(null)
+        exportSession = null
         gifEncoder?.close(); gifEncoder = null
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/gif").setMethodCallHandler(null)
         mapSnapshot?.close()

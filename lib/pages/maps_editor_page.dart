@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
 import '../services/maps_editor_actions.dart';
+import '../services/export_background_session.dart';
 import '../services/maps_export_pipeline.dart';
 import '../services/media_importer.dart';
 import '../services/native_renderer.dart';
@@ -33,6 +31,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   late final ProjectStore _store = widget.store ?? ProjectStore();
   final _renderer = NativeRenderer(), _captureKey = GlobalKey();
   final _form = PlaceFormControllers();
+  final _backgroundExport = ExportBackgroundSession();
   ReelProject _project = ReelProject();
   int _placeTool = 0, _timelineTool = 0, _tab = 0;
   int _selected = 0, _captureIndex = 0, _editRevision = 0;
@@ -250,23 +249,17 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   Future<Uint8List> _capturePng() async {
     if (_cancelled || !mounted) throw const FormatException('Export cancelled');
-    await SchedulerBinding.instance.endOfFrame;
-    final boundary =
-        _captureKey.currentContext!.findRenderObject()!
-            as RenderRepaintBoundary;
-    final image = await boundary.toImage(
+    return OffscreenCaptureStage.capturePng(
+      _captureKey,
       pixelRatio: TemplateLayout.exportScale,
     );
-    try {
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      return bytes!.buffer.asUint8List();
-    } finally {
-      image.dispose();
-    }
   }
 
   void _updateState(VoidCallback fn) {
-    if (mounted) setState(fn);
+    if (mounted) {
+      setState(fn);
+      if (_exporting) unawaited(_backgroundExport.update(_status, _progress));
+    }
   }
 
   MapsExportPipeline _createPipeline() => MapsExportPipeline(
@@ -303,12 +296,21 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       _progress = null;
       _previewRevision = newId();
     });
+    var complete = false;
     try {
+      final notifications = await _backgroundExport.start(_project.title);
+      if (notifications == false) {
+        _toast(
+          'Enable notifications in Android settings to see export progress.',
+        );
+      }
       await _save(silent: true);
       await action(_createPipeline());
+      complete = !_cancelled;
     } catch (e) {
       _toast(MapsEditorActions.formatError(e));
     } finally {
+      await _backgroundExport.finish(complete: complete);
       if (mounted) {
         setState(() {
           _exporting = false;
@@ -334,6 +336,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (_project.clips.isEmpty) return;
       final path = await pipeline.runExport();
       if (!mounted || _cancelled) return;
+      await _backgroundExport.finish(complete: true);
+      if (!mounted) return;
       setState(() {
         _status = 'Export complete';
         _exportPhase = ExportPhase.finishing;

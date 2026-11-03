@@ -1,4 +1,5 @@
 import '../services/media_importer.dart';
+import '../services/export_background_session.dart';
 import '../services/feed_export_pipeline.dart';
 import '../widgets/feed_export_panel.dart';
 import '../widgets/feed_posts_editor.dart';
@@ -36,6 +37,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     with WidgetsBindingObserver {
   ReelProject get p => widget.project;
   final _renderer = NativeRenderer(), _captureKey = GlobalKey();
+  final _backgroundExport = ExportBackgroundSession();
   int _tab = 0, _selected = 0, _postTool = 0, _revision = 0;
   bool _busy = false, _exporting = false, _dirty = false, _cancelled = false;
   String _status = '';
@@ -428,6 +430,12 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       _exportPosition = 0;
     });
     try {
+      final notifications = await _backgroundExport.start(p.title);
+      if (notifications == false) {
+        _toast(
+          'Enable notifications in Android settings to see export progress.',
+        );
+      }
       if (!await _save()) return;
       final pipeline = FeedExportPipeline(
         project: p,
@@ -436,10 +444,16 @@ class _FeedEditorPageState extends State<FeedEditorPage>
         onPrecache: _precache,
         onCapture: _capture,
         onStatus: (s) {
-          if (mounted) setState(() => _status = s);
+          if (mounted) {
+            setState(() => _status = s);
+            unawaited(_backgroundExport.update(_status, _progress));
+          }
         },
         onProgress: (v) {
-          if (mounted) setState(() => _progress = v);
+          if (mounted) {
+            setState(() => _progress = v);
+            unawaited(_backgroundExport.update(_status, _progress));
+          }
         },
         onPhase: (phase) {
           if (mounted) setState(() => _exportPhase = phase);
@@ -454,6 +468,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
       );
       final path = await pipeline.run();
       if (!mounted || _cancelled) return;
+      await _backgroundExport.finish(complete: true);
+      if (!mounted) return;
       setState(() {
         _exportPhase = ExportPhase.finishing;
         _status = 'Export complete';
@@ -467,6 +483,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     } catch (e) {
       _toast(e.toString().replaceFirst('FormatException: ', ''));
     } finally {
+      await _backgroundExport.finish(complete: false);
       if (mounted) {
         setState(() {
           _exporting = false;
