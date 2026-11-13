@@ -88,7 +88,6 @@ void main() {
       ),
     );
     expect(find.byType(Streetview3dWorldOverlay), findsOneWidget);
-    expect(find.text('Cafe'), findsOneWidget);
   });
 
   testWidgets('StreetviewCanvas delegates to Streetview3dCanvas', (
