@@ -98,8 +98,7 @@ class _Streetview3dCapturePageState extends State<Streetview3dCapturePage> {
     for (var step = 0; step < widget.targetSteps; step++) {
       if (_cancelled || !mounted) return;
       setState(
-        () => _status =
-            'Capturing step ${step + 1} of ${widget.targetSteps}…',
+        () => _status = 'Capturing step ${step + 1} of ${widget.targetSteps}…',
       );
       await Future<void>.delayed(const Duration(milliseconds: 900));
       if (_cancelled || !mounted) return;
