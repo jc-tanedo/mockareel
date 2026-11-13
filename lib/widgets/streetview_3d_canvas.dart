@@ -7,8 +7,6 @@ import '../model/project.dart';
 import '../model/streetview_3d_camera.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
-import 'streetview_3d_chrome.dart';
-import 'streetview_3d_world_overlay.dart';
 import 'streetview_chrome.dart';
 
 /// 3D on-rails Street View canvas for both live preview and 30fps export.
@@ -135,7 +133,7 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
     } else {
       // Media rest scene: when overlayOnly is true (during export), native
       // ReelRenderer composites the video/photo underneath, so only draw HUD.
-      final camera = Camera3D.streetRest();
+      const camera = Camera3D.streetRest;
       content = Stack(
         fit: StackFit.expand,
         children: [
@@ -161,14 +159,14 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
                 child: Streetview3dWorldOverlay(
                   camera: camera,
                   settings: settings,
-                  restMode: true,
+                  showChevrons: settings.showArrows,
                 ),
               ),
             ),
           Positioned.fill(
             child: StreetviewChrome(
               settings: settings,
-              aerial: false,
+              map: false,
               dark: project.darkOutput,
               is3d: true,
             ),

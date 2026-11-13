@@ -7,7 +7,6 @@ import '../model/project.dart';
 import '../model/streetview_3d_camera.dart';
 import 'streetview_3d_buildings.dart';
 import 'streetview_3d_corridor_painter.dart';
-import 'streetview_3d_world_overlay.dart';
 import 'streetview_chrome.dart';
 
 /// Full-bleed opening aerial map hold for Streetview 3D.
