@@ -8,7 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../model/place.dart';
+import '../model/project.dart';
 
 /// Automated WebView Street View stepper that captures real Street View frames
 /// along a route from [fromPlace] toward [toPlace].
@@ -41,13 +41,13 @@ class _Streetview3dCapturePageState extends State<Streetview3dCapturePage> {
   @override
   void initState() {
     super.initState();
-    final lat = widget.fromPlace.lat ?? 40.7580;
-    final lng = widget.fromPlace.lng ?? -73.9855;
+    final lat = widget.fromPlace.latitude ?? 40.7580;
+    final lng = widget.fromPlace.longitude ?? -73.9855;
     final heading = _bearingDegrees(
       lat,
       lng,
-      widget.toPlace.lat ?? lat + 0.002,
-      widget.toPlace.lng ?? lng,
+      widget.toPlace.latitude ?? lat + 0.002,
+      widget.toPlace.longitude ?? lng,
     );
     final url =
         'https://www.google.com/maps/@?api=1&map_action=pano'

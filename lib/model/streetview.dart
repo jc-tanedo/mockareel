@@ -41,9 +41,9 @@ class StreetviewSettings {
     'openingMapSeconds': openingMapSeconds,
     'laterMapSeconds': laterMapSeconds,
     'endOnMap': endOnMap,
-    if (fromPlace.name.isNotEmpty || fromPlace.lat != null)
+    if (fromPlace.name.isNotEmpty || fromPlace.latitude != null)
       'fromPlace': fromPlace.toJson(),
-    if (toPlace.name.isNotEmpty || toPlace.lat != null)
+    if (toPlace.name.isNotEmpty || toPlace.latitude != null)
       'toPlace': toPlace.toJson(),
     if (walkthroughFrames.isNotEmpty) 'walkthroughFrames': walkthroughFrames,
   };

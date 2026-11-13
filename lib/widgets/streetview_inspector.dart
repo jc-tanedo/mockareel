@@ -236,8 +236,8 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             ),
             FilledButton.icon(
               onPressed:
-                  widget.project.streetview.fromPlace.lat != null &&
-                      widget.project.streetview.toPlace.lat != null
+                  widget.project.streetview.fromPlace.latitude != null &&
+                      widget.project.streetview.toPlace.latitude != null
                   ? _captureWalkthrough
                   : null,
               icon: const Icon(Icons.streetview),
