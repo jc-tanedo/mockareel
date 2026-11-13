@@ -98,12 +98,6 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
                   max(0.001, scene.duration - StreetviewTimeline.rippleSeconds))
               .clamp(0.0, 1.0)
         : 0.0;
-    final ripple = isMap && scene.kind != 'ending-map'
-        ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
-              StreetviewTimeline.rippleSeconds
-        : isArrow
-        ? elapsed / StreetviewTimeline.rippleSeconds
-        : -1.0;
 
     final Widget content;
     if (isMap) {
