@@ -9,21 +9,43 @@ double _seconds(dynamic value, double fallback, double min, double max) =>
 class StreetviewSettings {
   double openingMapSeconds, laterMapSeconds;
   bool endOnMap;
+  PlaceDetails fromPlace, toPlace;
+  List<String> walkthroughFrames;
   StreetviewSettings({
     this.openingMapSeconds = 2,
     this.laterMapSeconds = 1.5,
     this.endOnMap = false,
-  });
+    PlaceDetails? fromPlace,
+    PlaceDetails? toPlace,
+    List<String>? walkthroughFrames,
+  }) : fromPlace = fromPlace ?? PlaceDetails(),
+       toPlace = toPlace ?? PlaceDetails(),
+       walkthroughFrames = walkthroughFrames ?? [];
   factory StreetviewSettings.fromJson(Map<String, dynamic> j) =>
       StreetviewSettings(
         openingMapSeconds: _seconds(j['openingMapSeconds'], 2, .5, 30),
         laterMapSeconds: _seconds(j['laterMapSeconds'], 1.5, .5, 30),
         endOnMap: j['endOnMap'] == true,
+        fromPlace: j['fromPlace'] is Map<String, dynamic>
+            ? PlaceDetails.fromJson(j['fromPlace'] as Map<String, dynamic>)
+            : null,
+        toPlace: j['toPlace'] is Map<String, dynamic>
+            ? PlaceDetails.fromJson(j['toPlace'] as Map<String, dynamic>)
+            : null,
+        walkthroughFrames: [
+          for (final f in (j['walkthroughFrames'] as List? ?? []))
+            if (f is String && f.isNotEmpty) f,
+        ],
       );
   Map<String, dynamic> toJson() => {
     'openingMapSeconds': openingMapSeconds,
     'laterMapSeconds': laterMapSeconds,
     'endOnMap': endOnMap,
+    if (fromPlace.name.isNotEmpty || fromPlace.lat != null)
+      'fromPlace': fromPlace.toJson(),
+    if (toPlace.name.isNotEmpty || toPlace.lat != null)
+      'toPlace': toPlace.toJson(),
+    if (walkthroughFrames.isNotEmpty) 'walkthroughFrames': walkthroughFrames,
   };
 }
 

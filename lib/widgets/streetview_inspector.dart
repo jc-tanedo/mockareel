@@ -6,6 +6,7 @@ import '../model/project.dart';
 import '../model/maps_web_result.dart';
 import '../pages/maps_web_search_page.dart';
 import '../pages/maps_web_header_page.dart';
+import '../pages/streetview_3d_capture_page.dart';
 import '../services/project_store.dart';
 import 'place_actions_editor.dart';
 import 'media_edits_editor.dart';
@@ -32,6 +33,41 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
   bool _busy = false;
   int _revision = 0;
   StreetviewMedia get _s => widget.clip.streetview;
+
+  Future<void> _pickEndpoint(bool isFrom) async {
+    final sv = widget.project.streetview;
+    final current = isFrom ? sv.fromPlace : sv.toPlace;
+    final value = await Navigator.of(context).push<MapsWebImport>(
+      MaterialPageRoute(
+        builder: (_) => MapsWebSearchPage(initial: current.name),
+      ),
+    );
+    if (value == null || !mounted) return;
+    if (isFrom) {
+      sv.fromPlace = value.place;
+    } else {
+      sv.toPlace = value.place;
+    }
+    widget.onChanged();
+    setState(() {});
+  }
+
+  Future<void> _captureWalkthrough() async {
+    final sv = widget.project.streetview;
+    final frames = await Navigator.of(context).push<List<String>>(
+      MaterialPageRoute(
+        builder: (_) => Streetview3dCapturePage(
+          fromPlace: sv.fromPlace,
+          toPlace: sv.toPlace,
+        ),
+      ),
+    );
+    if (frames == null || frames.isEmpty || !mounted) return;
+    sv.walkthroughFrames = frames;
+    widget.onChanged();
+    setState(() {});
+  }
+
   Future<void> _location() async {
     final value = await Navigator.of(context).push<MapsWebImport>(
       MaterialPageRoute(
@@ -167,6 +203,52 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           _field('Address', _s.place.address, (v) => _s.place.address = v),
         ],
       ),
+      if (widget.project.isStreetview3d)
+        EditorSectionCard(
+          title: const Text('Street View route (From → To)'),
+          subtitle: Text(
+            widget.project.streetview.walkthroughFrames.isEmpty
+                ? 'Pick From & To locations, then capture real Street View'
+                : '${widget.project.streetview.walkthroughFrames.length} Street View frames captured',
+          ),
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('From location'),
+              subtitle: Text(
+                widget.project.streetview.fromPlace.name.isEmpty
+                    ? 'Tap to pick starting point'
+                    : widget.project.streetview.fromPlace.name,
+              ),
+              trailing: const Icon(Icons.place_outlined),
+              onTap: () => _pickEndpoint(true),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('To location'),
+              subtitle: Text(
+                widget.project.streetview.toPlace.name.isEmpty
+                    ? 'Tap to pick destination'
+                    : widget.project.streetview.toPlace.name,
+              ),
+              trailing: const Icon(Icons.flag_outlined),
+              onTap: () => _pickEndpoint(false),
+            ),
+            FilledButton.icon(
+              onPressed:
+                  widget.project.streetview.fromPlace.lat != null &&
+                      widget.project.streetview.toPlace.lat != null
+                  ? _captureWalkthrough
+                  : null,
+              icon: const Icon(Icons.streetview),
+              label: Text(
+                widget.project.streetview.walkthroughFrames.isEmpty
+                    ? 'Capture Street View walkthrough'
+                    : 'Re-capture Street View walkthrough',
+              ),
+            ),
+          ],
+        ),
       if (!widget.project.isStreetview3d)
         EditorSectionCard(
           title: const Text('Map place details and buttons'),
