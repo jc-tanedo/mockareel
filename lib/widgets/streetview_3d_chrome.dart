@@ -118,7 +118,9 @@ class Streetview3dAerialSwoopScene extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (streetImage == null && streetAlpha > 0)
-          Positioned.fill(child: Opacity(opacity: streetAlpha, child: streetClip)),
+          Positioned.fill(
+            child: Opacity(opacity: streetAlpha, child: streetClip),
+          ),
         Positioned.fill(
           child: CustomPaint(
             painter: Streetview3dCorridorPainter(

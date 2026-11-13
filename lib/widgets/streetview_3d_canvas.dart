@@ -85,7 +85,8 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
     final isMedia = scene.kind == 'media';
 
     final mapImage = _resolveImage(settings.mapPath);
-    final outgoingPath = widget.posters['${clip.id}:end'] ?? widget.posters[clip.id];
+    final outgoingPath =
+        widget.posters['${clip.id}:end'] ?? widget.posters[clip.id];
     final outgoingImage = _resolveImage(outgoingPath);
     final nextClip = i + 1 < project.clips.length ? project.clips[i + 1] : null;
     final incomingPath = nextClip == null ? null : widget.posters[nextClip.id];

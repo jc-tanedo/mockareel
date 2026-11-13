@@ -80,12 +80,7 @@ class Streetview3dCorridorPainter extends CustomPainter {
     }
   }
 
-  void _drawGroundMap(
-    Canvas canvas,
-    Size size,
-    ui.Image image,
-    double alpha,
-  ) {
+  void _drawGroundMap(Canvas canvas, Size size, ui.Image image, double alpha) {
     const cols = 10;
     const rows = 10;
     const halfW = 36.0;
