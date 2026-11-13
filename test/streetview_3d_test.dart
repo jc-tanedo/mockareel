@@ -87,7 +87,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('42ND ST'), findsOneWidget);
+    expect(find.byType(Streetview3dWorldOverlay), findsOneWidget);
     expect(find.text('Cafe'), findsOneWidget);
   });
 
