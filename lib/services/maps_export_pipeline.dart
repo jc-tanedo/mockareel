@@ -206,7 +206,9 @@ class MapsExportPipeline {
       for (var i = 0; i < scenes.length; i++) {
         final scene = scenes[i];
         final clip = project.clips[scene.mediaIndex];
-        if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
+        if ((scene.kind == 'map' ||
+                scene.kind == 'swoop' ||
+                scene.kind == 'ending-map') &&
             clip.streetview.mapPath == null) {
           throw FormatException(
             'Capture a map for “${clip.name}” before exporting.',
@@ -216,7 +218,7 @@ class MapsExportPipeline {
         // Decode this scene's actual pixels immediately before its first paint;
         // otherwise a resolved Image.file can still capture a transparent frame.
         final assets = <String>{
-          if (scene.kind == 'map') posters[clip.id]!,
+          if (scene.kind == 'map' || scene.kind == 'swoop') posters[clip.id]!,
           if (scene.kind == 'ending-map' ||
               scene.kind == 'back' ||
               scene.kind == 'arrow')
@@ -224,6 +226,7 @@ class MapsExportPipeline {
           if (scene.kind == 'arrow')
             posters[project.clips[scene.mediaIndex + 1].id]!,
           if ((scene.kind == 'map' ||
+                  scene.kind == 'swoop' ||
                   scene.kind == 'ending-map' ||
                   scene.kind == 'back') &&
               clip.streetview.mapPath != null)

@@ -12,6 +12,7 @@ class StreetviewScene {
 /// another scene or extend the output. A return-to-map tap is a separate scene.
 abstract final class StreetviewTimeline {
   static const rippleSeconds = .2;
+  static const swoopSeconds = 1.35;
   static List<StreetviewScene> scenes(ReelProject p) {
     if (p.clips.isEmpty) return [];
     final result = <StreetviewScene>[];
@@ -22,6 +23,9 @@ abstract final class StreetviewTimeline {
     }
 
     add('map', 0, p.streetview.openingMapSeconds);
+    if (p.isStreetview3d) {
+      add('swoop', 0, swoopSeconds);
+    }
     for (var i = 0; i < p.clips.length; i++) {
       add('media', i, p.clips[i].duration);
       final settings = p.clips[i].streetview;

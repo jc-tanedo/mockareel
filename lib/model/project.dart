@@ -248,7 +248,10 @@ class ReelProject {
   final String template;
   FeedSettings feed;
   StreetviewSettings streetview;
-  bool get isStreetview => template == 'streetview';
+  bool get isStreetview =>
+      template == 'streetview' || template == 'streetview-3d';
+  bool get isStreetview3d => template == 'streetview-3d';
+  bool get isClassicStreetview => template == 'streetview';
   bool get isFeed => template == 'tiktok-feed';
   String? heroClipId;
   bool storyChromeClose;

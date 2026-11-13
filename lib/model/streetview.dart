@@ -53,6 +53,9 @@ class StreetviewMedia {
 
   String transition, arrow;
   double transitionSeconds;
+  String roadLabel, crossStreetLabel, railStop, railDirection;
+  bool showBuildings, showPoiPins;
+  List<String> poiLabels;
   StreetviewMedia({
     PlaceDetails? place,
     this.mapPath,
@@ -78,8 +81,16 @@ class StreetviewMedia {
     this.transition = 'arrow',
     this.arrow = 'right',
     this.transitionSeconds = .45,
+    this.roadLabel = '',
+    this.crossStreetLabel = '',
+    this.railStop = 'near',
+    this.railDirection = 'straight',
+    this.showBuildings = true,
+    this.showPoiPins = true,
+    List<String>? poiLabels,
   }) : slowZoom = slowZoom ?? panZoom,
        slowPan = slowPan ?? panZoom,
+       poiLabels = poiLabels ?? [],
        place = place ?? PlaceDetails();
   factory StreetviewMedia.fromJson(Map<String, dynamic> j) => StreetviewMedia(
     place: PlaceDetails.fromJson(
@@ -110,6 +121,18 @@ class StreetviewMedia {
     transition: j['transition'] == 'map' ? 'map' : 'arrow',
     arrow: j['arrow'] == 'left' ? 'left' : 'right',
     transitionSeconds: _seconds(j['transitionSeconds'], .45, .2, 2),
+    roadLabel: j['roadLabel'] as String? ?? '',
+    crossStreetLabel: j['crossStreetLabel'] as String? ?? '',
+    railStop: j['railStop'] == 'far' ? 'far' : 'near',
+    railDirection: j['railDirection'] == 'left' || j['railDirection'] == 'right'
+        ? j['railDirection'] as String
+        : 'straight',
+    showBuildings: j['showBuildings'] != false,
+    showPoiPins: j['showPoiPins'] != false,
+    poiLabels: [
+      for (final p in (j['poiLabels'] as List? ?? []).take(3))
+        if (p is String && p.trim().isNotEmpty) p.trim(),
+    ],
   );
   Map<String, dynamic> toJson() => {
     'place': place.toJson(),
@@ -136,5 +159,12 @@ class StreetviewMedia {
     'transition': transition,
     'arrow': arrow,
     'transitionSeconds': transitionSeconds,
+    'roadLabel': roadLabel,
+    'crossStreetLabel': crossStreetLabel,
+    'railStop': railStop,
+    'railDirection': railDirection,
+    'showBuildings': showBuildings,
+    'showPoiPins': showPoiPins,
+    'poiLabels': poiLabels,
   };
 }

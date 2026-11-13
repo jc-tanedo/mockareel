@@ -6,6 +6,7 @@ import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
+import 'streetview_3d_canvas.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
 
@@ -27,6 +28,16 @@ class StreetviewCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
+    if (project.isStreetview3d) {
+      return Streetview3dCanvas(
+        project: project,
+        position: position,
+        playing: playing,
+        overlayOnly: overlayOnly,
+        posterOnly: posterOnly,
+        posters: posters,
+      );
+    }
     final scene = StreetviewTimeline.at(project, position),
         i = scene.mediaIndex;
     final clip = project.clips[i], settings = clip.streetview;

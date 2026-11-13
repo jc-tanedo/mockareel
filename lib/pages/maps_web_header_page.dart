@@ -19,6 +19,7 @@ class MapsWebHeaderPage extends StatefulWidget {
   final Widget? browserOverride;
   final double aspectRatio;
   final bool showHeaderGuide;
+  final bool satellite;
   const MapsWebHeaderPage({
     super.key,
     required this.place,
@@ -26,6 +27,7 @@ class MapsWebHeaderPage extends StatefulWidget {
     this.browserOverride,
     this.aspectRatio = 1000 / 625,
     this.showHeaderGuide = true,
+    this.satellite = false,
   }) : assert(driver == null || browserOverride != null),
        assert(aspectRatio > 0 && aspectRatio < 10);
   @override
@@ -86,7 +88,7 @@ class _MapsWebHeaderPageState extends State<MapsWebHeaderPage> {
       _status = 'Loading Google Maps…';
     });
     try {
-      await _driver!.load(widget.place);
+      await _driver!.load(widget.place, satellite: widget.satellite);
       if (!mounted || generation != _generation) return;
       if (mounted && generation == _generation) {
         setState(() {

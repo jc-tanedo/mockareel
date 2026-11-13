@@ -146,11 +146,14 @@ class MapsWebImport {
 }
 
 abstract final class MapsWebUrls {
-  static Uri header(PlaceDetails place) {
+  static Uri header(PlaceDetails place, {bool satellite = false}) {
+    Uri withSatellite(Uri uri) => !satellite
+        ? uri
+        : uri.replace(queryParameters: {...uri.queryParameters, 't': 'k'});
     final saved = place.mapsUrl;
     if (saved != null && Uri.tryParse(saved)?.scheme == 'https') {
       try {
-        return browserUri(search(saved));
+        return withSatellite(browserUri(search(saved)));
       } on FormatException {
         /* Imported backups may contain an invalid URL. */
       }
@@ -162,14 +165,16 @@ abstract final class MapsWebUrls {
     if (place.placeId != null &&
         place.placeId!.startsWith('ChIJ') &&
         query.isNotEmpty) {
-      return Uri.https('www.google.com', '/maps/search/', {
-        'api': '1',
-        'query': query,
-        'query_place_id': place.placeId!,
-        'hl': 'en',
-      });
+      return withSatellite(
+        Uri.https('www.google.com', '/maps/search/', {
+          'api': '1',
+          'query': query,
+          'query_place_id': place.placeId!,
+          'hl': 'en',
+        }),
+      );
     }
-    if (query.isNotEmpty) return search(query);
+    if (query.isNotEmpty) return withSatellite(search(query));
     final lat = place.latitude, lng = place.longitude;
     if (lat != null &&
         lng != null &&
@@ -177,7 +182,7 @@ abstract final class MapsWebUrls {
         lng.isFinite &&
         lat.abs() <= 90 &&
         lng.abs() <= 180) {
-      return search('$lat,$lng');
+      return withSatellite(search('$lat,$lng'));
     }
     throw const FormatException(
       'Find a place or enter a name and address first.',

@@ -1,0 +1,100 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/streetview.dart';
+import 'package:mockareel/model/streetview_3d_camera.dart';
+import 'package:mockareel/model/streetview_timeline.dart';
+import 'package:mockareel/widgets/streetview_3d_buildings.dart';
+import 'package:mockareel/widgets/streetview_3d_world_overlay.dart';
+import 'package:mockareel/widgets/streetview_canvas.dart';
+
+void main() {
+  test('Camera3D aerialHold, streetRest, swoopAt, and railHopAt', () {
+    final aerial = Camera3D.aerialHold();
+    expect(aerial.pitch, greaterThan(1.0));
+    expect(aerial.pos.y, greaterThan(1.5));
+
+    final rest = Camera3D.streetRest();
+    expect(rest.pitch, closeTo(0.0, 0.001));
+    expect(rest.pos.y, closeTo(0.0, 0.001));
+
+    final swoopMid = Camera3D.swoopAt(0.5);
+    expect(swoopMid.pos.y, greaterThan(rest.pos.y));
+    expect(swoopMid.pos.y, lessThan(aerial.pos.y));
+
+    final hopStraight = Camera3D.railHopAt(0.5, 'straight');
+    expect(hopStraight.yaw, closeTo(0.0, 0.001));
+    expect(hopStraight.pos.z, greaterThan(0.0));
+
+    final hopRight = Camera3D.railHopAt(1.0, 'right');
+    expect(hopRight.yaw, greaterThan(0.1));
+  });
+
+  test('StreetviewTimeline includes swoop scene for streetview-3d', () {
+    final p = ReelProject(
+      template: 'streetview-3d',
+      clips: [
+        ReelClip(name: 'Stop 1', path: '/tmp/a.jpg', duration: 2.0),
+        ReelClip(name: 'Stop 2', path: '/tmp/b.jpg', duration: 2.0),
+      ],
+    );
+    final scenes = StreetviewTimeline.scenes(p);
+    expect(scenes.any((s) => s.kind == 'swoop'), isTrue);
+    expect(scenes.first.kind, 'map');
+    expect(scenes[1].kind, 'swoop');
+    expect(scenes[2].kind, 'media');
+  });
+
+  test('BuildingBlock3D generates corridor and aerial blocks', () {
+    final blocks = BuildingBlock3D.corridorBlocks();
+    expect(blocks, isNotEmpty);
+    expect(blocks.any((b) => b.x < 0), isTrue);
+    expect(blocks.any((b) => b.x > 0), isTrue);
+  });
+
+  testWidgets('Streetview3dWorldOverlay renders road label and POI pins', (
+    tester,
+  ) async {
+    final settings = StreetviewClipSettings(
+      roadLabel: '42ND ST',
+      crossStreetLabel: '5TH AVE',
+      poiLabels: ['Cafe', 'Museum'],
+      showPoiPins: true,
+      showArrows: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            height: 640,
+            child: Streetview3dWorldOverlay(
+              camera: Camera3D.streetRest(),
+              settings: settings,
+              restMode: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('42ND ST'), findsOneWidget);
+    expect(find.text('Cafe'), findsOneWidget);
+  });
+
+  testWidgets('StreetviewCanvas delegates to Streetview3dCanvas', (
+    tester,
+  ) async {
+    final p = ReelProject(
+      template: 'streetview-3d',
+      clips: [ReelClip(name: 'Stop 1', path: '/tmp/a.jpg', duration: 2.0)],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StreetviewCanvas(project: p, position: 0.5, posterOnly: true),
+        ),
+      ),
+    );
+    expect(find.byType(StreetviewCanvas), findsOneWidget);
+  });
+}

@@ -55,8 +55,11 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         MaterialPageRoute(
           builder: (_) => MapsWebHeaderPage(
             place: _s.place,
-            aspectRatio: 360 / StreetviewLayout.mapHeight,
+            aspectRatio: widget.project.isStreetview3d
+                ? 360 / 640
+                : 360 / StreetviewLayout.mapHeight,
             showHeaderGuide: false,
+            satellite: widget.project.isStreetview3d,
           ),
         ),
       );
@@ -164,21 +167,25 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           _field('Address', _s.place.address, (v) => _s.place.address = v),
         ],
       ),
-      EditorSectionCard(
-        title: const Text('Map place details and buttons'),
-        subtitle: const Text('Place information and rendered actions'),
-        children: [
-          _field('Category', _s.place.category, (v) => _s.place.category = v),
-          _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
-          PlaceActionsEditor(
-            key: ValueKey(_revision),
-            place: _s.place,
-            embedded: true,
-            suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
-            onChanged: widget.onChanged,
-          ),
-        ],
-      ),
+      if (!widget.project.isStreetview3d)
+        EditorSectionCard(
+          title: const Text('Map place details and buttons'),
+          subtitle: const Text('Place information and rendered actions'),
+          children: [
+            _field('Category', _s.place.category, (v) => _s.place.category = v),
+            _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
+            PlaceActionsEditor(
+              key: ValueKey(_revision),
+              place: _s.place,
+              embedded: true,
+              suggestedActions: StreetviewPlaceSheet.actions(
+                _s.place,
+                map: true,
+              ),
+              onChanged: widget.onChanged,
+            ),
+          ],
+        ),
       MediaEditsEditor(
         key: ValueKey('effects-${widget.clip.id}'),
         clip: widget.clip,
@@ -192,9 +199,23 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             isExpanded: true,
             initialValue: _s.transition,
             decoration: const InputDecoration(labelText: 'Transition type'),
-            items: const [
-              DropdownMenuItem(value: 'arrow', child: Text('Arrow movement')),
-              DropdownMenuItem(value: 'map', child: Text('Return to Maps')),
+            items: [
+              DropdownMenuItem(
+                value: 'arrow',
+                child: Text(
+                  widget.project.isStreetview3d
+                      ? 'On-rails forward movement'
+                      : 'Arrow movement',
+                ),
+              ),
+              DropdownMenuItem(
+                value: 'map',
+                child: Text(
+                  widget.project.isStreetview3d
+                      ? 'Return to Aerial map'
+                      : 'Return to Maps',
+                ),
+              ),
             ],
             onChanged: (v) {
               _s.transition = v!;
@@ -202,19 +223,67 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             },
           ),
           if (_s.transition == 'arrow') ...[
-            DropdownButtonFormField<String>(
-              isExpanded: true,
-              initialValue: _s.arrow,
-              decoration: const InputDecoration(labelText: 'Navigation arrow'),
-              items: const [
-                DropdownMenuItem(value: 'left', child: Text('Left')),
-                DropdownMenuItem(value: 'right', child: Text('Right')),
-              ],
-              onChanged: (v) {
-                _s.arrow = v!;
-                widget.onChanged();
-              },
-            ),
+            if (widget.project.isStreetview3d) ...[
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _s.railStop,
+                decoration: const InputDecoration(
+                  labelText: 'Rail tap distance',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'near',
+                    child: Text('Near chevron on road'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'far',
+                    child: Text('Far down the road'),
+                  ),
+                ],
+                onChanged: (v) {
+                  _s.railStop = v!;
+                  widget.onChanged();
+                },
+              ),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _s.railDirection,
+                decoration: const InputDecoration(labelText: 'Rail path'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'straight',
+                    child: Text('Straight down road'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'left',
+                    child: Text('Turn left onto cross street'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'right',
+                    child: Text('Turn right onto cross street'),
+                  ),
+                ],
+                onChanged: (v) {
+                  _s.railDirection = v!;
+                  widget.onChanged();
+                },
+              ),
+            ] else
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _s.arrow,
+                decoration: const InputDecoration(
+                  labelText: 'Navigation arrow',
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'left', child: Text('Left')),
+                  DropdownMenuItem(value: 'right', child: Text('Right')),
+                ],
+                onChanged: (v) {
+                  _s.arrow = v!;
+                  widget.onChanged();
+                },
+              ),
           ],
           _slider(
             _s.transition == 'arrow'
@@ -292,6 +361,33 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             _s.attribution,
             (v) => _s.attribution = v,
           ),
+          if (widget.project.isStreetview3d) ...[
+            _field('Road label', _s.roadLabel, (v) => _s.roadLabel = v),
+            _field(
+              'Cross street label',
+              _s.crossStreetLabel,
+              (v) => _s.crossStreetLabel = v,
+            ),
+            _field(
+              'Floating POI pins (comma-separated)',
+              _s.poiLabels.join(', '),
+              (v) => _s.poiLabels = v
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList(),
+            ),
+            _switch(
+              '3D building massing',
+              _s.showBuildings,
+              (v) => _s.showBuildings = v,
+            ),
+            _switch(
+              'Floating POI pins',
+              _s.showPoiPins,
+              (v) => _s.showPoiPins = v,
+            ),
+          ],
           _switch('Top controls', _s.showControls, (v) => _s.showControls = v),
           _switch('Navigation arrows', _s.showArrows, (v) => _s.showArrows = v),
           _switch('Place sheet', _s.showLocation, (v) => _s.showLocation = v),

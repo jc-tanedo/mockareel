@@ -63,6 +63,14 @@ class TemplatePickerPage extends StatelessWidget {
                   Icons.streetview,
                   const Color(0xff8bd3dd),
                 ),
+                _template(
+                  context,
+                  'streetview-3d',
+                  'Streetview 3D',
+                  'On-rails 3D street tour',
+                  Icons.view_in_ar_outlined,
+                  const Color(0xff9cc7ff),
+                ),
               ],
             ),
           ),
@@ -82,7 +90,7 @@ class TemplatePickerPage extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final feed = id == 'tiktok-feed';
-    final street = id == 'streetview';
+    final street = id == 'streetview' || id == 'streetview-3d';
     return Card(
       margin: EdgeInsets.zero,
       color: colors.surfaceContainerLow,
