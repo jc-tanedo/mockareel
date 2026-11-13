@@ -21,11 +21,11 @@ void main() {
     expect(swoopMid.pos.y, greaterThan(rest.pos.y));
     expect(swoopMid.pos.y, lessThan(aerial.pos.y));
 
-    final hopStraight = Camera3D.railHopAt(0.5, direction: 'straight');
+    final hopStraight = Camera3D.railHopAt(0.5, railDirection: 'straight');
     expect(hopStraight.yaw, closeTo(0.0, 0.001));
     expect(hopStraight.pos.z, greaterThan(0.0));
 
-    final hopRight = Camera3D.railHopAt(1.0, direction: 'right');
+    final hopRight = Camera3D.railHopAt(1.0, railDirection: 'right');
     expect(hopRight.yaw, greaterThan(0.1));
   });
 

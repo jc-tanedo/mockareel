@@ -109,26 +109,43 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
     if (isMap) {
       content = Streetview3dAerialScene(
         settings: settings,
-        mapImage: mapImage,
         dark: project.darkOutput,
-        ripple: ripple,
+        thumbnail: ClipPoster(
+          clip: clip,
+          position: 0,
+          resolvedPath: widget.posters[clip.id],
+        ),
       );
     } else if (isSwoop) {
       content = Streetview3dAerialSwoopScene(
+        progress: swoopT,
         settings: settings,
+        streetClip: ClipPoster(
+          clip: clip,
+          position: 0,
+          resolvedPath: outgoingPath,
+        ),
         mapImage: mapImage,
         streetImage: outgoingImage,
-        t: swoopT,
         dark: project.darkOutput,
       );
     } else if (isArrow && nextClip != null) {
       content = Streetview3dDollyScene(
+        progress: hopT,
+        outgoingMedia: ClipPoster(
+          clip: clip,
+          position: clip.duration,
+          resolvedPath: outgoingPath,
+        ),
+        incomingMedia: ClipPoster(
+          clip: nextClip,
+          position: 0,
+          resolvedPath: incomingPath,
+        ),
         settings: settings,
-        nextSettings: nextClip.streetview,
+        dark: project.darkOutput,
         outgoingImage: outgoingImage,
         incomingImage: incomingImage,
-        t: hopT,
-        ripple: ripple,
       );
     } else {
       // Media rest scene: when overlayOnly is true (during export), native
@@ -166,7 +183,6 @@ class _Streetview3dCanvasState extends State<Streetview3dCanvas> {
           Positioned.fill(
             child: StreetviewChrome(
               settings: settings,
-              map: false,
               dark: project.darkOutput,
               is3d: true,
             ),
