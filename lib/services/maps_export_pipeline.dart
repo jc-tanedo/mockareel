@@ -76,8 +76,9 @@ class MapsExportPipeline {
           );
           await onPrecache(paths['${c.id}:end']!);
           if (project.isStreetview3d) {
-            if (c.streetview.mapPath != null)
+            if (c.streetview.mapPath != null) {
               await OrbitScene.load(c.streetview.mapPath!);
+            }
             if (c.streetview.walking && !c.isTimed) {
               for (final layer in c.streetview.walkLayers) {
                 await onPrecache(layer);
