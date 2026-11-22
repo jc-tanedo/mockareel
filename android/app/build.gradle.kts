@@ -87,6 +87,7 @@ flutter {
 }
 
 dependencies {
+    implementation("com.google.ai.edge.litert:litert:1.4.1")
     testImplementation("junit:junit:4.13.2")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
     implementation("androidx.media3:media3-transformer:1.9.2")

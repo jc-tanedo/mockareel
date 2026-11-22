@@ -1,5 +1,8 @@
 import 'editor_section_card.dart';
 import 'dart:io';
+import '../services/photo_walk.dart';
+import '../services/media_edits.dart';
+import '../services/open_orbit_map.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -32,6 +35,38 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
   bool _busy = false;
   int _revision = 0;
   StreetviewMedia get _s => widget.clip.streetview;
+  Future<void> _move(String move) async {
+    final clip = widget.clip;
+    if (move == 'hold' || clip.streetview.walkLayers.length == 3) {
+      clip.streetview.walkMove = move;
+      widget.onChanged();
+      return;
+    }
+    final stamp = EditedMedia.stamp(clip);
+    setState(() => _busy = true);
+    try {
+      final walk = await PhotoWalk.prepare(clip, widget.store.root!);
+      if (!mounted || widget.clip != clip || EditedMedia.stamp(clip) != stamp) {
+        for (final path in walk.layers) {
+          await File(path).delete();
+        }
+        return;
+      }
+      clip.streetview.walkLayers = walk.layers;
+      clip.streetview.walkDepth = walk.depth;
+      clip.streetview.walkMove = move;
+      widget.onChanged();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not prepare photo: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _location() async {
     final value = await Navigator.of(context).push<MapsWebImport>(
       MaterialPageRoute(
@@ -51,6 +86,41 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     if (_busy || !_s.canCaptureMap) return;
     setState(() => _busy = true);
     try {
+      if (widget.project.isStreetview3d) {
+        final clip = widget.clip, place = _s.place;
+        final lat = place.latitude, lon = place.longitude;
+        if (lat == null || lon == null) {
+          final coords = await showDialog<(double, double)>(
+            context: context,
+            builder: (context) => const _PinCoordinates(),
+          );
+          if (coords == null ||
+              !mounted ||
+              widget.clip != clip ||
+              _s.place != place) {
+            return;
+          }
+          place.latitude = coords.$1;
+          place.longitude = coords.$2;
+          widget.onChanged();
+        }
+        final scene = await OpenOrbitMap.fetch(
+          place.latitude!,
+          place.longitude!,
+        );
+        if (!mounted || widget.clip != clip || _s.place != place) return;
+        final file = File(
+          '${widget.store.root!.path}/media/orbit-${newId()}.json',
+        );
+        await file.writeAsString(scene, flush: true);
+        if (!mounted || widget.clip != clip || _s.place != place) {
+          await file.delete();
+          return;
+        }
+        _s.mapPath = file.path;
+        widget.onChanged();
+        return;
+      }
       final bytes = await Navigator.of(context).push<Uint8List>(
         MaterialPageRoute(
           builder: (_) => MapsWebHeaderPage(
@@ -148,6 +218,26 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             icon: const Icon(Icons.search),
             label: const Text('Select this media’s location'),
           ),
+          if (widget.project.isStreetview3d)
+            TextButton.icon(
+              icon: const Icon(Icons.location_city),
+              label: const Text('Use Tokyo Station'),
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      _s.place = PlaceDetails(
+                        name: 'Tokyo Station',
+                        address: 'Marunouchi, Tokyo',
+                        latitude: OpenOrbitMap.tokyoLat,
+                        longitude: OpenOrbitMap.tokyoLon,
+                      );
+                      _s.locationSelected = true;
+                      _s.mapPath = null;
+                      _revision++;
+                      widget.onChanged();
+                      await _capture();
+                    },
+            ),
           if (_s.canCaptureMap)
             TextButton.icon(
               onPressed: _busy ? null : _capture,
@@ -182,7 +272,14 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       MediaEditsEditor(
         key: ValueKey('effects-${widget.clip.id}'),
         clip: widget.clip,
-        onChanged: widget.onChanged,
+        onChanged: () {
+          if (widget.project.isStreetview3d) {
+            _s.walkLayers = [];
+            _s.walkDepth = [];
+            _s.walkMove = 'hold';
+          }
+          widget.onChanged();
+        },
       ),
       EditorSectionCard(
         title: const Text('Transition to next media'),
@@ -227,53 +324,83 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ),
         ],
       ),
-      EditorSectionCard(
-        title: const Text('Camera motion'),
-        subtitle: const Text('Movement for this media'),
-        children: [
-          _switch('Slow zoom', _s.slowZoom, (v) => _s.slowZoom = v),
-          if (_s.slowZoom)
-            _amount(
-              'Zoom amount',
-              _s.zoomAmount,
-              0,
-              .2,
-              (v) => _s.zoomAmount = v,
-              percent: true,
+      if (widget.project.isStreetview3d && !widget.clip.isTimed)
+        EditorSectionCard(
+          title: const Text('Photo walkthrough'),
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final move in const {
+                  'hold': 'Hold still',
+                  'left': 'Step left',
+                  'right': 'Step right',
+                  'forward': 'Walk forward',
+                }.entries)
+                  ChoiceChip(
+                    label: Text(move.value),
+                    selected: _s.walkMove == move.key,
+                    onSelected: _busy ? null : (_) => _move(move.key),
+                  ),
+              ],
             ),
-          _switch('Slow pan', _s.slowPan, (v) => _s.slowPan = v),
-          if (_s.slowPan)
-            _amount(
-              'Pan distance',
-              _s.panAmount,
-              -.08,
-              .08,
-              (v) => _s.panAmount = v,
-              percent: true,
-            ),
-          _switch('Slow turntable', _s.turntable, (v) => _s.turntable = v),
-          if (_s.turntable) ...[
-            _amount(
-              'Turn angle',
-              _s.turntableDegrees,
-              0,
-              15,
-              (v) => _s.turntableDegrees = v,
-            ),
-            _switch(
-              'Reverse turn direction',
-              _s.turntableReverse,
-              (v) => _s.turntableReverse = v,
+            if (_busy)
+              const LinearProgressIndicator()
+            else if (_s.walkLayers.isEmpty)
+              const Text(
+                'Choosing a move prepares this photo on your phone. First use downloads a 64 MB depth model.',
+              ),
+          ],
+        ),
+      if (!widget.project.isStreetview3d)
+        EditorSectionCard(
+          title: const Text('Camera motion'),
+          subtitle: const Text('Movement for this media'),
+          children: [
+            _switch('Slow zoom', _s.slowZoom, (v) => _s.slowZoom = v),
+            if (_s.slowZoom)
+              _amount(
+                'Zoom amount',
+                _s.zoomAmount,
+                0,
+                .2,
+                (v) => _s.zoomAmount = v,
+                percent: true,
+              ),
+            _switch('Slow pan', _s.slowPan, (v) => _s.slowPan = v),
+            if (_s.slowPan)
+              _amount(
+                'Pan distance',
+                _s.panAmount,
+                -.08,
+                .08,
+                (v) => _s.panAmount = v,
+                percent: true,
+              ),
+            _switch('Slow turntable', _s.turntable, (v) => _s.turntable = v),
+            if (_s.turntable) ...[
+              _amount(
+                'Turn angle',
+                _s.turntableDegrees,
+                0,
+                15,
+                (v) => _s.turntableDegrees = v,
+              ),
+              _switch(
+                'Reverse turn direction',
+                _s.turntableReverse,
+                (v) => _s.turntableReverse = v,
+              ),
+            ],
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Camera movements carry the navigation arrows with the scene.',
+              ),
             ),
           ],
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Camera movements carry the navigation arrows with the scene.',
-            ),
-          ),
-        ],
-      ),
+        ),
       EditorSectionCard(
         title: const Text('Street View overlays'),
         subtitle: const Text('Labels and visibility for this media'),
@@ -324,4 +451,65 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       ),
     ],
   );
+}
+
+class _PinCoordinates extends StatefulWidget {
+  const _PinCoordinates();
+  @override
+  State<_PinCoordinates> createState() => _PinCoordinatesState();
+}
+
+class _PinCoordinatesState extends State<_PinCoordinates> {
+  String lat = '', lon = '';
+  @override
+  Widget build(BuildContext context) {
+    final latitude = double.tryParse(lat.trim()),
+        longitude = double.tryParse(lon.trim());
+    final valid =
+        latitude != null &&
+        latitude.abs() <= 85 &&
+        longitude != null &&
+        longitude.abs() <= 180;
+    return AlertDialog(
+      title: const Text('Enter pin coordinates'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'The selected place did not include coordinates. Enter its pin to load buildings and terrain.',
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Latitude'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
+              ),
+              onChanged: (v) => setState(() => lat = v),
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Longitude'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
+              ),
+              onChanged: (v) => setState(() => lon = v),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: valid
+              ? () => Navigator.pop(context, (latitude, longitude))
+              : null,
+          child: const Text('Load map'),
+        ),
+      ],
+    );
+  }
 }

@@ -150,7 +150,17 @@ class ProjectStore {
       }
       final maps = <String, String>{};
       for (var i = 0; i < project.clips.length; i++) {
-        final path = project.clips[i].streetview.mapPath;
+        final settings = project.clips[i].streetview;
+        if (settings.walkLayers.length == 3) {
+          final names = <String>[];
+          for (final path in settings.walkLayers) {
+            final name = 'media/walk-$i-${names.length}.png';
+            await encoder.addFile(File(path), name);
+            names.add(name);
+          }
+          (clips[i]['streetview'] as Map)['walkLayers'] = names;
+        }
+        final path = settings.mapPath;
         if (path == null) continue;
         var relative = maps[path];
         if (relative == null) {
@@ -229,6 +239,15 @@ class ProjectStore {
         final restoredMaps = <String, String>{};
         for (final clip in clips) {
           final streetview = clip['streetview'] as Map?;
+          final layers = streetview?['walkLayers'];
+          if (layers != null) {
+            if (layers is! List || layers.length != 3) {
+              throw const FormatException('Invalid photo walk layers.');
+            }
+            streetview!['walkLayers'] = [
+              for (final source in layers) await restoreExtra(source as String),
+            ];
+          }
           final source = streetview?['mapPath'] as String?;
           if (source != null) {
             final restored = restoredMaps[source] ?? await restoreExtra(source);

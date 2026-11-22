@@ -14,7 +14,24 @@ class StreetviewCamera extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final pose = StreetviewMotion.at(clip, seconds);
+    return StreetviewCameraTransform(
+      pose: StreetviewMotion.at(clip, seconds),
+      child: child,
+    );
+  }
+}
+
+class StreetviewCameraTransform extends StatelessWidget {
+  final StreetviewPose pose;
+  final Widget child;
+  const StreetviewCameraTransform({
+    super.key,
+    required this.pose,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return ClipRect(
       child: Transform.translate(
         offset: Offset(pose.offsetX, 0),

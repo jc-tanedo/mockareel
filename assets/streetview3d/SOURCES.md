@@ -1,0 +1,5 @@
+The Tokyo Station scene contains simplified PLATEAU building footprints and heights (MLIT Japan), street and ground geometry, and GSI elevation samples. Its origin is 35.68124 N, 139.76712 E. Geometry is rounded to metres and the elevation grid is sampled every 50 metres. Credits are displayed in the map shot.
+
+The source compilation includes OpenStreetMap contributions. This derived database, tokyo.json, is made available under the [Open Database License 1.0](https://opendatacommons.org/licenses/odbl/1-0/). [Source compiled tiles](https://github.com/jeantimex/tokyo/tree/ba88f5f9dbc6782a729692c3743e70b27ba78498/tiles/tokyo) · [Project PLATEAU](https://www.mlit.go.jp/plateau/) · [GSI](https://www.gsi.go.jp/) · [OSM copyright](https://www.openstreetmap.org/copyright).
+
+Other locations use OpenStreetMap contributors’ building and land-use data under ODbL and Mapzen Terrarium elevation tiles where available. Building heights are estimated from storeys when explicit heights are missing. [Elevation credits](https://github.com/tilezen/joerd/blob/master/docs/attribution.md).

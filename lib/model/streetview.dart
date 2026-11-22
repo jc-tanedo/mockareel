@@ -30,6 +30,10 @@ class StreetviewSettings {
 class StreetviewMedia {
   PlaceDetails place;
   String? mapPath;
+  String walkMove;
+  List<String> walkLayers;
+  List<int> walkDepth;
+  bool get walking => walkMove != 'hold' && walkLayers.length == 3;
   String date, attribution, copyright, moreDatesLabel;
   bool locationSelected;
   bool get canCaptureMap =>
@@ -56,6 +60,9 @@ class StreetviewMedia {
   StreetviewMedia({
     PlaceDetails? place,
     this.mapPath,
+    this.walkMove = 'hold',
+    List<String>? walkLayers,
+    List<int>? walkDepth,
     this.date = '',
     this.attribution = 'Google',
     this.copyright = '© 2025 Google',
@@ -78,7 +85,9 @@ class StreetviewMedia {
     this.transition = 'arrow',
     this.arrow = 'right',
     this.transitionSeconds = .45,
-  }) : slowZoom = slowZoom ?? panZoom,
+  }) : walkLayers = walkLayers ?? [],
+       walkDepth = walkDepth ?? [],
+       slowZoom = slowZoom ?? panZoom,
        slowPan = slowPan ?? panZoom,
        place = place ?? PlaceDetails();
   factory StreetviewMedia.fromJson(Map<String, dynamic> j) => StreetviewMedia(
@@ -86,6 +95,19 @@ class StreetviewMedia {
       Map<String, dynamic>.from(j['place'] as Map? ?? {}),
     ),
     mapPath: j['mapPath'] as String?,
+    walkDepth: switch (j['walkDepth']) {
+      final List d
+          when d.length == 1024 &&
+              d.every((v) => v is int && v >= 0 && v <= 255) =>
+        d.cast<int>(),
+      _ => [],
+    },
+    walkMove: const {'left', 'right', 'forward'}.contains(j['walkMove'])
+        ? j['walkMove'] as String
+        : 'hold',
+    walkLayers: (j['walkLayers'] as List?)?.length == 3
+        ? (j['walkLayers'] as List).cast<String>()
+        : [],
     date: j['date'] as String? ?? '',
     attribution: j['attribution'] as String? ?? 'Google',
     copyright: j['copyright'] as String? ?? '© 2025 Google',
@@ -114,6 +136,9 @@ class StreetviewMedia {
   Map<String, dynamic> toJson() => {
     'place': place.toJson(),
     'mapPath': mapPath,
+    if (walkLayers.length == 3) 'walkLayers': walkLayers,
+    if (walkDepth.length == 1024) 'walkDepth': walkDepth,
+    if (walkMove != 'hold') 'walkMove': walkMove,
     'date': date,
     'attribution': attribution,
     'copyright': copyright,

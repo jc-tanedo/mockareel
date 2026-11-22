@@ -8,12 +8,20 @@ import io.flutter.plugin.common.MethodChannel
 
 @UnstableApi
 class MainActivity : FlutterActivity() {
+    private var depthChannel: MethodChannel? = null
     private var gifEncoder: GifVideoEncoder? = null
     private var mapSnapshot: MapSnapshot? = null
     private var exportSession: ExportSessionHost? = null
     private var renderer: ReelRenderer? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        depthChannel = MethodChannel(
+            messenger,
+            "dev.mockareel/photo-depth",
+            io.flutter.plugin.common.StandardMethodCodec.INSTANCE,
+            messenger.makeBackgroundTaskQueue(),
+        ).also { it.setMethodCallHandler(WalkDepth(applicationContext)) }
         exportSession = ExportSessionHost(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(exportSession)
         gifEncoder = GifVideoEncoder(applicationContext)
@@ -30,6 +38,8 @@ class MainActivity : FlutterActivity() {
         exportSession?.onPermissionsResult(requestCode)
     }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        depthChannel?.setMethodCallHandler(null)
+        depthChannel = null
         ExportService.end(applicationContext, false)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(null)
         exportSession = null

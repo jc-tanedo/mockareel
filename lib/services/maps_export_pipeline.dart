@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
+import '../model/orbit_scene.dart';
 import '../model/project.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
@@ -74,7 +75,15 @@ class MapsExportPipeline {
             position: c.duration - .001,
           );
           await onPrecache(paths['${c.id}:end']!);
-          if (c.streetview.mapPath != null) {
+          if (project.isStreetview3d) {
+            if (c.streetview.mapPath != null)
+              await OrbitScene.load(c.streetview.mapPath!);
+            if (c.streetview.walking && !c.isTimed) {
+              for (final layer in c.streetview.walkLayers) {
+                await onPrecache(layer);
+              }
+            }
+          } else if (c.streetview.mapPath != null) {
             await onPrecache(c.streetview.mapPath!);
           }
         }
@@ -215,7 +224,21 @@ class MapsExportPipeline {
         // Whole-project precaching can evict early assets on longer reels.
         // Decode this scene's actual pixels immediately before its first paint;
         // otherwise a resolved Image.file can still capture a transparent frame.
+        if (project.isStreetview3d &&
+            clip.streetview.mapPath != null &&
+            scene.kind != 'media' &&
+            scene.kind != 'arrow') {
+          await OrbitScene.load(clip.streetview.mapPath!);
+        }
         final assets = <String>{
+          if (project.isStreetview3d &&
+              !clip.isTimed &&
+              clip.streetview.walking)
+            ...clip.streetview.walkLayers,
+          if (project.isStreetview3d &&
+              scene.kind == 'arrow' &&
+              project.clips[scene.mediaIndex + 1].streetview.walking)
+            ...project.clips[scene.mediaIndex + 1].streetview.walkLayers,
           if (scene.kind == 'map') posters[clip.id]!,
           if (scene.kind == 'ending-map' ||
               scene.kind == 'back' ||
@@ -226,6 +249,7 @@ class MapsExportPipeline {
           if ((scene.kind == 'map' ||
                   scene.kind == 'ending-map' ||
                   scene.kind == 'back') &&
+              !project.isStreetview3d &&
               clip.streetview.mapPath != null)
             clip.streetview.mapPath!,
         };
@@ -238,9 +262,13 @@ class MapsExportPipeline {
             media &&
             clip.streetview.showArrows &&
             StreetviewMotion.active(clip);
-        final count = media && !animatedArrows
-            ? 1
-            : (scene.duration * 30).ceil();
+        final staticOverlay =
+            media &&
+            !animatedArrows &&
+            !(project.isStreetview3d &&
+                !clip.isTimed &&
+                clip.streetview.walking);
+        final count = staticOverlay ? 1 : (scene.duration * 30).ceil();
         final paths = <String>[];
 
         for (var f = 0; f < count; f++) {
@@ -258,7 +286,7 @@ class MapsExportPipeline {
         }
 
         overlays.add(paths.last);
-        frames.add(media && !animatedArrows ? [] : paths);
+        frames.add(staticOverlay ? [] : paths);
         clips.add(
           media
               ? {

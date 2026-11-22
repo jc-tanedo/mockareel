@@ -121,3 +121,10 @@ With Python Playwright, Pillow and system Chromium installed, run
 `python3 tool/check_maps_header.py` for the offline browser fixture. It checks
 that initial and late-added map controls are hidden, external zoom still works,
 and map labels and pins remain visible. Separate PNG tests verify the manually added attribution.
+
+
+## Streetview 3D
+
+Choose **Streetview 3D**, import a photo and tap **Use Tokyo Station** in **Media location** to preview an offline orbit of the station. Other pins download nearby OpenStreetMap buildings and elevation tiles. Coverage varies by location. The camera circles the selected pin using the geometry saved with that clip.
+
+In **Photo walkthrough**, choose **Step left**, **Step right** or **Walk forward**. The first move downloads the MiDaS depth model (about 66 MB). Android then estimates depth from the edited photo, fills exposed areas with nearby pixels and projects the photo onto a textured mesh. Fine details behind foreground objects are approximate. Each prepared photo works offline and its depth data travels with project backups. Videos and GIFs play normally. Use **Transition to next media** to choose how to leave each clip.
