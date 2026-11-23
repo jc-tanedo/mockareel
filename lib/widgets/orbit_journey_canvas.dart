@@ -102,6 +102,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                 : OrbitMediaPose.at(
                     active ? scene.kind : 'media',
                     active ? fraction : 0,
+                    scene: geometry,
                   );
             final map = Stack(
               fit: StackFit.expand,
@@ -119,18 +120,19 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     dark: project.darkOutput,
                     zoom: pose.zoom,
                   ),
-                Positioned(
-                  left: pose.anchor.dx - 80 * pose.zoom * .58,
-                  top: pose.anchor.dy - 5,
-                  width: 160 * pose.zoom * .58,
-                  height: 12,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black38,
-                      borderRadius: BorderRadius.circular(100),
+                if (pose.mount == null)
+                  Positioned(
+                    left: pose.anchor.dx - 80 * pose.zoom * .58,
+                    top: pose.anchor.dy - 5,
+                    width: 160 * pose.zoom * .58,
+                    height: 12,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        borderRadius: BorderRadius.circular(100),
+                      ),
                     ),
                   ),
-                ),
               ],
             );
             final world = Stack(
@@ -154,10 +156,13 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (flying && t > 0 && t < 1)
+                if (geometry != null &&
+                    (pose.mount != null || (flying && t > 0 && t < 1)))
                   IgnorePointer(
                     child: Opacity(
-                      opacity: min(1.0, 8 * t * (1 - t)),
+                      opacity: pose.mount != null
+                          ? 1
+                          : min(1.0, 8 * t * (1 - t)),
                       child: CustomPaint(
                         painter: OrbitPainter(
                           geometry,
@@ -330,5 +335,5 @@ class _OutsidePlane extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(_OutsidePlane old) => pose.progress != old.pose.progress;
+  bool shouldReclip(_OutsidePlane old) => pose.matrix != old.pose.matrix;
 }

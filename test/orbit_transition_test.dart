@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +22,102 @@ void main() {
   final city = OrbitScene([roof], List.filled(625, 0), 'City');
 
   test(
+    'mounted panel corners project onto the same exterior wall throughout the shot',
+    () {
+      final terrain = List.generate(625, (i) => (i % 25) * .5);
+      for (final edge in [roof.points, roof.points.reversed.toList()]) {
+        final scene = OrbitScene(
+          [
+            OrbitFootprint(100, [...edge, edge.first]),
+          ],
+          terrain,
+          'Station',
+        );
+        final mount = scene.wallMount!;
+        expect(mount.center.dx, closeTo(-22.05, .00001));
+        expect(mount.normal, const Offset(-1, 0));
+        expect(mount.sizeFactor, lessThan(1));
+        final halfWidth = OrbitWallMount.defaultWidth * mount.sizeFactor / 2;
+        expect(mount.center.dy - halfWidth, greaterThan(0));
+        expect(mount.center.dy + halfWidth, lessThan(20));
+        for (final pose in [
+          OrbitMediaPose.at('map', .4, scene: scene),
+          OrbitMediaPose.at('media', .5, scene: scene),
+          OrbitMediaPose.travel(scene, .6, -1),
+          OrbitMediaPose.travel(scene, .6, 1),
+          OrbitMediaPose.at('back', .8, scene: scene),
+        ]) {
+          final c = cos(pose.heading),
+              s = sin(pose.heading),
+              scale = .8 * pose.zoom;
+          for (final x in [0.0, 360.0]) {
+            final point =
+                mount.center + mount.tangent * ((x / 180 - 1) * halfWidth);
+            for (final y in [0.0, 640.0]) {
+              final height =
+                  mount.baseAbovePin +
+                  (1 - y / 640) *
+                      OrbitWallMount.defaultHeight *
+                      mount.sizeFactor;
+              final screen =
+                  pose.pin(const Size(360, 640), scale) +
+                  Offset(
+                        point.dx * c - point.dy * s,
+                        (point.dx * s + point.dy * c) * pose.depthScale -
+                            height * pose.heightScale,
+                      ) *
+                      scale;
+              final panel = MatrixUtils.transformPoint(
+                pose.matrix,
+                Offset(x, y),
+              );
+              expect((panel - screen).distance, lessThan(1e-8));
+              final gl = pose.native, nx = x / 180 - 1, ny = 1 - y / 320;
+              expect((gl[0] * nx + gl[2] + 1) * 180, closeTo(screen.dx, 1e-8));
+              expect(
+                (1 - gl[3] * nx - gl[4] * ny - gl[5]) * 320,
+                closeTo(screen.dy, 1e-8),
+              );
+            }
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'unsuitable or obstructed walls retain the original free-standing pose',
+    () {
+      final occluder = OrbitFootprint(150, const [
+        Offset(-90, -90),
+        Offset(90, -90),
+        Offset(90, 90),
+        Offset(-90, 90),
+      ]);
+      for (final scene in [
+        flat,
+        OrbitScene([OrbitFootprint(4, roof.points)], flat.grid, 'Low'),
+        OrbitScene(
+          [
+            OrbitFootprint(
+              100,
+              roof.points.map((p) => p + const Offset(200, 0)).toList(),
+            ),
+          ],
+          flat.grid,
+          'Distant',
+        ),
+        OrbitScene([roof, occluder], flat.grid, 'Enclosed'),
+      ]) {
+        expect(scene.wallMount, isNull);
+        expect(
+          OrbitMediaPose.at('media', .5, scene: scene).native,
+          OrbitMediaPose.at('media', .5).native,
+        );
+      }
+    },
+  );
+  test(
     'flight matches both media poses and responds to direction, roofs and terrain',
     () {
       final hills = OrbitScene(
@@ -31,7 +128,7 @@ void main() {
       for (final scene in [flat, hills, city]) {
         for (final direction in [-1, 1]) {
           for (final t in [0.0, 1.0]) {
-            final expected = OrbitMediaPose.at('media', 1 - t);
+            final expected = OrbitMediaPose.at('media', 1 - t, scene: scene);
             final pose = OrbitMediaPose.travel(scene, t, direction);
             expect(pose.matrix.storage, expected.matrix.storage);
             expect(pose.heading, expected.heading);
@@ -45,7 +142,7 @@ void main() {
       expect(left.turn, -right.turn);
       final overFlat = OrbitMediaPose.travel(flat, .5, 1);
       final overHills = OrbitMediaPose.travel(hills, .5, 1);
-      expect(right.zoom, lessThan(overFlat.zoom));
+      expect(right.distanceScale, lessThan(overFlat.distanceScale));
       expect(right.lift, greaterThan(overFlat.lift));
       expect(overHills.lift, isNot(overFlat.lift));
     },
@@ -54,7 +151,7 @@ void main() {
   test(
     'buildings on the camera side can cover pixels inside the media plane',
     () async {
-      final pose = OrbitMediaPose.travel(city, .5, 1);
+      final pose = OrbitMediaPose.travel(flat, .5, 1);
       Future<int> painted(OrbitScene map) async {
         final recorder = ui.PictureRecorder();
         OrbitPainter(

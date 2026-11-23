@@ -225,8 +225,10 @@ class MapsExportPipeline {
         // Whole-project precaching can evict early assets on longer reels.
         // Decode this scene's actual pixels immediately before its first paint;
         // otherwise a resolved Image.file can still capture a transparent frame.
+        OrbitScene? geometry;
         if (project.isStreetview3d && clip.streetview.mapPath != null) {
-          await (await OrbitScene.load(clip.streetview.mapPath!)).warmAtlas();
+          geometry = await OrbitScene.load(clip.streetview.mapPath!);
+          await geometry.warmAtlas();
           final nextPath = scene.kind == 'arrow'
               ? project.clips[scene.mediaIndex + 1].streetview.mapPath
               : null;
@@ -303,6 +305,7 @@ class MapsExportPipeline {
                         OrbitMediaPose.at(
                           'media',
                           (f / 30) / scene.duration,
+                          scene: geometry,
                         ).native,
                     ],
                 }

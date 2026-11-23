@@ -2,6 +2,9 @@ import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 import 'preview_video_platform.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:mockareel/model/orbit_media_pose.dart';
+import 'package:mockareel/model/orbit_scene.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -72,6 +75,20 @@ void testStreetviewExport(
                 await rootBundle.loadString('assets/streetview3d/tokyo.json'),
               )
             : mapPhoto;
+        final wallAsset = orbit
+            ? await File('${dir.path}/wall.json').writeAsString(
+                jsonEncode({
+                  'credit': 'Wall fixture',
+                  'grid': List.filled(625, 10),
+                  'shapes': [
+                    [
+                      24,
+                      [-25, -15, 5, -15, 5, 15, -25, 15],
+                    ],
+                  ],
+                }),
+              )
+            : mapPhoto;
         p = ReelProject(
           template: orbit ? 'streetview-3d' : 'streetview',
           streetview: StreetviewSettings(
@@ -90,7 +107,7 @@ void testStreetviewExport(
                 duration: .5,
                 streetview: StreetviewMedia(
                   place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
-                  mapPath: mapAsset.path,
+                  mapPath: i == 1 ? wallAsset.path : mapAsset.path,
                   walkDepth: orbit && i == 0
                       ? List.generate(1024, (n) => n % 256)
                       : [],
@@ -200,14 +217,46 @@ void testStreetviewExport(
                   await alpha(videoFrames.last, 150, 700) == 255;
               checks['photo occupies a bounded world surface'] =
                   !await hasMedia(frames[1].last, x: 150, y: 700);
-              checks['return holds video inside station'] =
-                  await hasMedia(frames[returnIndex].last, x: 540, y: 900) &&
-                  !await hasMedia(frames[returnIndex].last, x: 150, y: 700);
+              final wall = await OrbitScene.load(
+                p.clips.last.streetview.mapPath!,
+              );
+              final returning = frames[returnIndex] as List;
+              final lastReturn = OrbitMediaPose.at(
+                'back',
+                (returning.length - 1) /
+                    30 /
+                    p.clips.last.streetview.transitionSeconds,
+                scene: wall,
+              );
+              final center =
+                  MatrixUtils.transformPoint(
+                    lastReturn.matrix,
+                    const Offset(180, 320),
+                  ) *
+                  3;
+              checks['return holds the video on its wall as the camera pulls back'] =
+                  await hasMedia(
+                    returning.last,
+                    x: center.dx.round(),
+                    y: center.dy.round(),
+                  ) &&
+                  !await hasMedia(returning.last, x: 150, y: 700);
               final matrices =
                   args['clips'][secondMediaIndex]['orbitPlaneFrames'] as List;
-              checks['native projection tracks the same frames'] =
+              checks['native video uses the preview wall on every media frame'] =
+                  wall.wallMount != null &&
                   matrices.length == videoFrames.length &&
-                  matrices.first[0] != matrices.last[0];
+                  List.generate(
+                    matrices.length,
+                    (f) => listEquals(
+                      matrices[f] as List,
+                      OrbitMediaPose.at(
+                        'media',
+                        f / 30 / p.clips.last.duration,
+                        scene: wall,
+                      ).native,
+                    ),
+                  ).every((matches) => matches);
               checks['orbit moves during opening'] = !listEquals(
                 await File(frames[0].first as String).readAsBytes(),
                 await File(frames[0].last as String).readAsBytes(),

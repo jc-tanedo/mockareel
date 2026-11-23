@@ -201,7 +201,7 @@ class OrbitPainter extends CustomPainter {
     final buildings = <OrbitFootprint>[];
     for (final f in scene.shapes) {
       if (f.height >= 0) {
-        if (!foregroundOnly || OrbitMediaPose.inFrontOfPanel(f)) {
+        if (!foregroundOnly || camera.inFrontOfPanel(f)) {
           buildings.add(f);
         }
         continue;
@@ -262,6 +262,7 @@ class OrbitPainter extends CustomPainter {
       scene != old.scene ||
       foregroundOnly != old.foregroundOnly ||
       camera.progress != old.camera.progress ||
+      camera.mount != old.camera.mount ||
       camera.turn != old.camera.turn ||
       camera.tilt != old.camera.tilt ||
       camera.focus != old.camera.focus ||
