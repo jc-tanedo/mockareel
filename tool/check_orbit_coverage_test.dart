@@ -1,0 +1,19 @@
+// Live, opt-in probe. Run with flutter test tool/check_orbit_coverage_test.dart.
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockareel/model/orbit_scene.dart';
+import 'package:mockareel/services/open_orbit_map.dart';
+
+void main() {
+  for (final (name, lat, lon) in [
+    ('Kyoto Station', 34.9858, 135.7588),
+    ('Gare de Lyon', 48.8443, 2.3730),
+    ('San Fernando, Pampanga', 15.0286, 120.6898),
+  ]) {
+    test(name, () async {
+      final scene = OrbitScene.decode(await OpenOrbitMap.fetch(lat, lon));
+      // ignore: avoid_print
+      print('$name | ${scene.coverage} | ${scene.credit}');
+      expect(scene.shapes.any((s) => s.height > 0), isTrue);
+    }, timeout: const Timeout(Duration(seconds: 60)));
+  }
+}
