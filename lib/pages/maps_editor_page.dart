@@ -183,28 +183,33 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             project.streetview.adoptClipLocations(project.clips) || located;
         if (!mounted) return;
       }
-      if (project.isStreetview3d) {
-        for (final l in project.streetview.locations) {
-          if (l.overviewPath != null && !await File(l.overviewPath!).exists()) {
-            l.overviewPath = null;
-            located = true;
-          }
-          if (l.mapPath != null && !await File(l.mapPath!).exists()) {
-            l.mapPath = null;
-            for (final c in project.clips.where(
-              (c) => c.streetview.locationId == l.id,
-            )) {
-              c.streetview.mapPath = null;
-            }
-            located = true;
-          }
-        }
-        if (!mounted) return;
-      }
       _setProject(project);
       setState(() => _ready = true);
       if (located) _change();
       unawaited(_fetchMissingGeometry());
+      // File checks may take a while on restored projects. Show the editor
+      // immediately and repair only references that still match the saved path.
+      for (final l in List.of(project.streetview.locations)) {
+        final overview = l.overviewPath, map = l.mapPath;
+        if (overview != null &&
+            !await File(overview).exists() &&
+            l.overviewPath == overview) {
+          if (!mounted) return;
+          l.overviewPath = null;
+          _change();
+        }
+        if (map != null && !await File(map).exists() && l.mapPath == map) {
+          if (!mounted) return;
+          l.mapPath = null;
+          for (final c in project.clips.where(
+            (c) =>
+                c.streetview.locationId == l.id && c.streetview.mapPath == map,
+          )) {
+            c.streetview.mapPath = null;
+          }
+          _change();
+        }
+      }
     } catch (e) {
       if (mounted) setState(() => _status = 'Storage error: $e');
     }

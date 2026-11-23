@@ -263,9 +263,9 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.ensureVisible(find.text('Capture map for clip 2'));
+      await tester.ensureVisible(find.text('View location'));
       await tester.pump();
-      await tester.tap(find.text('Capture map for clip 2'));
+      await tester.tap(find.text('View location'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(
