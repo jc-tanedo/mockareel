@@ -74,6 +74,30 @@ class OrbitScene {
     }
     return OrbitScene(shapes, grid, data['credit'] as String);
   }
+
+  /// Relief around the media pin, including nearby roofs, in metres.
+  late final double localRelief = _measureRelief();
+  double _measureRelief() {
+    final center = elevation(Offset.zero);
+    double low = center, high = center;
+    void include(double height) {
+      if (height < low) low = height;
+      if (height > high) high = height;
+    }
+
+    for (int row = 9; row <= 15; row++) {
+      for (int col = 9; col <= 15; col++) {
+        include(grid[row * 25 + col]);
+      }
+    }
+    for (final shape in shapes) {
+      if (shape.height > 0 && shape.center.distanceSquared <= 180 * 180) {
+        include(elevation(shape.center) + shape.height);
+      }
+    }
+    return high - low;
+  }
+
   double elevation(Offset p) {
     final x = ((p.dx + 600) / 50).clamp(0.0, 23.99999),
         z = ((p.dy + 600) / 50).clamp(0.0, 23.99999);
@@ -109,9 +133,19 @@ class OrbitScene {
   }
 
   static OrbitScene? cached(String path) => _cache[path];
-  static Future<OrbitScene> load(String path) async {
+  static final _loading = <String, Future<OrbitScene>>{};
+  static Future<OrbitScene> load(String path) {
     final hit = cached(path);
-    if (hit != null) return hit;
+    if (hit != null) return Future.value(hit);
+    return _loading.putIfAbsent(
+      path,
+      () => _read(path).whenComplete(() {
+        _loading.remove(path);
+      }),
+    );
+  }
+
+  static Future<OrbitScene> _read(String path) async {
     final file = File(path);
     if (await file.length() > 12000000) {
       throw const FormatException('Map scene is too large.');

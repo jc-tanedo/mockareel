@@ -2,8 +2,9 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/orbit_scene.dart';
+import '../model/orbit_media_pose.dart';
 
-class OrbitMap extends StatefulWidget {
+class OrbitMap extends StatelessWidget {
   final String path;
   final double progress, zoom;
   final bool dark;
@@ -15,94 +16,147 @@ class OrbitMap extends StatefulWidget {
     this.zoom = 1,
   });
   @override
-  State<OrbitMap> createState() => _OrbitMapState();
+  Widget build(BuildContext context) => OrbitSceneBuilder(
+    path: path,
+    builder: (scene, failed) => OrbitMapView(
+      scene: scene,
+      failed: failed,
+      camera: OrbitMediaPose(progress),
+      dark: dark,
+      zoom: zoom,
+    ),
+  );
 }
 
-class _OrbitMapState extends State<OrbitMap> {
-  late var scene = OrbitScene.load(widget.path);
+class OrbitSceneBuilder extends StatefulWidget {
+  final String? path;
+  final Widget Function(OrbitScene? scene, bool failed) builder;
+  const OrbitSceneBuilder({
+    super.key,
+    required this.path,
+    required this.builder,
+  });
   @override
-  void didUpdateWidget(OrbitMap old) {
+  State<OrbitSceneBuilder> createState() => _OrbitSceneBuilderState();
+}
+
+class _OrbitSceneBuilderState extends State<OrbitSceneBuilder> {
+  Future<OrbitScene>? _load() =>
+      widget.path == null ? null : OrbitScene.load(widget.path!);
+  late var scene = _load();
+  @override
+  void didUpdateWidget(OrbitSceneBuilder old) {
     super.didUpdateWidget(old);
-    if (old.path != widget.path) scene = OrbitScene.load(widget.path);
+    if (old.path != widget.path) scene = _load();
   }
 
   @override
   Widget build(BuildContext context) => FutureBuilder<OrbitScene>(
     future: scene,
-    builder: (context, snapshot) {
-      final map =
-          OrbitScene.cached(widget.path) ??
-          (snapshot.connectionState == ConnectionState.done
-              ? snapshot.data
-              : null);
-      if (map == null) {
-        return Center(
-          child: snapshot.hasError
-              ? const Text('Map unavailable')
-              : const CircularProgressIndicator(),
-        );
-      }
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          if (map.atlas case final atlas?)
-            Image(
-              image: atlas,
-              excludeFromSemantics: true,
-              frameBuilder: (context, child, frame, sync) {
-                if (child is! RawImage || child.image == null) return child;
-                return CustomPaint(
-                  painter: _GoogleOrbitPainter(child.image!, widget.progress),
-                );
-              },
-            )
-          else
-            CustomPaint(
-              painter: OrbitPainter(
-                map,
-                widget.progress,
-                widget.dark,
-                zoom: widget.zoom,
-              ),
+    builder: (context, snapshot) => widget.builder(
+      widget.path == null
+          ? null
+          : OrbitScene.cached(widget.path!) ??
+                (snapshot.connectionState == ConnectionState.done
+                    ? snapshot.data
+                    : null),
+      snapshot.hasError,
+    ),
+  );
+}
+
+class OrbitMapView extends StatelessWidget {
+  final OrbitScene? scene;
+  final bool failed, dark;
+  final OrbitMediaPose camera;
+  final double zoom;
+  const OrbitMapView({
+    super.key,
+    required this.scene,
+    required this.failed,
+    required this.camera,
+    required this.dark,
+    required this.zoom,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final map = scene;
+    if (map == null) {
+      return Center(
+        child: failed
+            ? const Text('Map unavailable')
+            : const CircularProgressIndicator(),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (map.atlas case final atlas?)
+          Image(
+            image: atlas,
+            excludeFromSemantics: true,
+            frameBuilder: (context, child, frame, sync) {
+              if (child is! RawImage || child.image == null) return child;
+              return CustomPaint(
+                painter: _GoogleOrbitPainter(child.image!, camera.progress),
+              );
+            },
+          )
+        else
+          CustomPaint(
+            painter: OrbitPainter(
+              map,
+              camera.progress,
+              dark,
+              zoom: zoom,
+              camera: camera,
             ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: ColoredBox(
-              color: Colors.black87,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  map.credit,
-                  style: const TextStyle(color: Colors.white, fontSize: 8),
-                ),
+          ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ColoredBox(
+            color: Colors.black87,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                map.credit,
+                style: const TextStyle(color: Colors.white, fontSize: 8),
               ),
             ),
           ),
-        ],
-      );
-    },
-  );
+        ),
+      ],
+    );
+  }
 }
 
 class OrbitPainter extends CustomPainter {
   final OrbitScene scene;
-  final double progress, zoom;
-  final bool dark;
-  OrbitPainter(this.scene, this.progress, this.dark, {this.zoom = 1});
+  final double zoom;
+  final OrbitMediaPose camera;
+  final bool dark, foregroundOnly;
+  OrbitPainter(
+    this.scene,
+    double progress,
+    this.dark, {
+    this.zoom = 1,
+    this.foregroundOnly = false,
+    OrbitMediaPose? camera,
+  }) : camera = camera ?? OrbitMediaPose(progress);
   @override
   void paint(Canvas canvas, Size size) {
-    final angle = (-65 + 26 * progress) * pi / 180,
-        c = cos(angle),
-        s = sin(angle);
+    final angle = camera.heading, c = cos(angle), s = sin(angle);
     final scale = size.width / 450 * zoom,
-        origin = Offset(size.width * .5, size.height * .54);
+        origin = camera.pin(size, scale),
+        depthScale = camera.depthScale,
+        heightScale = camera.heightScale;
     final ground = scene.elevation(Offset.zero);
     double depth(Offset p) => p.dx * s + p.dy * c;
     Offset project(Offset p, double h) =>
         origin +
         Offset(
           (p.dx * c - p.dy * s) * scale,
-          (depth(p) * .64 - (h - ground) * .77) * scale,
+          (depth(p) * depthScale - (h - ground) * heightScale) * scale,
         );
     final brush = Paint();
     void face(List<Offset> points, Color color) {
@@ -114,33 +168,45 @@ class OrbitPainter extends CustomPainter {
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
+    if (foregroundOnly) {
+      final plane = (Path()..addRect(Offset.zero & size)).transform(
+        camera.matrix.storage,
+      );
+      canvas.clipPath(plane);
+    }
+    final clipBounds = canvas.getLocalClipBounds();
     final land = dark ? const Color(0xff273545) : const Color(0xffc4d1bd);
-    canvas.drawColor(land, BlendMode.src);
-    for (var z = 0; z < 24; z++) {
-      for (var x = 0; x < 24; x++) {
-        final p = Offset(x * 50.0 - 600, z * 50.0 - 600), i = z * 25 + x;
-        final heights = scene.grid;
-        face(
-          [
-            project(p, heights[i]),
-            project(p + const Offset(50, 0), heights[i + 1]),
-            project(p + const Offset(50, 50), heights[i + 26]),
-            project(p + const Offset(0, 50), heights[i + 25]),
-          ],
-          Color.lerp(
-            land,
-            Colors.black,
-            ((heights[i + 1] - heights[i]) / 90 + .08).clamp(0, 0.35),
-          )!,
-        );
+    if (!foregroundOnly) {
+      canvas.drawColor(land, BlendMode.src);
+      for (var z = 0; z < 24; z++) {
+        for (var x = 0; x < 24; x++) {
+          final p = Offset(x * 50.0 - 600, z * 50.0 - 600), i = z * 25 + x;
+          final heights = scene.grid;
+          face(
+            [
+              project(p, heights[i]),
+              project(p + const Offset(50, 0), heights[i + 1]),
+              project(p + const Offset(50, 50), heights[i + 26]),
+              project(p + const Offset(0, 50), heights[i + 25]),
+            ],
+            Color.lerp(
+              land,
+              Colors.black,
+              ((heights[i + 1] - heights[i]) / 90 + .08).clamp(0, 0.35),
+            )!,
+          );
+        }
       }
     }
     final buildings = <OrbitFootprint>[];
     for (final f in scene.shapes) {
       if (f.height >= 0) {
-        buildings.add(f);
+        if (!foregroundOnly || OrbitMediaPose.inFrontOfPanel(f)) {
+          buildings.add(f);
+        }
         continue;
       }
+      if (foregroundOnly) continue;
       face(
         [for (final p in f.points) project(p, scene.elevation(p))],
         f.height == -3
@@ -162,7 +228,7 @@ class OrbitPainter extends CustomPainter {
                 ..addPolygon(top, true)
                 ..addPolygon(bottom, true))
               .getBounds();
-      if (!bounds.overlaps(Offset.zero & size)) continue;
+      if (!bounds.overlaps(clipBounds)) continue;
       final sides = List.generate(top.length, (i) => i)
         ..sort(
           (i, j) => (depth(b.points[i]) + depth(b.points[(i + 1) % top.length]))
@@ -184,15 +250,22 @@ class OrbitPainter extends CustomPainter {
       }
       face(top, dark ? const Color(0xff93a7b7) : const Color(0xffe9e6df));
     }
-    canvas.drawCircle(origin, 5, brush..color = Colors.white);
-    canvas.drawCircle(origin, 3.5, brush..color = Colors.red);
+    if (!foregroundOnly) {
+      canvas.drawCircle(origin, 5, brush..color = Colors.white);
+      canvas.drawCircle(origin, 3.5, brush..color = Colors.red);
+    }
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(OrbitPainter old) =>
       scene != old.scene ||
-      progress != old.progress ||
+      foregroundOnly != old.foregroundOnly ||
+      camera.progress != old.camera.progress ||
+      camera.turn != old.camera.turn ||
+      camera.tilt != old.camera.tilt ||
+      camera.focus != old.camera.focus ||
+      camera.lift != old.camera.lift ||
       dark != old.dark ||
       zoom != old.zoom;
 }

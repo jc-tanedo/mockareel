@@ -38,18 +38,26 @@ class OrbitJourneyCanvas extends StatelessWidget {
         media = scene.kind == 'media',
         back = scene.kind == 'back';
     final clip = project.clips[index], settings = clip.streetview;
+    // Leave at least three movement samples even for a short arrow tap.
+    final lastFrame = ((scene.duration * 30).ceil() - 1) / 30;
+    final tapSeconds = arrow
+        ? min(StreetviewTimeline.rippleSeconds, max(0.0, lastFrame - 3 / 30))
+        : StreetviewTimeline.rippleSeconds;
     final t = arrow
-        ? ((elapsed - StreetviewTimeline.rippleSeconds) /
-                  max(.001, scene.duration - StreetviewTimeline.rippleSeconds))
-              .clamp(0.0, 1.0)
+        ? ((elapsed - tapSeconds) / max(1 / 30, lastFrame - tapSeconds)).clamp(
+            0.0,
+            1.0,
+          )
         : 0.0;
     final direction = settings.arrow == 'left' ? -1 : 1;
+    final shared =
+        arrow &&
+        settings.mapPath != null &&
+        settings.mapPath == project.clips[index + 1].streetview.mapPath;
+    final blend = Curves.easeInOut.transform(((t - .25) / .5).clamp(0.0, 1.0));
     Widget shot(int i) {
       final item = project.clips[i];
       final active = i == index, incoming = arrow && i == index + 1;
-      final pose = active
-          ? OrbitMediaPose.at(scene.kind, fraction)
-          : OrbitMediaPose.at('media', 0);
       final seconds = active
           ? (media ? elapsed : (scene.kind == 'map' ? 0.0 : item.duration))
           : i < index
@@ -57,35 +65,6 @@ class OrbitJourneyCanvas extends StatelessWidget {
           : 0.0;
       final timedHole = overlayOnly && media && active && item.isTimed;
       final path = item.streetview.mapPath;
-      final map = Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(
-            color: project.darkOutput
-                ? const Color(0xff233747)
-                : const Color(0xffcad9cf),
-          ),
-          if (path != null)
-            OrbitMap(
-              path: path,
-              progress: pose.progress,
-              dark: project.darkOutput,
-              zoom: pose.zoom,
-            ),
-          Positioned(
-            left: 180 - 80 * pose.zoom * .58,
-            top: 640 * .54 - 5,
-            width: 160 * pose.zoom * .58,
-            height: 12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black38,
-                borderRadius: BorderRadius.circular(100),
-              ),
-            ),
-          ),
-        ],
-      );
       final held = seconds >= item.duration
           ? posters['${item.id}:end']
           : posters[item.id];
@@ -104,41 +83,113 @@ class OrbitJourneyCanvas extends StatelessWidget {
           playing: playing && active && media && position < project.duration,
         );
       }
-      final world = Stack(
-        fit: StackFit.expand,
-        children: [
-          if (timedHole)
-            ClipPath(clipper: _OutsidePlane(pose), child: map)
-          else
-            map,
-          Transform(
-            transform: pose.matrix,
-            child: DecoratedBox(
-              position: DecorationPosition.foreground,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white70, width: 2),
-              ),
-              child: ClipRect(child: surface),
-            ),
-          ),
-        ],
-      );
-      final opacity = active
-          ? 1 - t
-          : incoming
-          ? t
-          : 0.0;
       return Positioned.fill(
         key: ValueKey('orbit-clip-${item.id}'),
-        child: Opacity(
-          opacity: opacity,
-          child: Transform.translate(
-            offset: Offset(
-              arrow ? direction * (active ? -t : 1 - t) * 110 : 0,
-              0,
-            ),
-            child: world,
-          ),
+        child: OrbitSceneBuilder(
+          path: path,
+          builder: (geometry, failed) {
+            final flying =
+                arrow &&
+                (active || incoming) &&
+                geometry != null &&
+                geometry.atlas == null;
+            final pose = flying
+                ? OrbitMediaPose.travel(
+                    geometry,
+                    t,
+                    incoming && !shared ? -direction : direction,
+                  )
+                : OrbitMediaPose.at(
+                    active ? scene.kind : 'media',
+                    active ? fraction : 0,
+                  );
+            final map = Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(
+                  color: project.darkOutput
+                      ? const Color(0xff233747)
+                      : const Color(0xffcad9cf),
+                ),
+                if (path != null)
+                  OrbitMapView(
+                    scene: geometry,
+                    failed: failed,
+                    camera: pose,
+                    dark: project.darkOutput,
+                    zoom: pose.zoom,
+                  ),
+                Positioned(
+                  left: pose.anchor.dx - 80 * pose.zoom * .58,
+                  top: pose.anchor.dy - 5,
+                  width: 160 * pose.zoom * .58,
+                  height: 12,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                ),
+              ],
+            );
+            final world = Stack(
+              fit: StackFit.expand,
+              children: [
+                if (!(flying && shared && incoming))
+                  if (timedHole)
+                    ClipPath(clipper: _OutsidePlane(pose), child: map)
+                  else
+                    map,
+                Opacity(
+                  opacity: flying && active ? 1 - blend : 1,
+                  child: Transform(
+                    transform: pose.matrix,
+                    child: DecoratedBox(
+                      position: DecorationPosition.foreground,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white70, width: 2),
+                      ),
+                      child: ClipRect(child: surface),
+                    ),
+                  ),
+                ),
+                if (flying && t > 0 && t < 1)
+                  IgnorePointer(
+                    child: Opacity(
+                      opacity: min(1.0, 8 * t * (1 - t)),
+                      child: CustomPaint(
+                        painter: OrbitPainter(
+                          geometry,
+                          pose.progress,
+                          project.darkOutput,
+                          zoom: pose.zoom,
+                          camera: pose,
+                          foregroundOnly: true,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+            final opacity = active
+                ? (flying ? 1.0 : 1 - t)
+                : incoming
+                ? (flying ? blend : t)
+                : 0.0;
+            return Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(
+                  arrow && !flying
+                      ? direction * (active ? -t : 1 - t) * 110
+                      : 0,
+                  0,
+                ),
+                child: world,
+              ),
+            );
+          },
         ),
       );
     }
@@ -155,7 +206,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
         ? '${place.latitude!.toStringAsFixed(5)}, ${place.longitude!.toStringAsFixed(5)}'
         : '';
     final ripple = arrow || back
-        ? elapsed / StreetviewTimeline.rippleSeconds
+        ? elapsed / tapSeconds
         : scene.kind == 'map'
         ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
               StreetviewTimeline.rippleSeconds
@@ -182,8 +233,8 @@ class OrbitJourneyCanvas extends StatelessWidget {
                 ),
               ImageFiltered(
                 imageFilter: ui.ImageFilter.blur(
-                  sigmaX: sin(t * pi) * 9,
-                  sigmaY: sin(t * pi) * 2,
+                  sigmaX: sin(t * pi) * 2.5,
+                  sigmaY: sin(t * pi) * 1.0,
                 ),
                 enabled: arrow && t > 0,
                 child: Stack(

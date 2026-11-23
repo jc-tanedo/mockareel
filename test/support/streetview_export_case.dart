@@ -186,6 +186,13 @@ void testStreetviewExport(
               checks['photo camera is rendered every frame'] =
                   (frames[1] as List).length == 15 &&
                   await hasMedia(frames[1].last as String);
+              final flight = frames[2] as List;
+              // A right turn places the pinned panels left of this ray at
+              // mid-flight. Its original and destination frames both cover it.
+              checks['arrow reveals the station between the two panels'] =
+                  await hasMedia(flight.first, x: 620, y: 915) &&
+                  !await hasMedia(flight[5], x: 620, y: 915) &&
+                  await hasMedia(flight.last, x: 620, y: 915);
               final videoFrames = frames[secondMediaIndex] as List;
               checks['video texture visible inside world panel'] =
                   await alpha(videoFrames.last, 540, 700) == 0;

@@ -312,7 +312,11 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       ),
       EditorSectionCard(
         title: const Text('Transition to next media'),
-        subtitle: const Text('How this media leads into the next'),
+        subtitle: Text(
+          widget.project.isStreetview3d && _s.transition == 'arrow'
+              ? 'The arrow turns the camera through the captured 3D scene.'
+              : 'How this media leads into the next',
+        ),
         children: [
           DropdownButtonFormField<String>(
             isExpanded: true,
