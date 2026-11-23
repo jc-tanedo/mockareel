@@ -34,7 +34,12 @@ class OrbitMediaPose {
 
   double get _panelScale => .30 * zoom * (mount?.sizeFactor ?? 1);
 
-  factory OrbitMediaPose.at(String kind, double t, {OrbitScene? scene}) {
+  factory OrbitMediaPose.at(
+    String kind,
+    double t, {
+    OrbitScene? scene,
+    String? wallId,
+  }) {
     final u = Curves.easeInOut.transform(t.clamp(0.0, 1.0));
     final progress = switch (kind) {
       'map' || 'ending-map' => .35 * u,
@@ -42,7 +47,7 @@ class OrbitMediaPose {
       'back' => 1.0 - u,
       _ => 1.0,
     };
-    return OrbitMediaPose(progress, mount: scene?.wallMount);
+    return OrbitMediaPose(progress, mount: scene?.wallFor(wallId));
   }
 
   /// Interpolate a north-up overhead view into the attached media camera.
@@ -51,8 +56,14 @@ class OrbitMediaPose {
     OrbitScene? scene,
     double world, {
     required bool returning,
+    String? wallId,
   }) {
-    final end = OrbitMediaPose.at('media', returning ? 1 : 0, scene: scene);
+    final end = OrbitMediaPose.at(
+      'media',
+      returning ? 1 : 0,
+      scene: scene,
+      wallId: wallId,
+    );
     if (world >= 1) return end;
     final progress = world * end.progress;
     final base = OrbitMediaPose(progress, mount: end.mount);

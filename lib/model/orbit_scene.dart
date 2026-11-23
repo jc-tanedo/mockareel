@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'building_appearance.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -12,8 +13,19 @@ class OrbitFootprint {
   final Offset center;
   late final Path outline = Path()..addPolygon(points, true);
   late final Rect bounds = outline.getBounds();
-  OrbitFootprint(this.height, this.points)
-    : center = points.reduce((a, b) => a + b) / points.length.toDouble();
+  final BuildingAppearance appearance;
+  late final int _paletteSeed =
+      (bounds.center.dx.round() * 73856093 ^
+              bounds.center.dy.round() * 19349663 ^
+              bounds.width.round() * 83492791)
+          .abs();
+  Color color({required bool roof, required bool dark}) =>
+      appearance.base(top: roof, seed: _paletteSeed, dark: dark);
+  OrbitFootprint(
+    this.height,
+    this.points, [
+    this.appearance = const BuildingAppearance(),
+  ]) : center = points.reduce((a, b) => a + b) / points.length.toDouble();
 
   bool blocksRay(Offset start, Offset direction, double reach) {
     final end = start + direction * reach;
@@ -44,7 +56,9 @@ class OrbitWallMount {
   static const defaultWidth = 135.0, defaultHeight = 192 / (.8 * .77);
   final Offset center, tangent;
   final double baseAbovePin, sizeFactor;
+  final String id;
   const OrbitWallMount(
+    this.id,
     this.center,
     this.tangent,
     this.baseAbovePin,
@@ -52,8 +66,8 @@ class OrbitWallMount {
   );
   Offset get normal => Offset(-tangent.dy, tangent.dx);
 
-  static OrbitWallMount? find(OrbitScene scene) {
-    if (scene.atlas != null) return null;
+  static Map<String, OrbitWallMount> candidates(OrbitScene scene) {
+    if (scene.atlas != null) return const {};
     final view = Offset(-sin(defaultHeading), cos(defaultHeading));
     const radius = 120.0;
     // Preserve clear local placements before trying a different camera heading
@@ -98,9 +112,15 @@ class OrbitWallMount {
             : facing < .5
             ? 1
             : 0;
+        String endpoint(Offset p) => '${p.dx.round()},${p.dy.round()}';
+        final endpoints = [
+          endpoint(a),
+          endpoint(points[(i + 1) % points.length]),
+        ]..sort();
         groups[group].add((
           score,
           OrbitWallMount(
+            endpoints.join('/'),
             center + normal * .05,
             tangent,
             scene.elevation(building.center) -
@@ -111,13 +131,40 @@ class OrbitWallMount {
         ));
       }
     }
+    final visible = <String, OrbitWallMount>{};
     for (final candidates in groups) {
       candidates.sort((a, b) => a.$1.compareTo(b.$1));
-      for (final (_, candidate) in candidates.take(96)) {
-        if (candidate._visible(scene)) return candidate;
+      for (final (_, candidate) in candidates) {
+        if (!visible.containsKey(candidate.id) &&
+            !visible.values.any(candidate._overlapsPanel) &&
+            candidate._visible(scene)) {
+          visible[candidate.id] = candidate;
+        }
       }
     }
-    return null;
+    return Map.unmodifiable(visible);
+  }
+
+  // Providers can split a single facade into slightly different segments.
+  // Avoid offering two placements on top of one another on the same face.
+  bool _overlapsPanel(OrbitWallMount other) {
+    final d = other.center - center;
+    double dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
+    if (dot(normal, other.normal) < .998 || dot(d, normal).abs() > 1) {
+      return false;
+    }
+    final smaller = min(sizeFactor, other.sizeFactor);
+    final overlap =
+        defaultWidth * (sizeFactor + other.sizeFactor) / 2 -
+        dot(d, tangent).abs();
+    final vertical =
+        min(
+          baseAbovePin + defaultHeight * sizeFactor,
+          other.baseAbovePin + defaultHeight * other.sizeFactor,
+        ) -
+        max(baseAbovePin, other.baseAbovePin);
+    return overlap >= .8 * defaultWidth * smaller &&
+        vertical >= .8 * defaultHeight * smaller;
   }
 
   // Trace rays from the lower corners towards the camera at both ends of
@@ -166,12 +213,44 @@ class OrbitScene {
   final String credit;
   final MemoryImage? atlas;
   OrbitScene(this.shapes, this.grid, this.credit, {this.atlas});
-  late final OrbitWallMount? wallMount = OrbitWallMount.find(this);
-  String get placementDescription {
+  late final Map<String, OrbitWallMount> walls = OrbitWallMount.candidates(
+    this,
+  );
+  OrbitWallMount? get wallMount => walls.values.firstOrNull;
+  OrbitWallMount? wallFor(String? id) => walls[id] ?? wallMount;
+  // A refreshed survey can round the same facade endpoints to adjacent metres.
+  // Only keep a previous choice when both ends still match a visible wall.
+  String? matchingWall(String? id) {
+    if (id == null || walls.containsKey(id)) return id;
+    final coords = id.split(RegExp('[,/]')).map(double.tryParse).toList();
+    if (coords.length != 4 || coords.any((v) => v == null || !v.isFinite)) {
+      return null;
+    }
+    final a = Offset(coords[0]!, coords[1]!),
+        b = Offset(coords[2]!, coords[3]!);
+    String? match;
+    var best = 4.01;
+    for (final key in walls.keys) {
+      final edge = key.split(RegExp('[,/]')).map(double.parse).toList();
+      final p = Offset(edge[0], edge[1]), q = Offset(edge[2], edge[3]);
+      final distance = min(
+        max((p - a).distanceSquared, (q - b).distanceSquared),
+        max((p - b).distanceSquared, (q - a).distanceSquared),
+      );
+      if (distance < best) {
+        match = key;
+        best = distance;
+      }
+    }
+    return match;
+  }
+
+  String get placementDescription => describeWall(null);
+  String describeWall(String? id) {
     if (atlas != null) {
       return 'Media at pin · This capture contains imagery only.';
     }
-    if (wallMount case final mount?) {
+    if (wallFor(id) case final mount?) {
       return 'Media on building wall · ${mount.center.distance.round()} m from pin';
     }
     return shapes.any((s) => s.height > 0)
@@ -226,10 +305,16 @@ class OrbitScene {
         continue;
       }
       shapes.add(
-        OrbitFootprint(number(row[0]), [
-          for (int i = 0; i < coords.length; i += 2)
-            Offset(number(coords[i]), number(coords[i + 1])),
-        ]),
+        OrbitFootprint(
+          number(row[0]),
+          [
+            for (int i = 0; i < coords.length; i += 2)
+              Offset(number(coords[i]), number(coords[i + 1])),
+          ],
+          row.length > 2 && row[2] is Map
+              ? BuildingAppearance.fromJson(row[2] as Map)
+              : const BuildingAppearance(),
+        ),
       );
     }
     final grid = (data['grid'] as List).map(number).toList();

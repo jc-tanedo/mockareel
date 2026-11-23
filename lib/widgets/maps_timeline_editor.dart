@@ -1,3 +1,5 @@
+import 'orbit_map.dart';
+import '../model/orbit_scene.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
@@ -25,6 +27,7 @@ class MapsTimelineEditor extends StatelessWidget {
   final VoidCallback onSettings, onEditLocation;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
+  final ValueChanged<OrbitScene> onShuffleWall;
 
   const MapsTimelineEditor({
     super.key,
@@ -43,6 +46,7 @@ class MapsTimelineEditor extends StatelessWidget {
     required this.onEditLocation,
     required this.onChanged,
     required this.onPreviewUpdated,
+    required this.onShuffleWall,
   });
 
   Widget _framingControl(
@@ -400,6 +404,39 @@ class MapsTimelineEditor extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ),
+                    if (project.isStreetview3d)
+                      OrbitSceneBuilder(
+                        path: project.clips[selectedIndex].streetview.mapPath,
+                        builder: (scene, failed) {
+                          final media = project.clips[selectedIndex].streetview;
+                          final count = scene?.walls.length ?? 0;
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              count == 1
+                                  ? 'Only one suitable wall'
+                                  : count == 0
+                                  ? 'Media at pin'
+                                  : '$count suitable walls',
+                            ),
+                            subtitle: Text(
+                              scene?.describeWall(media.wallId) ??
+                                  (failed
+                                      ? 'Could not read the saved geometry.'
+                                      : media.mapPath == null
+                                      ? 'Choose a pin with 3D geometry to place this clip.'
+                                      : 'Checking geometry…'),
+                            ),
+                            trailing: count > 1
+                                ? TextButton.icon(
+                                    icon: const Icon(Icons.shuffle),
+                                    label: const Text('Shuffle wall'),
+                                    onPressed: () => onShuffleWall(scene!),
+                                  )
+                                : null,
+                          );
+                        },
                       ),
                     if (timelineTool == 2 && project.isStreetview)
                       StreetviewInspector(

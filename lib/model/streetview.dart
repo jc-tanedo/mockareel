@@ -27,6 +27,14 @@ class OrbitLocation {
   }
 
   void assign(ReelClip clip) {
+    final media = clip.streetview;
+    if (media.locationId != id &&
+        (media.place.latitude != place.latitude ||
+            media.place.longitude != place.longitude ||
+            media.mapPath != mapPath)) {
+      media.wallId = null;
+      media.visitedWalls.clear();
+    }
     clip.streetview
       ..locationId = id
       ..locationSelected = true
@@ -164,6 +172,8 @@ class StreetviewSettings {
 class StreetviewMedia {
   PlaceDetails place;
   String? mapPath;
+  String? wallId;
+  List<String> visitedWalls;
   String walkMove;
   List<String> walkLayers;
   List<int> walkDepth;
@@ -196,6 +206,8 @@ class StreetviewMedia {
   StreetviewMedia({
     PlaceDetails? place,
     this.mapPath,
+    this.wallId,
+    List<String>? visitedWalls,
     this.walkMove = 'hold',
     List<String>? walkLayers,
     List<int>? walkDepth,
@@ -223,7 +235,8 @@ class StreetviewMedia {
     this.transition = 'arrow',
     this.arrow = 'right',
     this.transitionSeconds = .45,
-  }) : walkLayers = walkLayers ?? [],
+  }) : visitedWalls = visitedWalls ?? [],
+       walkLayers = walkLayers ?? [],
        walkDepth = walkDepth ?? [],
        slowZoom = slowZoom ?? panZoom,
        slowPan = slowPan ?? panZoom,
@@ -235,6 +248,8 @@ class StreetviewMedia {
     locationId: j['locationId'] as String?,
     locationOrigin: j['locationOrigin'] as String? ?? '',
     mapPath: j['mapPath'] as String?,
+    wallId: j['wallId'] as String?,
+    visitedWalls: (j['visitedWalls'] as List?)?.whereType<String>().toList(),
     walkDepth: switch (j['walkDepth']) {
       final List d
           when d.length == 1024 &&
@@ -276,6 +291,8 @@ class StreetviewMedia {
   Map<String, dynamic> toJson() => {
     'place': place.toJson(),
     'mapPath': mapPath,
+    if (wallId != null) 'wallId': wallId,
+    if (visitedWalls.isNotEmpty) 'visitedWalls': visitedWalls,
     if (walkLayers.length == 3) 'walkLayers': walkLayers,
     if (walkDepth.length == 1024) 'walkDepth': walkDepth,
     if (walkMove != 'hold') 'walkMove': walkMove,

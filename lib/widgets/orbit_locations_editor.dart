@@ -312,7 +312,9 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                                     clips.firstOrNull?.streetview.mapPath ??
                                     selected.mapPath,
                                 builder: (scene, failed) => Text(
-                                  scene?.placementDescription ??
+                                  scene?.describeWall(
+                                        clips.firstOrNull?.streetview.wallId,
+                                      ) ??
                                       (failed
                                           ? 'Could not read the saved geometry.'
                                           : 'Checking media placement…'),

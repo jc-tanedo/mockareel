@@ -121,11 +121,17 @@ class OrbitJourneyCanvas extends StatelessWidget {
             final pose = travelling
                 ? (incoming ? dolly.arrival : dolly.departure)
                 : active && mapHandoff
-                ? OrbitMediaPose.mapFlight(geometry, world, returning: back)
+                ? OrbitMediaPose.mapFlight(
+                    geometry,
+                    world,
+                    returning: back,
+                    wallId: item.streetview.wallId,
+                  )
                 : OrbitMediaPose.at(
                     active ? scene.kind : 'media',
                     active ? fraction : 0,
                     scene: geometry,
+                    wallId: item.streetview.wallId,
                   );
             final map = Stack(
               fit: StackFit.expand,
@@ -205,7 +211,12 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     opacity: travelling && active ? 1 - blend : hudOpacity,
                     child: Transform(
                       transform: pose.groundFrom(
-                        OrbitMediaPose.at('media', 1, scene: geometry),
+                        OrbitMediaPose.at(
+                          'media',
+                          1,
+                          scene: geometry,
+                          wallId: item.streetview.wallId,
+                        ),
                       ),
                       child: Stack(
                         fit: StackFit.expand,
@@ -344,11 +355,13 @@ class OrbitJourneyCanvas extends StatelessWidget {
                         back ? source : geometry,
                         world,
                         returning: back,
+                        wallId: settings.wallId,
                       );
                       final overhead = OrbitMediaPose.mapFlight(
                         back ? source : geometry,
                         0,
                         returning: back,
+                        wallId: settings.wallId,
                       );
                       return Opacity(
                         opacity: mapOpacity,

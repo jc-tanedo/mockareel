@@ -19,6 +19,7 @@ class TimelinePreview extends StatefulWidget {
   final int selected;
   final double maxHeight;
   final bool startAtBeginning;
+  final double? initialPosition;
   final bool loop;
   final bool autoPlay;
   const TimelinePreview({
@@ -26,6 +27,7 @@ class TimelinePreview extends StatefulWidget {
     required this.project,
     this.selected = 0,
     this.startAtBeginning = false,
+    this.initialPosition,
     this.maxHeight = 420,
     this.loop = true,
     this.autoPlay = true,
@@ -92,7 +94,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_tick);
-    _position = _selectedStart;
+    _position = widget.initialPosition ?? _selectedStart;
   }
 
   @override

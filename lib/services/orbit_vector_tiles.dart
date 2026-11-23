@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:pmtiles/pmtiles.dart';
 import 'package:vector_tile/vector_tile.dart';
 import 'orbit_buildings.dart';
+import '../model/building_appearance.dart';
 
 typedef MapDownload = Future<Uint8List> Function(http.Client, Uri);
 
@@ -176,8 +177,25 @@ class OrbitVectorTiles {
           final feature = OrbitGeometry.fromRing(
             height,
             points,
+            appearance: BuildingAppearance.read(
+              wall:
+                  props['facade_color']?.value ??
+                  props['building:colour']?.value,
+              roof: props['roof_color']?.value ?? props['roof:colour']?.value,
+              wallMaterial:
+                  props['facade_material']?.value ??
+                  props['building:material']?.value,
+              roofMaterial:
+                  props['roof_material']?.value ??
+                  props['roof:material']?.value,
+            ),
             contributors: {
-              for (final k in ['@geometry_source', '@height_source'])
+              for (final k in [
+                '@geometry_source',
+                '@height_source',
+                '@facade_color_source',
+                '@roof_color_source',
+              ])
                 if (props[k]?.value case final String name
                     when name.isNotEmpty && name.length <= 160)
                   name,

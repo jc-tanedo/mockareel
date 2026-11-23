@@ -42,7 +42,7 @@ Uint8List archiveFor(
       y = (1 - log(tan(phi) + 1 / cos(phi)) / pi) * .5 * n;
   final feature = mvt.createVectorTileFeature(
     type: mvt.VectorTile_GeomType.POLYGON,
-    tags: [0, 0],
+    tags: [0, 0, 1, 1],
     geometry: [
       9,
       ((x % 1) * 4096).round() * 2,
@@ -64,8 +64,11 @@ Uint8List archiveFor(
             name: layer,
             extent: 4096,
             version: 2,
-            keys: [heightKey],
-            values: [mvt.createVectorTileValue(doubleValue: 32)],
+            keys: [heightKey, 'facade_color'],
+            values: [
+              mvt.createVectorTileValue(doubleValue: 32),
+              mvt.createVectorTileValue(stringValue: "#a53"),
+            ],
             features: [feature],
           ),
         ],
@@ -128,6 +131,7 @@ void main() {
       });
       expect(ranges, 2);
       expect(scene.shapes.single.height, 32);
+      expect(scene.shapes.single.appearance.wall, 0xaa5533);
       expect(scene.shapes.single.points.any((p) => p.distance < 2), true);
       expect(scene.credit, contains(japan ? 'PLATEAU' : 'Overture'));
     });
@@ -201,7 +205,11 @@ void main() {
             'elements': [
               for (final x in [lon, lon + .001])
                 {
-                  'tags': {'building': 'yes', 'building:levels': 2},
+                  'tags': {
+                    'building': 'yes',
+                    'building:levels': 2,
+                    'roof:colour': '#283951',
+                  },
                   'geometry': [
                     for (final p in square(x)) {'lon': p[0], 'lat': p[1]},
                   ],
@@ -214,6 +222,7 @@ void main() {
       return http.Response('', 404);
     });
     expect(scene.shapes.map((f) => f.height), [24, 6]);
+    expect(scene.shapes.map((f) => f.appearance.roof), [0x283951, 0x283951]);
     expect(scene.credit, contains('IGN'));
     expect(scene.credit, contains('OpenStreetMap'));
     expect(scene.credit, isNot(contains('Overture')));

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import 'orbit_buildings.dart';
+import '../model/building_appearance.dart';
 import 'orbit_vector_tiles.dart';
 
 class OpenOrbitMap {
@@ -123,6 +124,10 @@ class OpenOrbitMap {
         final shape = OrbitGeometry.fromRing(
           orbitBuildingHeight(props?['hauteur'], props?['nombre_d_etages']),
           points,
+          appearance: BuildingAppearance.read(
+            wallMaterial: props?['materiaux_des_murs'],
+            roofMaterial: props?['materiaux_de_la_toiture'],
+          ),
         );
         if (shape != null) shapes.add(shape);
       }
@@ -157,7 +162,16 @@ class OpenOrbitMap {
             : tags['natural'] == 'water'
             ? -3
             : -2;
-        final feature = OrbitGeometry.fromRing(height.toDouble(), coords);
+        final feature = OrbitGeometry.fromRing(
+          height.toDouble(),
+          coords,
+          appearance: BuildingAppearance.read(
+            wall: tags['building:colour'] ?? tags['building:color'],
+            roof: tags['roof:colour'] ?? tags['roof:color'],
+            wallMaterial: tags['building:material'],
+            roofMaterial: tags['roof:material'],
+          ),
+        );
         if (feature != null) shapes.add(feature);
       }
     }

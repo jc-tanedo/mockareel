@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/orbit_media_pose.dart';
+import 'package:mockareel/model/building_appearance.dart';
 import 'package:mockareel/model/orbit_dolly.dart';
 import 'package:mockareel/widgets/streetview_arrows.dart';
 import 'package:mockareel/model/orbit_scene.dart';
@@ -244,28 +245,28 @@ void main() {
     'buildings on the camera side can cover pixels inside the media plane',
     () async {
       final pose = OrbitMediaPose.at('media', .5);
-      Future<int> painted(OrbitScene map) async {
+      Future<ByteData> painted(
+        OrbitScene map, {
+        required bool dark,
+        required bool foreground,
+      }) async {
         final recorder = ui.PictureRecorder();
         OrbitPainter(
           map,
           pose.progress,
-          false,
+          dark,
           zoom: pose.zoom,
           camera: pose,
-          foregroundOnly: true,
+          foregroundOnly: foreground,
         ).paint(Canvas(recorder), const Size(360, 640));
         final picture = recorder.endRecording();
         final image = await picture.toImage(360, 640);
         final data = (await image.toByteData(
           format: ui.ImageByteFormat.rawRgba,
         ))!;
-        final pixels = [
-          for (int i = 3; i < data.lengthInBytes; i += 4)
-            if (data.getUint8(i) > 0) i,
-        ];
         image.dispose();
         picture.dispose();
-        return pixels.length;
+        return data;
       }
 
       final behind = OrbitScene(
@@ -273,8 +274,34 @@ void main() {
         city.grid,
         'Behind',
       );
-      expect(await painted(city), greaterThan(10));
-      expect(await painted(behind), 0);
+      final colored = OrbitScene(
+        [
+          OrbitFootprint(
+            100,
+            roof.points,
+            const BuildingAppearance(wall: 0x2255dd, roof: 0x2233dd),
+          ),
+        ],
+        city.grid,
+        'Mapped',
+      );
+      for (final dark in [false, true]) {
+        final base = await painted(colored, dark: dark, foreground: false);
+        final front = await painted(colored, dark: dark, foreground: true);
+        final back = await painted(behind, dark: dark, foreground: true);
+        int matching = 0;
+        for (int i = 0; i < front.lengthInBytes; i += 4) {
+          if (back.getUint8(i + 3) != 0) {
+            fail('Rear building crossed the media plane');
+          }
+          if (front.getUint8(i + 3) != 255) continue;
+          if (front.getUint32(i) == base.getUint32(i) &&
+              front.getUint8(i + 2) > front.getUint8(i) + 40) {
+            matching++;
+          }
+        }
+        expect(matching, greaterThan(10));
+      }
     },
   );
 

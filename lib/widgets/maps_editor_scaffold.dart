@@ -1,3 +1,4 @@
+import '../model/orbit_scene.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -54,6 +55,7 @@ class MapsEditorScaffold extends StatelessWidget {
   final VoidCallback onBackup;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
+  final ValueChanged<OrbitScene> onShuffleWall;
   final Widget Function(double height) previewBuilder;
   final Widget captureStage;
   final Widget exportPreview;
@@ -102,6 +104,7 @@ class MapsEditorScaffold extends StatelessWidget {
     required this.onBackup,
     required this.onChanged,
     required this.onPreviewUpdated,
+    required this.onShuffleWall,
     required this.previewBuilder,
     required this.captureStage,
     required this.exportPreview,
@@ -230,6 +233,7 @@ class MapsEditorScaffold extends StatelessWidget {
                             onBackup: onBackup,
                             onChanged: onChanged,
                             onPreviewUpdated: onPreviewUpdated,
+                            onShuffleWall: onShuffleWall,
                           ),
                         ),
                 ),

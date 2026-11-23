@@ -11,8 +11,21 @@ void main() {
   ]) {
     test(name, () async {
       final scene = OrbitScene.decode(await OpenOrbitMap.fetch(lat, lon));
+      final buildings = scene.shapes.where((f) => f.height > 0);
+      final colors = buildings
+          .where((f) => f.appearance.wall != null || f.appearance.roof != null)
+          .length;
+      final materials = buildings
+          .where(
+            (f) =>
+                f.appearance.wallMaterial != null ||
+                f.appearance.roofMaterial != null,
+          )
+          .length;
       // ignore: avoid_print
-      print('$name | ${scene.coverage} | ${scene.credit}');
+      print(
+        '$name | ${scene.coverage} | ${scene.walls.length} suitable walls | $colors with color, $materials with material | ${scene.credit}',
+      );
       expect(scene.shapes.any((s) => s.height > 0), isTrue);
     }, timeout: const Timeout(Duration(seconds: 60)));
   }

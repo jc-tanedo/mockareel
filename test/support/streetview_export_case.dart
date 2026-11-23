@@ -23,9 +23,10 @@ void testStreetviewExport(
   String transition, {
   bool smallImageCache = false,
   bool orbit = false,
+  bool samePin = false,
 }) {
   testWidgets(
-    'Streetview $transition MP4 preserves media (small cache: $smallImageCache)',
+    'Streetview $transition MP4 preserves media (small cache: $smallImageCache, same pin: $samePin)',
     (tester) async {
       final cache = PaintingBinding.instance.imageCache;
       final cacheLimit = cache.maximumSizeBytes;
@@ -107,12 +108,12 @@ void testStreetviewExport(
                 duration: .5,
                 streetview: StreetviewMedia(
                   place: PlaceDetails(
-                    name: 'Place $i',
-                    address: 'Address $i',
+                    name: samePin ? 'Station' : 'Place $i',
+                    address: samePin ? 'Shared pin' : 'Address $i',
                     latitude: 35.0,
-                    longitude: 139.0 + i * .002,
+                    longitude: samePin ? 139 : 139.0 + i * .002,
                   ),
-                  mapPath: i == 1 ? wallAsset.path : mapAsset.path,
+                  mapPath: i == 1 || samePin ? wallAsset.path : mapAsset.path,
                   walkDepth: orbit && i == 0
                       ? List.generate(1024, (n) => n % 256)
                       : [],
@@ -127,6 +128,16 @@ void testStreetviewExport(
           ],
         );
         if (orbit) {
+          // Pin the composition for pixel assertions. The editor migration and
+          // shuffle-order tests exercise random assignment separately.
+          final firstScene = await OrbitScene.load(
+            p.clips.first.streetview.mapPath!,
+          );
+          final lastScene = await OrbitScene.load(
+            p.clips.last.streetview.mapPath!,
+          );
+          p.clips.first.streetview.wallId = firstScene.walls.keys.first;
+          p.clips.last.streetview.wallId = lastScene.walls.keys.last;
           p.streetview.adoptClipLocations(p.clips);
           p.streetview.locations.last.overviewPath = mapPhoto.path;
         }
@@ -219,7 +230,12 @@ void testStreetviewExport(
                     p.clips[i].streetview.mapPath!,
                   );
                   return MatrixUtils.transformPoint(
-                        OrbitMediaPose.at('media', time, scene: scene).matrix,
+                        OrbitMediaPose.at(
+                          'media',
+                          time,
+                          scene: scene,
+                          wallId: p.clips[i].streetview.wallId,
+                        ).matrix,
                         const Offset(180, 320),
                       ) *
                       3;
@@ -233,11 +249,14 @@ void testStreetviewExport(
                       x: from.dx.round(),
                       y: from.dy.round(),
                     ) &&
-                    !await hasMedia(
-                      flight[5],
-                      x: from.dx.round(),
-                      y: from.dy.round(),
-                    ) &&
+                    (samePin
+                        ? p.clips.first.streetview.wallId !=
+                              p.clips.last.streetview.wallId
+                        : !await hasMedia(
+                            flight[5],
+                            x: from.dx.round(),
+                            y: from.dy.round(),
+                          )) &&
                     await hasMedia(
                       flight.last,
                       x: to.dx.round(),
@@ -266,7 +285,12 @@ void testStreetviewExport(
                 p.clips.last.streetview.mapPath!,
               );
               final returning = frames[returnIndex] as List;
-              final lastReturn = OrbitMediaPose.at('media', 1, scene: wall);
+              final lastReturn = OrbitMediaPose.at(
+                'media',
+                1,
+                scene: wall,
+                wallId: p.clips.last.streetview.wallId,
+              );
               final center =
                   MatrixUtils.transformPoint(
                     lastReturn.matrix,
@@ -305,6 +329,7 @@ void testStreetviewExport(
                         'media',
                         f / 30 / p.clips.last.duration,
                         scene: wall,
+                        wallId: p.clips.last.streetview.wallId,
                       ).native,
                     ),
                   ).every((matches) => matches);

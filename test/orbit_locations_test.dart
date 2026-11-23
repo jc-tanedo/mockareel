@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/project.dart';
+import 'package:mockareel/model/orbit_scene.dart';
+import 'package:mockareel/services/orbit_wall_placement.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/model/maps_web_result.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:mockareel/pages/maps_web_search_page.dart';
@@ -164,6 +167,24 @@ void main() {
         project.clips.map((c) => c.streetview.mapPath),
         everyElement(target.mapPath),
       );
+      for (
+        int i = 0;
+        i < 80 && project.clips.any((c) => c.streetview.wallId == null);
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(
+        project.clips.map((c) => c.streetview.wallId),
+        everyElement(isNotNull),
+      );
+      expect(
+        project.clips.first.streetview.wallId,
+        isNot(project.clips.last.streetview.wallId),
+      );
       final locationPicker = tester.widget<OrbitLocationPicker>(
         find.byType(OrbitLocationPicker),
       );
@@ -256,6 +277,33 @@ void main() {
       );
       expect(clip.streetview.mapPath, location.mapPath);
       expect(clip.streetview.streetviewTitle, 'Artist title');
+      await until(() => clip.streetview.wallId != null);
+      await tester.tap(find.text('Clips').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final shuffle = find.text('Shuffle wall');
+      await until(() => shuffle.evaluate().isNotEmpty);
+      await tester.ensureVisible(shuffle);
+      await tester.pump();
+      final previous = clip.streetview.wallId;
+      await tester.tap(shuffle);
+      await tester.pump();
+      expect(clip.streetview.wallId, isNot(previous));
+      expect(
+        tester
+            .widget<TimelinePreview>(find.byType(TimelinePreview))
+            .initialPosition,
+        closeTo(
+          project.streetview.openingMapSeconds + .85 * clip.duration,
+          1e-7,
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        (await store.restore()).clips.single.streetview.wallId,
+        clip.streetview.wallId,
+      );
+
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -323,7 +371,21 @@ void main() {
       plan.addClipsAt(locations[1], p.clips, [clip('kyoto')]);
       plan.addClipsAt(locations[0], p.clips, [clip('tokyo1'), clip('tokyo2')]);
       plan.addClipsAt(locations[0], p.clips, [clip('tokyo3')]);
+      final scene = await OrbitScene.load(locations.first.mapPath!);
+      final placement = OrbitWallPlacement();
+      for (final c in p.clips) {
+        placement.choose(c, p.clips, scene);
+      }
+      placement.choose(p.clips.first, p.clips, scene, shuffle: true);
       final restored = await store.importBackup(await store.backup(p));
+      expect(
+        restored.clips.map((c) => c.streetview.wallId),
+        p.clips.map((c) => c.streetview.wallId),
+      );
+      expect(
+        restored.clips.first.streetview.visitedWalls,
+        p.clips.first.streetview.visitedWalls,
+      );
       expect(restored.clips.map((c) => c.name), [
         'tokyo1',
         'tokyo2',

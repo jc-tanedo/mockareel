@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import '../services/open_orbit_map.dart';
+import '../model/orbit_scene.dart';
+import '../model/streetview_timeline.dart';
+import '../services/orbit_wall_placement.dart';
 import '../services/static_map.dart';
 import '../widgets/orbit_capture.dart';
 import 'dart:math';
@@ -65,6 +68,54 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Timer? _autosave;
   OrbitLocation? _location;
   OrbitLocation? _fetchingGeometry;
+  final _wallPlacement = OrbitWallPlacement();
+  final _checkedPlacement = Expando<(String?, String?, double?, double?)>();
+  (String?, String?, double?, double?) _placementSource(
+    StreetviewMedia media,
+  ) => (
+    media.mapPath,
+    media.locationId,
+    media.place.latitude,
+    media.place.longitude,
+  );
+  String? _wallPreviewRevision;
+
+  Future<void> _prepareWalls() async {
+    final project = _project;
+    if (!project.isStreetview3d) return;
+    var changed = false;
+    for (final clip in List.of(project.clips)) {
+      final path = clip.streetview.mapPath;
+      final source = _placementSource(clip.streetview);
+      if (path == null || _checkedPlacement[clip] == source) continue;
+      final OrbitScene scene;
+      try {
+        scene = await OrbitScene.load(path);
+      } catch (_) {
+        // The location card reports unreadable captures and offers replacement.
+        continue;
+      }
+      if (!mounted || project != _project) return;
+      if (_placementSource(clip.streetview) != source ||
+          !project.clips.contains(clip) ||
+          _checkedPlacement[clip] == source) {
+        continue;
+      }
+      changed = _wallPlacement.choose(clip, project.clips, scene) || changed;
+      _checkedPlacement[clip] = source;
+    }
+    if (changed && mounted) _markDirty();
+  }
+
+  void _shuffleWall(OrbitScene scene) {
+    final clip = _project.clips[_selected];
+    if (!_wallPlacement.choose(clip, _project.clips, scene, shuffle: true)) {
+      return;
+    }
+    _wallPreviewRevision = _previewRevision = newId();
+    _change();
+  }
+
   final _failedPins = <(String, double?, double?)>{};
   (String, double?, double?) _pin(OrbitLocation l) =>
       (l.id, l.place.latitude, l.place.longitude);
@@ -186,6 +237,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       _setProject(project);
       setState(() => _ready = true);
       if (located) _change();
+      unawaited(_prepareWalls());
       unawaited(_fetchMissingGeometry());
       // File checks may take a while on restored projects. Show the editor
       // immediately and repair only references that still match the saved path.
@@ -250,8 +302,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   void _change() {
     if (!mounted) return;
     _form.saveTo(_project.place);
-    _editRevision++;
+    unawaited(_prepareWalls());
     unawaited(_fetchMissingGeometry());
+    _markDirty();
+  }
+
+  void _markDirty() {
+    _editRevision++;
     setState(() => _dirty = true);
     _autosave?.cancel();
     _autosave = Timer(
@@ -263,6 +320,9 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Future<bool> _save({bool silent = false}) async {
     _autosave?.cancel();
     try {
+      await _prepareWalls();
+      if (!mounted) return false;
+      _autosave?.cancel();
       final revision = _editRevision;
       await _store.save(_project);
       if (!mounted || revision != _editRevision) return false;
@@ -703,6 +763,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       onBackup: _backup,
       onChanged: _change,
       onPreviewUpdated: _updatePreview,
+      onShuffleWall: _shuffleWall,
       previewBuilder: (height) => _preview(maxHeight: height),
       captureStage: OffscreenCaptureStage(
         captureKey: _captureKey,
@@ -718,6 +779,12 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           key: ValueKey(_previewRevision),
           project: _project,
           selected: _selected,
+          initialPosition:
+              _previewRevision == _wallPreviewRevision &&
+                  _project.clips.isNotEmpty
+              ? StreetviewTimeline.mediaStart(_project, _selected) +
+                    _project.clips[_selected].duration * .85
+              : null,
           startAtBeginning: _project.isStreetview && _selected == 0,
           maxHeight: maxHeight,
         );

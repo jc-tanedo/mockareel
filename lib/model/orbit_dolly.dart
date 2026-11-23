@@ -40,8 +40,18 @@ class OrbitDolly {
     OrbitScene? destination,
     double t,
   ) {
-    final start = OrbitMediaPose.at('media', 1, scene: source);
-    final end = OrbitMediaPose.at('media', 0, scene: destination);
+    final start = OrbitMediaPose.at(
+      'media',
+      1,
+      scene: source,
+      wallId: from.wallId,
+    );
+    final end = OrbitMediaPose.at(
+      'media',
+      0,
+      scene: destination,
+      wallId: to.wallId,
+    );
     final pins = _pinOffset(from.place, to.place);
     final samePin = pins != null && pins.distance < 1;
     final shared =
@@ -54,7 +64,7 @@ class OrbitDolly {
     final fallback =
         Offset(cos(start.heading), -sin(start.heading)) * (side * .8) -
         Offset(sin(start.heading), cos(start.heading)) * .6;
-    final repeated = shared || samePin;
+    final repeated = (shared || samePin) && start.mount?.id == end.mount?.id;
     // Both map grids span 1.2 km. Compress the missing middle of longer trips.
     final displacement = pins ?? (shared ? Offset.zero : fallback * 150);
     final span = displacement.distance;
@@ -127,10 +137,6 @@ class OrbitDolly {
 
     final outgoing = x == 0 ? start : local(start, sourceFocus, sourceHeight);
     final incoming = x == 1 ? end : local(end, destFocus, destHeight);
-    if (shared) {
-      final pose = x == 1 ? end : outgoing;
-      return OrbitDolly._(pose, pose, true);
-    }
-    return OrbitDolly._(outgoing, incoming, false);
+    return OrbitDolly._(outgoing, incoming, shared);
   }
 }

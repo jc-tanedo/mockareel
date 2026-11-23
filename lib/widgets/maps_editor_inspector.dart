@@ -1,3 +1,4 @@
+import '../model/orbit_scene.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
@@ -37,6 +38,7 @@ class MapsEditorInspector extends StatelessWidget {
   final VoidCallback onSettings;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
+  final ValueChanged<OrbitScene> onShuffleWall;
 
   const MapsEditorInspector({
     super.key,
@@ -68,6 +70,7 @@ class MapsEditorInspector extends StatelessWidget {
     required this.onSettings,
     required this.onChanged,
     required this.onPreviewUpdated,
+    required this.onShuffleWall,
   });
 
   Widget _addMediaButton() => OutlinedButton.icon(
@@ -141,6 +144,7 @@ class MapsEditorInspector extends StatelessWidget {
         onMoveClip: onMoveClip,
         onChanged: onChanged,
         onPreviewUpdated: onPreviewUpdated,
+        onShuffleWall: onShuffleWall,
       ),
       3 => AudioEditor(
         project: project,

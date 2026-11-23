@@ -320,6 +320,7 @@ class MapsExportPipeline {
                           'media',
                           (f / 30) / scene.duration,
                           scene: geometry,
+                          wallId: clip.streetview.wallId,
                         ).native,
                     ],
                 }

@@ -236,19 +236,20 @@ class OrbitPainter extends CustomPainter {
                 depth(b.points[j]) + depth(b.points[(j + 1) % top.length]),
               ),
         );
+      final wallColor = b.color(roof: false, dark: dark);
       for (final i in sides) {
         final j = (i + 1) % top.length;
         final edge = b.points[j] - b.points[i];
         face(
           [bottom[i], bottom[j], top[j], top[i]],
           Color.lerp(
-            dark ? const Color(0xff3b5164) : const Color(0xff839198),
-            dark ? const Color(0xff8496a6) : const Color(0xffc5cacc),
-            .5 + .42 * cos(edge.direction),
+            wallColor,
+            const Color(0xff172431),
+            .21 - .16 * cos(edge.direction),
           )!,
         );
       }
-      face(top, dark ? const Color(0xff93a7b7) : const Color(0xffe9e6df));
+      face(top, b.color(roof: true, dark: dark));
     }
     if (!foregroundOnly) {
       canvas.drawCircle(origin, 5, brush..color = Colors.white);
@@ -424,7 +425,7 @@ class _PlanPainter extends CustomPainter {
             : feature.height == -2
             ? (dark ? const Color(0xff284942) : const Color(0xffb2d5aa))
             : buildings
-            ? (dark ? const Color(0xff37485b) : const Color(0xffd4d0c9))
+            ? feature.color(roof: true, dark: dark)
             : (dark ? const Color(0xff526070) : Colors.white);
         canvas.drawPath(feature.outline, brush);
       }
