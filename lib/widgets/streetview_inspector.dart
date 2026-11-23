@@ -83,7 +83,9 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     _s.locationOrigin = '';
     _s.locationSelected = true;
     _s.mapPath = null;
-    if (widget.project.isStreetview3d) {
+    if (widget.project.isStreetview3d &&
+        _s.place.latitude != null &&
+        _s.place.longitude != null) {
       OrbitLocationDefaults.inherit(widget.project.clips);
     }
     widget.onChanged();
@@ -110,6 +112,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           }
           place.latitude = coords.$1;
           place.longitude = coords.$2;
+          OrbitLocationDefaults.inherit(widget.project.clips);
           widget.onChanged();
         }
         final config = await MapsAdvancedSettings.load(

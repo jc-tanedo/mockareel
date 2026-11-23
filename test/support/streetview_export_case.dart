@@ -12,6 +12,7 @@ import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:mockareel/services/native_renderer.dart';
+import 'package:mockareel/services/media_edits.dart';
 import 'package:mockareel/services/project_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -293,6 +294,9 @@ void testStreetviewExport(
         await dir.delete(recursive: true);
       });
       await tester.runAsync(() async {
+        // Complete the real file copy and edit debounce before widget pumping
+        // switches to the fake clock. The encoder still consumes the same asset.
+        await EditedMedia.instance.prepare(p.clips[1]);
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData.dark(useMaterial3: true),
