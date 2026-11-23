@@ -9,6 +9,7 @@ class StaticMapService {
     PlaceDetails place,
     String key, {
     int zoom = 15,
+    bool portrait = false,
   }) async {
     if (key.trim().isEmpty) {
       throw const FormatException(
@@ -33,7 +34,7 @@ class StaticMapService {
               'center': coordinates,
               'markers': 'color:red|$coordinates',
               'zoom': '${zoom.clamp(1, 20)}',
-              'size': '640x400',
+              'size': portrait ? '416x638' : '640x400',
               'scale': '2',
               'maptype': 'roadmap',
               'key': key.trim(),

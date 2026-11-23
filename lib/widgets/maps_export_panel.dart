@@ -144,7 +144,9 @@ class MapsExportPanel extends StatelessWidget {
                       Expanded(
                         child: Text(
                           missingClip != null
-                              ? 'This clip needs a captured map.'
+                              ? project.isStreetview3d
+                                    ? '3D geometry is missing for clip ${missingClip + 1}.'
+                                    : 'This clip needs a captured map.'
                               : 'Your map header needs an image.',
                           style: textTheme.bodySmall?.copyWith(
                             color: colors.onSecondaryContainer,
@@ -156,6 +158,8 @@ class MapsExportPanel extends StatelessWidget {
                         child: Text(
                           missingClip == null
                               ? 'Set up header'
+                              : project.isStreetview3d
+                              ? 'View location'
                               : 'Capture map for clip ${missingClip + 1}',
                         ),
                       ),

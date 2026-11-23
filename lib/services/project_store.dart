@@ -165,16 +165,18 @@ class ProjectStore {
         for (final clip in clips) clip['streetview'] as Map,
         ...?(data['streetview']['locations'] as List?)?.cast<Map>(),
       ]) {
-        final path = fields['mapPath'] as String?;
-        if (path == null) continue;
-        var relative = maps[path];
-        if (relative == null) {
-          relative =
-              'media/streetview-map-${maps.length}.${path.split('.').last}';
-          maps[path] = relative;
-          await encoder.addFile(File(path), relative);
+        for (final key in ['mapPath', 'overviewPath']) {
+          final path = fields[key] as String?;
+          if (path == null) continue;
+          var relative = maps[path];
+          if (relative == null) {
+            relative =
+                'media/streetview-map-${maps.length}.${path.split('.').last}';
+            maps[path] = relative;
+            await encoder.addFile(File(path), relative);
+          }
+          fields[key] = relative;
         }
-        fields['mapPath'] = relative;
       }
       if (project.feed.homeMedia != null) {
         final home = project.feed.homeMedia!;
@@ -265,11 +267,13 @@ class ProjectStore {
           ...?((json['streetview'] as Map?)?['locations'] as List?)
               ?.cast<Map>(),
         ]) {
-          final source = fields['mapPath'] as String?;
-          if (source == null) continue;
-          final restored = restoredMaps[source] ?? await restoreExtra(source);
-          restoredMaps[source] = restored;
-          fields['mapPath'] = restored;
+          for (final key in ['mapPath', 'overviewPath']) {
+            final source = fields[key] as String?;
+            if (source == null) continue;
+            final restored = restoredMaps[source] ?? await restoreExtra(source);
+            restoredMaps[source] = restored;
+            fields[key] = restored;
+          }
         }
         final home = (json['feed'] as Map?)?['homeMedia'] as Map?;
         if (home != null) {

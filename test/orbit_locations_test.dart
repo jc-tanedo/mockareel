@@ -8,6 +8,7 @@ import 'package:mockareel/model/maps_web_result.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:mockareel/pages/maps_web_search_page.dart';
 import 'package:mockareel/services/project_store.dart';
+import 'package:mockareel/services/open_orbit_map.dart';
 import 'package:mockareel/widgets/orbit_location_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,14 +29,37 @@ void main() {
       final store = _PhotoStore();
       var project = ReelProject(template: 'streetview-3d');
       final nav = GlobalKey<NavigatorState>();
+      var kyotoAttempts = 0;
       Future<void> show() async {
         await tester.pumpWidget(
           MaterialApp(
             navigatorKey: nav,
-            home: MapsEditorPage(store: store, initialProject: project),
+            home: MapsEditorPage(
+              store: store,
+              initialProject: project,
+              fetchGeometry: (lat, lon) async {
+                if (lat == 35 && ++kyotoAttempts == 1) {
+                  throw const FormatException('offline');
+                }
+                return OpenOrbitMap.fetch(
+                  OpenOrbitMap.tokyoLat,
+                  OpenOrbitMap.tokyoLon,
+                );
+              },
+            ),
           ),
         );
         await tester.pump();
+        for (
+          int i = 0;
+          i < 50 && find.text('Choose journey locations').evaluate().isEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
         await tester.pump(const Duration(milliseconds: 400));
       }
 
@@ -59,16 +83,11 @@ void main() {
       );
       await show();
       expect(find.text('Choose journey locations'), findsOneWidget);
-      await tester.tap(find.text('Use Tokyo Station'));
-      await tester.pump();
       final dir = Directory.systemTemp.createTempSync('planned-orbit-');
       addTearDown(() => dir.deleteSync(recursive: true));
       Directory('${dir.path}/media').createSync();
       store.root = dir;
-      final capture = find.text('Capture map');
-      await tester.ensureVisible(capture);
-      await tester.pump();
-      await tester.tap(capture);
+      await tester.tap(find.text('Use Tokyo Station'));
       await tester.pump();
       for (
         var i = 0;
@@ -96,6 +115,22 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Geometry download failed'), findsOneWidget);
+      await tester.ensureVisible(find.text('Retry geometry'));
+      await tester.tap(find.text('Retry geometry'));
+      for (
+        var i = 0;
+        i < 100 && project.streetview.locations.last.mapPath == null;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(kyotoAttempts, 2);
+      expect(find.text('3D geometry saved'), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
       expect(picks, 0);
       expect(project.clips, isEmpty);
@@ -155,6 +190,7 @@ void main() {
           OrbitLocation(
             place: PlaceDetails(name: name),
             mapPath: 'assets/streetview3d/tokyo.json',
+            overviewPath: 'assets/brand/mockareel-mark.png',
           ),
       ];
       plan.locations.addAll(locations);
@@ -188,6 +224,11 @@ void main() {
         ...restored.clips.map((c) => c.streetview.mapPath),
       };
       expect(paths, hasLength(1));
+      final overviews = restored.streetview.locations
+          .map((l) => l.overviewPath)
+          .toSet();
+      expect(overviews, hasLength(1));
+      expect(File(overviews.single!).existsSync(), true);
       expect(paths.single, startsWith(dir.path));
       expect(
         File(paths.single!).readAsStringSync(),

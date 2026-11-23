@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/orbit_media_pose.dart';
+import 'package:mockareel/model/orbit_dolly.dart';
+import 'package:mockareel/widgets/streetview_arrows.dart';
 import 'package:mockareel/model/orbit_scene.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_timeline.dart';
@@ -21,6 +24,12 @@ void main() {
   ]);
   final city = OrbitScene([roof], List.filled(625, 0), 'City');
 
+  StreetviewMedia pin(double lat, double lon) => StreetviewMedia(
+    place: PlaceDetails(latitude: lat, longitude: lon),
+  );
+  final source = pin(35, 139), destination = pin(35.001, 139.002);
+  OrbitDolly trip(OrbitScene world, double t) =>
+      OrbitDolly.between(source, destination, world, world, t);
   test(
     'mounted panel corners project onto the same exterior wall throughout the shot',
     () {
@@ -43,8 +52,8 @@ void main() {
         for (final pose in [
           OrbitMediaPose.at('map', .4, scene: scene),
           OrbitMediaPose.at('media', .5, scene: scene),
-          OrbitMediaPose.travel(scene, .6, -1),
-          OrbitMediaPose.travel(scene, .6, 1),
+          trip(scene, .6).arrival,
+          trip(scene, .6).departure,
           OrbitMediaPose.at('back', .8, scene: scene),
         ]) {
           final c = cos(pose.heading),
@@ -118,40 +127,72 @@ void main() {
     },
   );
   test(
-    'flight matches both media poses and responds to direction, roofs and terrain',
+    'the camera travels monotonically toward the next pin and both views agree in world space',
     () {
-      final hills = OrbitScene(
-        [],
-        List.generate(625, (i) => (i % 25) * 5.0),
-        'Hills',
-      );
-      for (final scene in [flat, hills, city]) {
-        for (final direction in [-1, 1]) {
-          for (final t in [0.0, 1.0]) {
-            final expected = OrbitMediaPose.at('media', 1 - t, scene: scene);
-            final pose = OrbitMediaPose.travel(scene, t, direction);
-            expect(pose.matrix.storage, expected.matrix.storage);
-            expect(pose.heading, expected.heading);
-          }
+      for (final scene in [flat, city]) {
+        final beginning = trip(scene, 0), ending = trip(scene, 1);
+        expect(
+          beginning.departure.matrix.storage,
+          OrbitMediaPose.at('media', 1, scene: scene).matrix.storage,
+        );
+        expect(
+          ending.arrival.matrix.storage,
+          OrbitMediaPose.at('media', 0, scene: scene).matrix.storage,
+        );
+        var last = -1.0;
+        for (final t in [.1, .3, .5, .7, .9]) {
+          final route = trip(scene, t), a = route.departure, b = route.arrival;
+          expect(a.focus.dx, greaterThan(last));
+          last = a.focus.dx;
+          expect(a.focus.dy, lessThan(0));
+          expect(
+            a.focus.dx - b.focus.dx,
+            closeTo(.002 * 111320 * cos(35.0005 * pi / 180), 1e-6),
+          );
+          expect(a.focus.dy - b.focus.dy, closeTo(-111.132, 1e-6));
+          expect(a.heading, closeTo(b.heading, 1e-10));
+          expect(a.zoom, closeTo(b.zoom, 1e-10));
         }
       }
-      final left = OrbitMediaPose.travel(city, .5, -1);
-      final right = OrbitMediaPose.travel(city, .5, 1);
-      expect(left.anchor.dx, greaterThan(180));
-      expect(right.anchor.dx, lessThan(180));
-      expect(left.turn, -right.turn);
-      final overFlat = OrbitMediaPose.travel(flat, .5, 1);
-      final overHills = OrbitMediaPose.travel(hills, .5, 1);
-      expect(right.distanceScale, lessThan(overFlat.distanceScale));
-      expect(right.lift, greaterThan(overFlat.lift));
-      expect(overHills.lift, isNot(overFlat.lift));
+      final wrapped = OrbitDolly.between(
+        pin(0, 179.999),
+        pin(0, -179.999),
+        flat,
+        flat,
+        .5,
+      );
+      expect(wrapped.departure.focus.dx, closeTo(111.32, .001));
+      final distant = OrbitDolly.between(
+        pin(40, -80),
+        pin(0, 50),
+        null,
+        null,
+        .5,
+      );
+      expect(distant.departure.focus.distance, closeTo(225, .001));
+      final atlas = OrbitScene(
+        [],
+        [],
+        'Atlas',
+        atlas: MemoryImage(Uint8List(1)),
+      );
+      expect(
+        OrbitDolly.between(
+          source,
+          destination,
+          atlas,
+          city,
+          .5,
+        ).arrival.zoom.isFinite,
+        true,
+      );
     },
   );
 
   test(
     'buildings on the camera side can cover pixels inside the media plane',
     () async {
-      final pose = OrbitMediaPose.travel(flat, .5, 1);
+      final pose = OrbitMediaPose.at('media', .5);
       Future<int> painted(OrbitScene map) async {
         final recorder = ui.PictureRecorder();
         OrbitPainter(
@@ -234,15 +275,32 @@ void main() {
       expect(find.byType(OrbitMapView), findsOneWidget);
       expect(
         tester.widget<OrbitMapView>(find.byType(OrbitMapView)).camera.turn,
-        greaterThan(0),
+        closeTo(0, 1e-8),
       );
+      p.clips.first.streetview.place = source.place;
+      p.clips.last.streetview.place = destination.place;
       p.clips.last.streetview.mapPath = other;
       await seek(.6);
       final views = tester
           .widgetList<OrbitMapView>(find.byType(OrbitMapView))
           .toList();
       expect(views, hasLength(2));
-      expect(views.first.camera.turn, -views.last.camera.turn);
+      expect(views.first.camera.focus.dx, greaterThan(0));
+      expect(views.last.camera.focus.dx, lessThan(0));
+      // The chevron center is the ground-projected layout center in the clip's 360x640 canvas.
+      final clipNode = find.byKey(const ValueKey('orbit-clip-a'));
+      final leftArrow = find
+          .descendant(of: clipNode, matching: find.byType(StreetviewArrow))
+          .first;
+      final box = tester.renderObject<RenderBox>(clipNode);
+      final actual = box.globalToLocal(tester.getCenter(leftArrow));
+      final expected = MatrixUtils.transformPoint(
+        views.first.camera.groundFrom(
+          OrbitMediaPose.at('media', 1, scene: views.first.scene),
+        ),
+        const Offset(63, 476),
+      );
+      expect((actual - expected).distance, lessThan(1e-6));
       await seek(29 / 30);
       expect(
         tester

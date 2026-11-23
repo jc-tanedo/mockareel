@@ -1,7 +1,10 @@
 import 'dart:math';
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/orbit_media_pose.dart';
+import '../model/orbit_dolly.dart';
+import '../model/streetview_layout.dart';
 import '../model/project.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
@@ -9,6 +12,7 @@ import 'media_frame.dart';
 import 'orbit_map.dart';
 import 'photo_walk_frame.dart';
 import 'streetview_arrows.dart';
+import 'streetview_map_scene.dart';
 
 class OrbitJourneyCanvas extends StatelessWidget {
   final ReelProject project;
@@ -38,6 +42,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
         media = scene.kind == 'media',
         back = scene.kind == 'back';
     final clip = project.clips[index], settings = clip.streetview;
+    final plan = scene.kind == 'map' || scene.kind == 'ending-map';
     // Leave at least three movement samples even for a short arrow tap.
     final lastFrame = ((scene.duration * 30).ceil() - 1) / 30;
     final tapSeconds = arrow
@@ -50,12 +55,8 @@ class OrbitJourneyCanvas extends StatelessWidget {
           )
         : 0.0;
     final direction = settings.arrow == 'left' ? -1 : 1;
-    final shared =
-        arrow &&
-        settings.mapPath != null &&
-        settings.mapPath == project.clips[index + 1].streetview.mapPath;
     final blend = Curves.easeInOut.transform(((t - .25) / .5).clamp(0.0, 1.0));
-    Widget shot(int i) {
+    Widget shot(int i, OrbitDolly? dolly) {
       final item = project.clips[i];
       final active = i == index, incoming = arrow && i == index + 1;
       final seconds = active
@@ -88,20 +89,12 @@ class OrbitJourneyCanvas extends StatelessWidget {
         child: OrbitSceneBuilder(
           path: path,
           builder: (geometry, failed) {
-            final flying =
-                arrow &&
-                (active || incoming) &&
-                geometry != null &&
-                geometry.atlas == null;
-            final pose = flying
-                ? OrbitMediaPose.travel(
-                    geometry,
-                    t,
-                    incoming && !shared ? -direction : direction,
-                  )
+            final travelling = dolly != null && (active || incoming);
+            final pose = travelling
+                ? (incoming ? dolly.arrival : dolly.departure)
                 : OrbitMediaPose.at(
-                    active ? scene.kind : 'media',
-                    active ? fraction : 0,
+                    active ? (back ? 'media' : scene.kind) : 'media',
+                    active ? (back ? 1 : fraction) : 0,
                     scene: geometry,
                   );
             final map = Stack(
@@ -138,13 +131,13 @@ class OrbitJourneyCanvas extends StatelessWidget {
             final world = Stack(
               fit: StackFit.expand,
               children: [
-                if (!(flying && shared && incoming))
+                if (!(travelling && dolly.sharedWorld && incoming))
                   if (timedHole)
                     ClipPath(clipper: _OutsidePlane(pose), child: map)
                   else
                     map,
                 Opacity(
-                  opacity: flying && active ? 1 - blend : 1,
+                  opacity: travelling && active ? 1 - blend : 1,
                   child: Transform(
                     transform: pose.matrix,
                     child: DecoratedBox(
@@ -157,7 +150,8 @@ class OrbitJourneyCanvas extends StatelessWidget {
                   ),
                 ),
                 if (geometry != null &&
-                    (pose.mount != null || (flying && t > 0 && t < 1)))
+                    geometry.atlas == null &&
+                    (pose.mount != null || (travelling && t > 0 && t < 1)))
                   IgnorePointer(
                     child: Opacity(
                       opacity: pose.mount != null
@@ -175,34 +169,57 @@ class OrbitJourneyCanvas extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (item.streetview.showArrows && (media || arrow || back))
+                  Opacity(
+                    opacity: travelling && active ? 1 - blend : 1,
+                    child: Transform(
+                      transform: pose.groundFrom(
+                        OrbitMediaPose.at('media', 1, scene: geometry),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const StreetviewArrows(),
+                          if (arrow && active && elapsed < tapSeconds)
+                            _TapRipple(
+                              center: Offset(
+                                direction < 0
+                                    ? StreetviewLayout.arrowLeft +
+                                          StreetviewLayout.arrowWidth / 2
+                                    : StreetviewLayout.width -
+                                          StreetviewLayout.arrowLeft -
+                                          StreetviewLayout.arrowWidth / 2,
+                                StreetviewLayout.arrowTop +
+                                    StreetviewLayout.arrowHeight / 2,
+                              ),
+                              progress: elapsed / tapSeconds,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             );
-            final opacity = active
-                ? (flying ? 1.0 : 1 - t)
-                : incoming
-                ? (flying ? blend : t)
-                : 0.0;
             return Opacity(
-              opacity: opacity,
-              child: Transform.translate(
-                offset: Offset(
-                  arrow && !flying
-                      ? direction * (active ? -t : 1 - t) * 110
-                      : 0,
-                  0,
-                ),
-                child: world,
-              ),
+              opacity: active
+                  ? 1
+                  : incoming
+                  ? blend
+                  : 0,
+              child: world,
             );
           },
         ),
       );
     }
 
-    final label = settings.streetviewTitle.isNotEmpty
-        ? settings.streetviewTitle
-        : settings.place.name;
-    final place = settings.place;
+    final chrome = arrow && blend >= .5
+        ? project.clips[index + 1].streetview
+        : settings;
+    final label = chrome.streetviewTitle.isNotEmpty
+        ? chrome.streetviewTitle
+        : chrome.place.name;
+    final place = chrome.place;
     final locationText = label.isNotEmpty
         ? label
         : place.address.isNotEmpty
@@ -210,18 +227,13 @@ class OrbitJourneyCanvas extends StatelessWidget {
         : (place.latitude != null && place.longitude != null)
         ? '${place.latitude!.toStringAsFixed(5)}, ${place.longitude!.toStringAsFixed(5)}'
         : '';
-    final ripple = arrow || back
+    final ripple = back
         ? elapsed / tapSeconds
         : scene.kind == 'map'
         ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
               StreetviewTimeline.rippleSeconds
         : -1.0;
-    final rippleCenter = arrow
-        ? Offset(direction < 0 ? 63 : 297, 476)
-        : back
-        ? const Offset(326, 40)
-        : const Offset(180, 330);
-    return FittedBox(
+    Widget canvas(OrbitDolly? dolly) => FittedBox(
       child: SizedBox(
         width: 360,
         height: 640,
@@ -236,28 +248,66 @@ class OrbitJourneyCanvas extends StatelessWidget {
                       ? const Color(0xff233747)
                       : const Color(0xffcad9cf),
                 ),
-              ImageFiltered(
-                imageFilter: ui.ImageFilter.blur(
-                  sigmaX: sin(t * pi) * 2.5,
-                  sigmaY: sin(t * pi) * 1.0,
-                ),
-                enabled: arrow && t > 0,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    for (
-                      int j = max(0, index - 1);
-                      j <= min(index + 1, project.clips.length - 1);
-                      j++
-                    )
-                      if (!overlayOnly ||
-                          j == index ||
-                          (arrow && j == index + 1))
-                        shot(j),
-                  ],
+              Opacity(
+                opacity: plan ? 0 : 1,
+                child: ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(
+                    sigmaX: sin(t * pi) * 2.5,
+                    sigmaY: sin(t * pi) * 1.0,
+                  ),
+                  enabled: arrow && t > 0,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      for (
+                        int j = max(0, index - 1);
+                        j <= min(index + 1, project.clips.length - 1);
+                        j++
+                      )
+                        if (!overlayOnly ||
+                            j == index ||
+                            (arrow && j == index + 1))
+                          shot(j, dolly),
+                    ],
+                  ),
                 ),
               ),
-              if (settings.showLocation && locationText.isNotEmpty)
+              if (plan)
+                Positioned.fill(
+                  child: OrbitSceneBuilder(
+                    path: settings.mapPath,
+                    builder: (geometry, _) {
+                      final path = project.streetview
+                          .locationFor(clip)
+                          ?.overviewPath;
+                      final fallback = OrbitPlanMap(
+                        scene: geometry,
+                        dark: project.darkOutput,
+                        name: place.name,
+                      );
+                      final ending = scene.kind == 'ending-map';
+                      return StreetviewMapScene(
+                        settings: settings,
+                        dark: project.darkOutput,
+                        basemap: path == null
+                            ? fallback
+                            : Image.file(
+                                File(path),
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) => fallback,
+                              ),
+                        thumbnail: ClipPoster(
+                          clip: clip,
+                          position: ending ? clip.duration : 0,
+                          resolvedPath: ending
+                              ? posters['${clip.id}:end']
+                              : posters[clip.id],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              if (!plan && chrome.showLocation && locationText.isNotEmpty)
                 Positioned(
                   left: 16,
                   right: 60,
@@ -276,7 +326,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                       child: Text(
                         [
                           locationText,
-                          if (settings.date.isNotEmpty) settings.date,
+                          if (chrome.date.isNotEmpty) chrome.date,
                         ].join(' · '),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -285,7 +335,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (settings.showControls && (media || back || arrow))
+              if (chrome.showControls && (media || back || arrow))
                 const Positioned(
                   right: 17,
                   top: 23,
@@ -295,33 +345,60 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     child: Icon(Icons.close, color: Colors.white, size: 18),
                   ),
                 ),
-              if (settings.showArrows && (media || arrow || back))
-                const StreetviewArrows(),
               if (ripple >= 0 && ripple < 1)
-                Positioned(
-                  left: rippleCenter.dx - 18,
-                  top: rippleCenter.dy - 18,
-                  child: Transform.scale(
-                    scale: .35 + ripple,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(
-                          alpha: .4 * (1 - ripple),
+                _TapRipple(
+                  center: back
+                      ? const Offset(326, 40)
+                      : const Offset(
+                          StreetviewLayout.thumbnailLeft +
+                              StreetviewLayout.thumbnailWidth / 2,
+                          StreetviewLayout.thumbnailTop +
+                              StreetviewLayout.thumbnailHeight / 2,
                         ),
-                        border: Border.all(color: Colors.white70),
-                      ),
-                    ),
-                  ),
+                  progress: ripple,
                 ),
             ],
           ),
         ),
       ),
     );
+    // Keep the player subtree mounted as the route comes in and out of view.
+    final next = arrow ? project.clips[index + 1].streetview : null;
+    return OrbitSceneBuilder(
+      path: arrow ? settings.mapPath : null,
+      builder: (source, _) => OrbitSceneBuilder(
+        path: next?.mapPath,
+        builder: (destination, _) => canvas(
+          next == null
+              ? null
+              : OrbitDolly.between(settings, next, source, destination, t),
+        ),
+      ),
+    );
   }
+}
+
+class _TapRipple extends StatelessWidget {
+  final Offset center;
+  final double progress;
+  const _TapRipple({required this.center, required this.progress});
+  @override
+  Widget build(BuildContext context) => Positioned(
+    left: center.dx - 18,
+    top: center.dy - 18,
+    child: Transform.scale(
+      scale: .35 + progress,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: .4 * (1 - progress)),
+          border: Border.all(color: Colors.white70),
+        ),
+      ),
+    ),
+  );
 }
 
 class _OutsidePlane extends CustomClipper<Path> {

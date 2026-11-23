@@ -314,7 +314,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         title: const Text('Transition to next media'),
         subtitle: Text(
           widget.project.isStreetview3d && _s.transition == 'arrow'
-              ? 'The arrow turns the camera through the captured 3D scene.'
+              ? 'The camera moves toward the next location.'
               : 'How this media leads into the next',
         ),
         children: [
@@ -322,9 +322,19 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             isExpanded: true,
             initialValue: _s.transition,
             decoration: const InputDecoration(labelText: 'Transition type'),
-            items: const [
-              DropdownMenuItem(value: 'arrow', child: Text('Arrow movement')),
-              DropdownMenuItem(value: 'map', child: Text('Return to Maps')),
+            items: [
+              DropdownMenuItem(
+                value: 'arrow',
+                child: Text(
+                  widget.project.isStreetview3d
+                      ? 'Dolly to next location'
+                      : 'Arrow movement',
+                ),
+              ),
+              const DropdownMenuItem(
+                value: 'map',
+                child: Text('Return to Maps'),
+              ),
             ],
             onChanged: (v) {
               _s.transition = v!;

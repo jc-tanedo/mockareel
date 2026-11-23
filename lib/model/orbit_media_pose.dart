@@ -26,33 +26,6 @@ class OrbitMediaPose {
       pow(mount?.sizeFactor ?? 1, .94 * _framing);
   double get _panelScale => .30 * zoom * (mount?.sizeFactor ?? 1);
 
-  /// Leave the outgoing media end pose and land at the incoming start pose.
-  /// Separate captures each show the locally mapped half of the manoeuvre.
-  factory OrbitMediaPose.travel(OrbitScene scene, double t, int direction) {
-    final x = t.clamp(0.0, 1.0);
-    final u = x * x * (3 - 2 * x);
-    final arc = 4 * u * (1 - u);
-    final progress = 1 - .65 * u;
-    final turn = direction * arc * pi / 4;
-    final mount = scene.wallMount;
-    final heading = _heading(progress, turn, mount);
-    final factor = mount?.sizeFactor ?? 1;
-    final center = mount?.center ?? Offset.zero;
-    final focus =
-        Offset(cos(heading), -sin(heading)) * (direction * 85 * arc * factor);
-    final groundRise =
-        scene.elevation(center + focus) - scene.elevation(center);
-    final relief = scene.localRelief.clamp(0.0, 180.0);
-    return OrbitMediaPose(
-      progress,
-      mount: mount,
-      turn: turn,
-      tilt: arc * (.21 + relief / 1000),
-      distanceScale: 1 - arc * (.19 + relief / 1500),
-      focus: focus,
-      lift: groundRise + arc * relief * .22 * factor,
-    );
-  }
   factory OrbitMediaPose.at(String kind, double t, {OrbitScene? scene}) {
     final u = Curves.easeInOut.transform(t.clamp(0.0, 1.0));
     final progress = switch (kind) {
@@ -106,6 +79,21 @@ class OrbitMediaPose {
     return Offset(size.width * .5, size.height * .54) -
         _project(target, height, scale);
   }
+
+  // Project ground-anchored screen graphics from the reference frame into this one.
+  Matrix4 get _groundMatrix {
+    final scale = .8 * zoom;
+    final origin = pin(const Size(360, 640), scale);
+    return Matrix4.identity()
+      ..setEntry(0, 0, cos(heading) * scale)
+      ..setEntry(0, 1, -sin(heading) * scale)
+      ..setEntry(1, 0, sin(heading) * depthScale * scale)
+      ..setEntry(1, 1, cos(heading) * depthScale * scale)
+      ..setTranslationRaw(origin.dx, origin.dy, 0);
+  }
+
+  Matrix4 groundFrom(OrbitMediaPose reference) =>
+      _groundMatrix..multiply(Matrix4.inverted(reference._groundMatrix));
 
   Offset get anchor {
     const size = Size(360, 640);

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../pages/maps_web_header_page.dart';
+import '../model/streetview_layout.dart';
 import '../model/project.dart';
 import '../pages/maps_web_search_page.dart';
 import '../services/open_orbit_map.dart';
@@ -12,22 +15,28 @@ import 'output_theme_picker.dart';
 class OrbitLocationsEditor extends StatefulWidget {
   final ReelProject project;
   final ProjectStore store;
-  final OrbitLocation? selected;
+  final OrbitLocation? selected, fetchingGeometry;
+  final bool Function(OrbitLocation) failedGeometry;
+  final ValueChanged<OrbitLocation> retryGeometry;
   final ValueChanged<OrbitLocation?> onSelect;
   final ValueChanged<OrbitLocation> onPickClips;
   final VoidCallback onSettings, onChanged, onUseGps;
-  final bool importing;
+  final bool importing, googleConfigured;
   const OrbitLocationsEditor({
     super.key,
     required this.project,
     required this.store,
     required this.selected,
+    required this.fetchingGeometry,
+    required this.failedGeometry,
+    required this.retryGeometry,
     required this.onSelect,
     required this.onPickClips,
     required this.onUseGps,
     required this.onSettings,
     required this.onChanged,
     required this.importing,
+    required this.googleConfigured,
   });
 
   @override
@@ -54,11 +63,12 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
     if (!mounted || value == null) return;
     if (replace == null) {
       _add(value.place);
-    } else if (replace.mapPath == null) {
-      replace.place = value.place;
-      _updateClips(replace);
     } else {
-      await _capture(replace, replacement: value.place);
+      replace.place = value.place;
+      replace.mapPath = null;
+      replace.overviewPath = null;
+      _updateClips(replace);
+      widget.retryGeometry(replace);
     }
   }
 
@@ -71,15 +81,11 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
     widget.onChanged();
   }
 
-  Future<void> _capture(
-    OrbitLocation location, {
-    PlaceDetails? replacement,
-  }) async {
+  Future<void> _capture(OrbitLocation location) async {
     if (_busy) return;
     setState(() => _capturing = true);
     try {
-      final place =
-          replacement ?? PlaceDetails.fromJson(location.place.toJson());
+      final place = PlaceDetails.fromJson(location.place.toJson());
       final result = await captureOrbit(context, place);
       if (!mounted || result == null) return;
       final file = await writeMapAsset(
@@ -102,6 +108,41 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Could not capture map: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _capturing = false);
+    }
+  }
+
+  Future<void> _overview(OrbitLocation location) async {
+    setState(() => _capturing = true);
+    try {
+      final bytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          builder: (_) => MapsWebHeaderPage(
+            place: location.place,
+            aspectRatio: 360 / StreetviewLayout.mapHeight,
+            showHeaderGuide: false,
+          ),
+        ),
+      );
+      if (!mounted || bytes == null) return;
+      final file = await writeMapAsset(
+        widget.store,
+        'overview-${newId()}.png',
+        bytes,
+      );
+      if (!mounted || !locations.contains(location)) {
+        await file.delete();
+        return;
+      }
+      location.overviewPath = file.path;
+      widget.onChanged();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save the 2D map: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _capturing = false);
@@ -195,6 +236,38 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                               : 'Add clips here',
                         ),
                       ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: widget.fetchingGeometry == selected
+                            ? const SizedBox.square(
+                                dimension: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                selected.mapPath != null
+                                    ? Icons.check_circle_outline
+                                    : Icons.warning_amber_rounded,
+                              ),
+                        title: Text(
+                          selected.mapPath != null
+                              ? '3D geometry saved'
+                              : widget.fetchingGeometry == selected
+                              ? 'Fetching 3D geometry…'
+                              : widget.failedGeometry(selected)
+                              ? 'Geometry download failed'
+                              : selected.place.latitude == null ||
+                                    selected.place.longitude == null
+                              ? 'Pin coordinates needed'
+                              : 'Waiting for geometry',
+                        ),
+                        subtitle: selected.mapPath == null
+                            ? const Text(
+                                'Geometry is required for 3D preview and export.',
+                              )
+                            : null,
+                      ),
                       if (selected.mapPath case final path?)
                         SizedBox(
                           height: 170,
@@ -211,14 +284,39 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                         spacing: 8,
                         children: [
                           OutlinedButton.icon(
-                            onPressed: _busy ? null : () => _capture(selected),
+                            onPressed:
+                                _busy || widget.fetchingGeometry == selected
+                                ? null
+                                : selected.mapPath == null &&
+                                      selected.place.latitude != null &&
+                                      selected.place.longitude != null
+                                ? () => widget.retryGeometry(selected)
+                                : () => _capture(selected),
+                            icon: const Icon(Icons.location_city),
+                            label: Text(
+                              selected.mapPath != null
+                                  ? 'Replace 3D capture'
+                                  : selected.place.latitude == null ||
+                                        selected.place.longitude == null
+                                  ? 'Enter pin coordinates'
+                                  : 'Retry geometry',
+                            ),
+                          ),
+                          if (widget.googleConfigured &&
+                              widget.failedGeometry(selected))
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _capture(selected),
+                              child: const Text('Try Google 3D capture'),
+                            ),
+                          TextButton.icon(
+                            onPressed: _busy ? null : () => _overview(selected),
                             icon: const Icon(Icons.map_outlined),
                             label: Text(
-                              _capturing
-                                  ? 'Capturing…'
-                                  : selected.mapPath == null
-                                  ? 'Capture map'
-                                  : 'Replace captured map',
+                              selected.overviewPath == null
+                                  ? 'Capture Google 2D map'
+                                  : 'Replace Google 2D map',
                             ),
                           ),
                           TextButton(

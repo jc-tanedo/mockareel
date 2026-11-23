@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import '../services/open_orbit_map.dart';
+import '../services/static_map.dart';
+import '../widgets/orbit_capture.dart';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -23,7 +28,13 @@ import 'exported_video_page.dart';
 class MapsEditorPage extends StatefulWidget {
   final ProjectStore? store;
   final ReelProject? initialProject;
-  const MapsEditorPage({super.key, this.store, this.initialProject});
+  final Future<String> Function(double, double) fetchGeometry;
+  const MapsEditorPage({
+    super.key,
+    this.store,
+    this.initialProject,
+    this.fetchGeometry = OpenOrbitMap.fetch,
+  });
   @override
   State<MapsEditorPage> createState() => _MapsEditorPageState();
 }
@@ -53,6 +64,90 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   Map<String, String> _capturePosters = {};
   Timer? _autosave;
   OrbitLocation? _location;
+  OrbitLocation? _fetchingGeometry;
+  final _failedPins = <(String, double?, double?)>{};
+  (String, double?, double?) _pin(OrbitLocation l) =>
+      (l.id, l.place.latitude, l.place.longitude);
+
+  Future<void> _fetchMissingGeometry() async {
+    if (!_ready || !_project.isStreetview3d || _fetchingGeometry != null) {
+      return;
+    }
+    final locations = _project.streetview.locations;
+    final location = locations
+        .where(
+          (l) =>
+              l.mapPath == null &&
+              l.place.latitude != null &&
+              l.place.longitude != null &&
+              !_failedPins.contains(_pin(l)),
+        )
+        .firstOrNull;
+    if (location == null) return;
+    final key = _pin(location);
+    bool current() =>
+        mounted &&
+        locations.contains(location) &&
+        location.mapPath == null &&
+        _pin(location) == key;
+    setState(() => _fetchingGeometry = location);
+    try {
+      final json = await widget.fetchGeometry(key.$2!, key.$3!);
+      if (!current()) return;
+      final file = await writeMapAsset(
+        _store,
+        'orbit-${newId()}.json',
+        utf8.encode(json),
+      );
+      if (!current()) {
+        await file.delete();
+        return;
+      }
+      final overview =
+          _useApiHeaders && _key.isNotEmpty && location.overviewPath == null
+          ? await _fetchGoogleOverview(location.place)
+          : null;
+      if (!current()) {
+        await file.delete();
+        if (overview != null) await overview.delete();
+        return;
+      }
+      if (overview != null) {
+        if (location.overviewPath == null) {
+          location.overviewPath = overview.path;
+        } else {
+          await overview.delete();
+        }
+      }
+      location.mapPath = file.path;
+      for (final clip in _project.clips.where(
+        (c) => c.streetview.locationId == location.id,
+      )) {
+        clip.streetview.mapPath = file.path;
+      }
+      _change();
+    } catch (_) {
+      if (current()) _failedPins.add(key);
+    } finally {
+      if (mounted) {
+        setState(() => _fetchingGeometry = null);
+        unawaited(_fetchMissingGeometry());
+      }
+    }
+  }
+
+  Future<File?> _fetchGoogleOverview(PlaceDetails place) async {
+    final service = StaticMapService();
+    try {
+      final bytes = await service.load(place, _key, portrait: true);
+      return await writeMapAsset(_store, 'overview-${newId()}.png', bytes);
+    } on Exception {
+      return null;
+    } finally {
+      service.dispose();
+    }
+  }
+
   static const _buildKey = String.fromEnvironment('MAPS_API_KEY');
 
   @override
@@ -88,9 +183,28 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             project.streetview.adoptClipLocations(project.clips) || located;
         if (!mounted) return;
       }
+      if (project.isStreetview3d) {
+        for (final l in project.streetview.locations) {
+          if (l.overviewPath != null && !await File(l.overviewPath!).exists()) {
+            l.overviewPath = null;
+            located = true;
+          }
+          if (l.mapPath != null && !await File(l.mapPath!).exists()) {
+            l.mapPath = null;
+            for (final c in project.clips.where(
+              (c) => c.streetview.locationId == l.id,
+            )) {
+              c.streetview.mapPath = null;
+            }
+            located = true;
+          }
+        }
+        if (!mounted) return;
+      }
       _setProject(project);
       setState(() => _ready = true);
       if (located) _change();
+      unawaited(_fetchMissingGeometry());
     } catch (e) {
       if (mounted) setState(() => _status = 'Storage error: $e');
     }
@@ -112,6 +226,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     if (!mounted) return;
     _form.saveTo(_project.place);
     _editRevision++;
+    unawaited(_fetchMissingGeometry());
     setState(() => _dirty = true);
     _autosave?.cancel();
     _autosave = Timer(
@@ -506,6 +621,13 @@ class _MapsEditorPageState extends State<MapsEditorPage>
               project: _project,
               store: _store,
               selected: _location ?? _project.streetview.locations.firstOrNull,
+              googleConfigured: _key.isNotEmpty,
+              fetchingGeometry: _fetchingGeometry,
+              failedGeometry: (l) => _failedPins.contains(_pin(l)),
+              retryGeometry: (l) {
+                _failedPins.remove(_pin(l));
+                unawaited(_fetchMissingGeometry());
+              },
               onUseGps: () => _importClips(),
               importing: _importing,
               onSelect: (location) => setState(() => _location = location),

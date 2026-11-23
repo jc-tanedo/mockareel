@@ -106,7 +106,12 @@ void testStreetviewExport(
                 sourceDuration: 3,
                 duration: .5,
                 streetview: StreetviewMedia(
-                  place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
+                  place: PlaceDetails(
+                    name: 'Place $i',
+                    address: 'Address $i',
+                    latitude: 35.0,
+                    longitude: 139.0 + i * .002,
+                  ),
                   mapPath: i == 1 ? wallAsset.path : mapAsset.path,
                   walkDepth: orbit && i == 0
                       ? List.generate(1024, (n) => n % 256)
@@ -121,6 +126,10 @@ void testStreetviewExport(
               ),
           ],
         );
+        if (orbit) {
+          p.streetview.adoptClipLocations(p.clips);
+          p.streetview.locations.last.overviewPath = mapPhoto.path;
+        }
       });
       p.clips[1].edits = MediaEdits(
         fisheye: true,
@@ -204,12 +213,23 @@ void testStreetviewExport(
                   (frames[1] as List).length == 15 &&
                   await hasMedia(frames[1].last as String);
               final flight = frames[2] as List;
-              // A right turn places the pinned panels left of this ray at
-              // mid-flight. Its original and destination frames both cover it.
-              checks['arrow reveals the station between the two panels'] =
-                  await hasMedia(flight.first, x: 620, y: 915) &&
-                  !await hasMedia(flight[5], x: 620, y: 915) &&
-                  await hasMedia(flight.last, x: 620, y: 915);
+              if (transition == 'arrow') {
+                checks['dolly leaves the outgoing panel and reaches the next panel'] =
+                    await hasMedia(flight.first, x: 620, y: 915) &&
+                    !await hasMedia(flight[5], x: 620, y: 915) &&
+                    await hasMedia(flight.last, x: 580, y: 915);
+              }
+              checks['opening thumbnail displays the first clip'] =
+                  await hasMedia(frames[0].first, x: 150, y: 1490);
+              for (final mapIndex in [
+                if (transition == 'map') secondMediaIndex - 1,
+                endingMapIndex,
+              ]) {
+                final color = await pixel(frames[mapIndex].first, 540, 800);
+                checks['2D scene $mapIndex displays the destination map and thumbnail'] =
+                    color[2] > color[1] + 50 &&
+                    await hasMedia(frames[mapIndex].first, x: 150, y: 1490);
+              }
               final videoFrames = frames[secondMediaIndex] as List;
               checks['video texture visible inside world panel'] =
                   await alpha(videoFrames.last, 540, 700) == 0;
@@ -221,20 +241,14 @@ void testStreetviewExport(
                 p.clips.last.streetview.mapPath!,
               );
               final returning = frames[returnIndex] as List;
-              final lastReturn = OrbitMediaPose.at(
-                'back',
-                (returning.length - 1) /
-                    30 /
-                    p.clips.last.streetview.transitionSeconds,
-                scene: wall,
-              );
+              final lastReturn = OrbitMediaPose.at('media', 1, scene: wall);
               final center =
                   MatrixUtils.transformPoint(
                     lastReturn.matrix,
                     const Offset(180, 320),
                   ) *
                   3;
-              checks['return holds the video on its wall as the camera pulls back'] =
+              checks['back tap holds the final video frame on its wall'] =
                   await hasMedia(
                     returning.last,
                     x: center.dx.round(),
@@ -257,7 +271,7 @@ void testStreetviewExport(
                       ).native,
                     ),
                   ).every((matches) => matches);
-              checks['orbit moves during opening'] = !listEquals(
+              checks['opening includes the thumbnail tap'] = !listEquals(
                 await File(frames[0].first as String).readAsBytes(),
                 await File(frames[0].last as String).readAsBytes(),
               );

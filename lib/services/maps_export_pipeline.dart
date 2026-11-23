@@ -52,7 +52,7 @@ class MapsExportPipeline {
     final missingClip = project.firstMissingMapClip;
     if (missingClip != null) {
       throw FormatException(
-        'Capture a map for clip ${missingClip + 1} (“${project.clips[missingClip].name}”) before exporting.',
+        '${project.isStreetview3d ? 'Fetch 3D geometry' : 'Capture a map'} for clip ${missingClip + 1} (“${project.clips[missingClip].name}”) before exporting.',
       );
     }
     if (project.needsMapHeader) {
@@ -236,7 +236,11 @@ class MapsExportPipeline {
             await (await OrbitScene.load(nextPath)).warmAtlas();
           }
         }
+        final overview = project.streetview.locationFor(clip)?.overviewPath;
         final assets = <String>{
+          if (overview != null &&
+              (scene.kind == 'map' || scene.kind == 'ending-map'))
+            overview,
           if (project.isStreetview3d &&
               !clip.isTimed &&
               clip.streetview.walking)

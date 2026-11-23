@@ -25,7 +25,21 @@ class OrbitLocationPicker extends StatelessWidget {
       for (final location in locations)
         DropdownMenuItem(
           value: location,
-          child: Text(location.label, overflow: TextOverflow.ellipsis),
+          child: Row(
+            children: [
+              if (location.mapPath == null)
+                const Padding(
+                  padding: EdgeInsets.only(right: 6),
+                  child: Tooltip(
+                    message: '3D geometry missing',
+                    child: Icon(Icons.cloud_download_outlined, size: 16),
+                  ),
+                ),
+              Flexible(
+                child: Text(location.label, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
         ),
     ],
     onChanged: onChanged == null

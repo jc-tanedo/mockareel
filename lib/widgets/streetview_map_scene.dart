@@ -23,12 +23,14 @@ class StreetviewMapScene extends StatelessWidget {
   final StreetviewMedia settings;
   final bool dark, showThumbnail;
   final Widget thumbnail;
+  final Widget? basemap;
   const StreetviewMapScene({
     super.key,
     required this.settings,
     required this.dark,
     required this.thumbnail,
     this.showThumbnail = true,
+    this.basemap,
   });
 
   @override
@@ -42,13 +44,15 @@ class StreetviewMapScene extends StatelessWidget {
             color: dark ? const Color(0xff1c2b40) : const Color(0xffe5eadf),
           ),
         ),
-        if (settings.mapPath != null)
+        if (basemap != null || settings.mapPath != null)
           Positioned(
             left: 0,
             top: 0,
             right: 0,
             height: StreetviewLayout.mapHeight,
-            child: Image.file(File(settings.mapPath!), fit: BoxFit.contain),
+            child:
+                basemap ??
+                Image.file(File(settings.mapPath!), fit: BoxFit.contain),
           ),
         Positioned(
           left: 10,

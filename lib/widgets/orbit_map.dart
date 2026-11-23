@@ -98,7 +98,7 @@ class OrbitMapView extends StatelessWidget {
             frameBuilder: (context, child, frame, sync) {
               if (child is! RawImage || child.image == null) return child;
               return CustomPaint(
-                painter: _GoogleOrbitPainter(child.image!, camera.progress),
+                painter: _GoogleOrbitPainter(child.image!, camera),
               );
             },
           )
@@ -273,17 +273,52 @@ class OrbitPainter extends CustomPainter {
 
 class _GoogleOrbitPainter extends CustomPainter {
   final ui.Image atlas;
-  final double progress;
-  _GoogleOrbitPainter(this.atlas, this.progress);
+  final OrbitMediaPose camera;
+  _GoogleOrbitPainter(this.atlas, this.camera);
   @override
   void paint(Canvas canvas, Size size) {
-    final at = progress.clamp(0.0, 1.0) * 23;
+    final at = camera.progress.clamp(0.0, 1.0) * 23;
     final w = atlas.width / 6, h = atlas.height / 4;
+    final viewport = Offset.zero & size;
+    var dest = viewport;
+    canvas.save();
+    canvas.clipRect(viewport);
+    if (camera.focus != Offset.zero ||
+        camera.lift != 0 ||
+        camera.turn != 0 ||
+        camera.distanceScale != 1 ||
+        camera.tilt != 0) {
+      // The atlas has images only. Pan the captured frame with the camera
+      // and overscan just enough to keep its edges outside the viewport.
+      final transform = camera.groundFrom(OrbitMediaPose(camera.progress));
+      final source = MatrixUtils.transformRect(
+        Matrix4.inverted(transform),
+        viewport,
+      );
+      final halfWidth = max(
+        (source.left - viewport.center.dx).abs(),
+        (source.right - viewport.center.dx).abs(),
+      );
+      final halfHeight = max(
+        (source.top - viewport.center.dy).abs(),
+        (source.bottom - viewport.center.dy).abs(),
+      );
+      final cover = max(
+        1.0,
+        max(2 * halfWidth / size.width, 2 * halfHeight / size.height),
+      );
+      dest = Rect.fromCenter(
+        center: viewport.center,
+        width: size.width * cover,
+        height: size.height * cover,
+      );
+      canvas.transform(transform.storage);
+    }
     void draw(int frame, double opacity) {
       canvas.drawImageRect(
         atlas,
         Rect.fromLTWH((frame % 6) * w, (frame ~/ 6) * h, w, h * .5 / .54),
-        Offset.zero & size,
+        dest,
         Paint()
           ..filterQuality = FilterQuality.low
           ..color = Colors.white.withValues(alpha: opacity),
@@ -292,9 +327,112 @@ class _GoogleOrbitPainter extends CustomPainter {
 
     draw(at.floor(), 1);
     if (at.ceil() != at.floor()) draw(at.ceil(), at - at.floor());
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(_GoogleOrbitPainter old) =>
-      old.atlas != atlas || old.progress != progress;
+      old.atlas != atlas || old.camera != camera;
+}
+
+/// North-up plan view of the saved vector capture for offline Maps scenes.
+class OrbitPlanMap extends StatelessWidget {
+  final OrbitScene? scene;
+  final bool dark;
+  final String name;
+  const OrbitPlanMap({
+    super.key,
+    required this.scene,
+    required this.dark,
+    required this.name,
+  });
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      CustomPaint(painter: _PlanPainter(scene, dark)),
+      Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on, size: 30, color: Color(0xffe64a39)),
+            if (name.isNotEmpty)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: dark ? Colors.black87 : Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: dark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      if (scene != null && scene!.atlas == null)
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ColoredBox(
+            color: Colors.black87,
+            child: Text(
+              scene!.credit,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 8, color: Colors.white),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _PlanPainter extends CustomPainter {
+  final OrbitScene? scene;
+  final bool dark;
+  _PlanPainter(this.scene, this.dark);
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawColor(
+      dark ? const Color(0xff233448) : const Color(0xffe9ebe4),
+      BlendMode.src,
+    );
+    canvas.translate(size.width / 2, size.height / 2);
+    final scale = size.width / 500;
+    canvas.scale(scale);
+    final visible = canvas.getLocalClipBounds(), brush = Paint();
+    for (final buildings in [false, true]) {
+      for (final feature in scene?.shapes ?? const <OrbitFootprint>[]) {
+        if ((feature.height > 0) != buildings ||
+            !feature.bounds.overlaps(visible)) {
+          continue;
+        }
+        brush.color = feature.height == -3
+            ? (dark ? const Color(0xff122b49) : const Color(0xffa6cfee))
+            : feature.height == -2
+            ? (dark ? const Color(0xff284942) : const Color(0xffb2d5aa))
+            : buildings
+            ? (dark ? const Color(0xff37485b) : const Color(0xffd4d0c9))
+            : (dark ? const Color(0xff526070) : Colors.white);
+        canvas.drawPath(feature.outline, brush);
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_PlanPainter old) =>
+      old.scene != scene || old.dark != dark;
 }
