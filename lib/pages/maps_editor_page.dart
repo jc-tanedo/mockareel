@@ -123,7 +123,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       for (final clip in _project.clips.where(
         (c) => c.streetview.locationId == location.id,
       )) {
-        clip.streetview.mapPath = file.path;
+        clip.streetview.mapPath ??= file.path;
       }
       _change();
     } catch (_) {
@@ -208,6 +208,26 @@ class _MapsEditorPageState extends State<MapsEditorPage>
             c.streetview.mapPath = null;
           }
           _change();
+        }
+      }
+      // Older projects may keep a stale clip-specific copy of a valid
+      // location capture. Restore only broken links after checking the files.
+      if (project.isStreetview3d) {
+        final checked = <String, bool>{};
+        for (final clip in List.of(project.clips)) {
+          final location = project.streetview.locationFor(clip);
+          final path = clip.streetview.mapPath;
+          if (location == null || path == null || path == location.mapPath) {
+            continue;
+          }
+          final exists = checked[path] ??= await File(path).exists();
+          if (!mounted) return;
+          if (!exists &&
+              clip.streetview.mapPath == path &&
+              clip.streetview.locationId == location.id) {
+            clip.streetview.mapPath = location.mapPath;
+            _change();
+          }
         }
       }
     } catch (e) {
@@ -623,6 +643,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     return MapsEditorScaffold(
       locationsEditor: _project.isStreetview3d
           ? OrbitLocationsEditor(
+              fetchGeometry: widget.fetchGeometry,
               project: _project,
               store: _store,
               selected: _location ?? _project.streetview.locations.firstOrNull,

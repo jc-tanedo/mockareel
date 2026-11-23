@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -171,6 +172,125 @@ void main() {
       expect(project.clips.first.streetview.place.name, 'Kyoto');
       expect(project.clips.last.streetview.locationId, target.id);
       await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'a reopened clip previews its saved placement and can find a new wall',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final dir = Directory.systemTemp.createTempSync('orbit-wall-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      Directory('${dir.path}/media').createSync();
+      final terrain = jsonEncode({
+        'grid': List.filled(625, 0),
+        'shapes': [],
+        'credit': 'Test map',
+      });
+      final path = File('${dir.path}/terrain.json')..writeAsStringSync(terrain);
+      final project = ReelProject(template: 'streetview-3d');
+      final location = OrbitLocation(
+        place: PlaceDetails(name: 'Station', latitude: 35, longitude: 139),
+        mapPath: path.path,
+      );
+      project.streetview.locations.add(location);
+      final clip = ReelClip(
+        id: 'photo',
+        path: 'assets/brand/mockareel-mark.png',
+        name: 'Photo',
+        isVideo: false,
+      );
+      project.streetview.addClipsAt(location, project.clips, [clip]);
+      clip.streetview.mapPath = '${dir.path}/lost.json';
+      clip.streetview.streetviewTitle = 'Artist title';
+      final store = _PhotoStore()..root = dir;
+      var attempts = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MapsEditorPage(
+            initialProject: project,
+            store: store,
+            fetchGeometry: (_, _) async => ++attempts == 1
+                ? terrain
+                : File('assets/streetview3d/tokyo.json').readAsStringSync(),
+          ),
+        ),
+      );
+      Future<void> until(bool Function() condition) async {
+        for (int i = 0; i < 100 && !condition(); i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        expect(condition(), isTrue);
+      }
+
+      final findWall = find.text('Find a wall with open data');
+      await until(
+        () =>
+            clip.streetview.mapPath == path.path &&
+            findWall.evaluate().isNotEmpty,
+      );
+      expect(find.textContaining('No building footprints'), findsOneWidget);
+      expect(find.byKey(const ValueKey('orbit-clip-photo')), findsWidgets);
+      await tester.ensureVisible(findWall);
+      await tester.pump();
+      await tester.tap(findWall);
+      await until(
+        () =>
+            find.textContaining('No suitable wall found').evaluate().isNotEmpty,
+      );
+      expect(location.mapPath, path.path);
+      await tester.tap(findWall);
+      await until(
+        () =>
+            find
+                .textContaining('Media on building wall')
+                .evaluate()
+                .isNotEmpty &&
+            location.mapPath != path.path,
+      );
+      expect(clip.streetview.mapPath, location.mapPath);
+      expect(clip.streetview.streetviewTitle, 'Artist title');
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  test(
+    'legacy clips recover shared geometry and preserve individual edits',
+    () {
+      final project = ReelProject(template: 'streetview-3d');
+      final pin = OrbitLocation(place: PlaceDetails(name: 'Station'));
+      project.streetview.locations.add(pin);
+      for (final path in [null, 'saved.json', 'override.json']) {
+        project.clips.add(
+          ReelClip(
+            id: newId(),
+            path: 'clip.jpg',
+            name: 'Clip',
+            isVideo: false,
+            streetview: StreetviewMedia(
+              locationId: pin.id,
+              mapPath: path,
+              streetviewTitle: 'Custom title',
+            ),
+          ),
+        );
+      }
+      final saved = ReelProject.fromJson(project.toJson());
+      expect(saved.streetview.adoptClipLocations(saved.clips), isTrue);
+      expect(saved.streetview.locations.single.mapPath, 'saved.json');
+      expect(saved.clips.map((c) => c.streetview.mapPath), [
+        'saved.json',
+        'saved.json',
+        'override.json',
+      ]);
+      expect(saved.clips.first.streetview.streetviewTitle, 'Custom title');
+      expect(saved.streetview.adoptClipLocations(saved.clips), isFalse);
     },
   );
 

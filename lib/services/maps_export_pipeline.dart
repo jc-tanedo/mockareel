@@ -229,17 +229,27 @@ class MapsExportPipeline {
         if (project.isStreetview3d && clip.streetview.mapPath != null) {
           geometry = await OrbitScene.load(clip.streetview.mapPath!);
           await geometry.warmAtlas();
-          final nextPath = scene.kind == 'arrow'
+          final nextPath =
+              (scene.kind == 'arrow' || scene.kind == 'back') &&
+                  scene.mediaIndex + 1 < project.clips.length
               ? project.clips[scene.mediaIndex + 1].streetview.mapPath
               : null;
           if (nextPath != null) {
             await (await OrbitScene.load(nextPath)).warmAtlas();
           }
         }
-        final overview = project.streetview.locationFor(clip)?.overviewPath;
+        final nextMap =
+            project.isStreetview3d &&
+                scene.kind == 'back' &&
+                scene.mediaIndex + 1 < project.clips.length
+            ? project.clips[scene.mediaIndex + 1]
+            : clip;
+        final overview = project.streetview.locationFor(nextMap)?.overviewPath;
         final assets = <String>{
           if (overview != null &&
-              (scene.kind == 'map' || scene.kind == 'ending-map'))
+              (scene.kind == 'map' ||
+                  scene.kind == 'ending-map' ||
+                  scene.kind == 'back'))
             overview,
           if (project.isStreetview3d &&
               !clip.isTimed &&
@@ -258,7 +268,7 @@ class MapsExportPipeline {
               scene.kind == 'back' ||
               scene.kind == 'arrow')
             posters['${clip.id}:end']!,
-          if (scene.kind == 'arrow')
+          if (scene.kind == 'arrow' || nextMap != clip)
             posters[project.clips[scene.mediaIndex + 1].id]!,
           if ((scene.kind == 'map' ||
                   scene.kind == 'ending-map' ||

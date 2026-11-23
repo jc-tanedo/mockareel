@@ -31,6 +31,33 @@ void main() {
   OrbitDolly trip(OrbitScene world, double t) =>
       OrbitDolly.between(source, destination, world, world, t);
   test(
+    'saved Tokyo Station geometry yields a visible wall on reopen',
+    () async {
+      final saved = await OrbitScene.load('assets/streetview3d/tokyo.json');
+      expect(saved.wallMount, isNotNull);
+      expect(saved.placementDescription, contains('Media on building wall'));
+    },
+  );
+  test('map flight meets the overhead map and the exact media pose', () {
+    for (final scene in [flat, city]) {
+      for (final returning in [true, false]) {
+        final start = OrbitMediaPose.mapFlight(scene, 0, returning: returning);
+        expect(start.heightScale, closeTo(0, 1e-8));
+        expect(
+          start.pin(const Size(360, 640), .8 * start.zoom).dy,
+          closeTo(276, 1e-8),
+        );
+        final mid = OrbitMediaPose.mapFlight(scene, .5, returning: returning);
+        expect(mid.heightScale, greaterThan(0));
+        expect(mid.heightScale, lessThan(.77));
+        expect(
+          OrbitMediaPose.mapFlight(scene, 1, returning: returning).native,
+          OrbitMediaPose.at('media', returning ? 1 : 0, scene: scene).native,
+        );
+      }
+    }
+  });
+  test(
     'mounted panel corners project onto the same exterior wall throughout the shot',
     () {
       final terrain = List.generate(625, (i) => (i % 25) * .5);
@@ -98,10 +125,10 @@ void main() {
     'unsuitable or obstructed walls retain the original free-standing pose',
     () {
       final occluder = OrbitFootprint(150, const [
-        Offset(-90, -90),
-        Offset(90, -90),
-        Offset(90, 90),
-        Offset(-90, 90),
+        Offset(-200, -200),
+        Offset(200, -200),
+        Offset(200, 200),
+        Offset(-200, 200),
       ]);
       for (final scene in [
         flat,

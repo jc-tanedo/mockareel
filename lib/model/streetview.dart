@@ -59,17 +59,26 @@ class StreetviewSettings {
 
   // Old reels stored places only on clips. Preserve their order and overrides.
   bool adoptClipLocations(List<ReelClip> clips) {
-    final known = locations.map((l) => l.id).toSet();
+    final known = {for (final location in locations) location.id: location};
     String signature(PlaceDetails place, String? path) =>
         jsonEncode([path, place.toJson()]);
+    var changed = false;
+    // A legacy capture can live on either side of the clip/location link.
+    for (final clip in clips) {
+      final media = clip.streetview;
+      final linked = known[media.locationId];
+      if (linked != null && linked.mapPath == null && media.mapPath != null) {
+        linked.mapPath = media.mapPath;
+        changed = true;
+      }
+    }
     final byPlace = {
       for (final location in locations)
         signature(location.place, location.mapPath): location,
     };
-    var changed = false;
     for (final clip in clips) {
       final media = clip.streetview;
-      if (known.contains(media.locationId)) continue;
+      if (known.containsKey(media.locationId)) continue;
       final place = media.place;
       if (!media.canCaptureMap &&
           media.mapPath == null &&
@@ -85,11 +94,19 @@ class StreetviewSettings {
           mapPath: media.mapPath,
         );
         locations.add(added);
-        known.add(added.id);
+        known[added.id] = added;
         return added;
       });
       media.locationId = location.id;
       changed = true;
+    }
+    for (final clip in clips) {
+      final media = clip.streetview;
+      final path = known[media.locationId]?.mapPath;
+      if (media.mapPath == null && path != null) {
+        media.mapPath = path;
+        changed = true;
+      }
     }
     return changed;
   }

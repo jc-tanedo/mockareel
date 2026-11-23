@@ -55,8 +55,10 @@ class OrbitWallMount {
   static OrbitWallMount? find(OrbitScene scene) {
     if (scene.atlas != null) return null;
     final view = Offset(-sin(defaultHeading), cos(defaultHeading));
-    const radius = 60.0;
-    final candidates = <(double, OrbitWallMount)>[];
+    const radius = 120.0;
+    // Preserve clear local placements before trying a different camera heading
+    // or a wall across a larger station plaza.
+    final groups = List.generate(3, (_) => <(double, OrbitWallMount)>[]);
     for (final building in scene.shapes) {
       if (building.height < 8 ||
           !building.bounds.inflate(radius).contains(Offset.zero)) {
@@ -78,7 +80,6 @@ class OrbitWallMount {
         final tangent = area > 0 ? -axis : axis;
         final normal = Offset(-tangent.dy, tangent.dx);
         final facing = normal.dx * view.dx + normal.dy * view.dy;
-        if (facing < .5) continue;
         final factor = min(
           1.0,
           min(
@@ -92,7 +93,12 @@ class OrbitWallMount {
         final center = a + axis * along.clamp(margin, length - margin);
         final score = center.distance + 12 * (1 - facing);
         if (center.distance > radius) continue;
-        candidates.add((
+        final group = center.distance > 60
+            ? 2
+            : facing < .5
+            ? 1
+            : 0;
+        groups[group].add((
           score,
           OrbitWallMount(
             center + normal * .05,
@@ -105,9 +111,11 @@ class OrbitWallMount {
         ));
       }
     }
-    candidates.sort((a, b) => a.$1.compareTo(b.$1));
-    for (final (_, candidate) in candidates.take(48)) {
-      if (candidate._visible(scene)) return candidate;
+    for (final candidates in groups) {
+      candidates.sort((a, b) => a.$1.compareTo(b.$1));
+      for (final (_, candidate) in candidates.take(96)) {
+        if (candidate._visible(scene)) return candidate;
+      }
     }
     return null;
   }
@@ -159,6 +167,18 @@ class OrbitScene {
   final MemoryImage? atlas;
   OrbitScene(this.shapes, this.grid, this.credit, {this.atlas});
   late final OrbitWallMount? wallMount = OrbitWallMount.find(this);
+  String get placementDescription {
+    if (atlas != null) {
+      return 'Media at pin · This capture contains imagery only.';
+    }
+    if (wallMount case final mount?) {
+      return 'Media on building wall · ${mount.center.distance.round()} m from pin';
+    }
+    return shapes.any((s) => s.height > 0)
+        ? 'Media at pin · No clear wall fits within 120 m.'
+        : 'Media at pin · No building footprints in this capture.';
+  }
+
   String get coverage {
     if (atlas != null) return 'Google Photorealistic 3D Tiles · Media at pin';
     final count = shapes.where((s) => s.height > 0).length;

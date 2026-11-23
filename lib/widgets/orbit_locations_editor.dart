@@ -1,8 +1,12 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../pages/maps_web_header_page.dart';
 import '../model/streetview_layout.dart';
 import '../model/project.dart';
+import '../model/orbit_scene.dart';
+import '../model/streetview_timeline.dart';
+import 'orbit_journey_canvas.dart';
 import '../pages/maps_web_search_page.dart';
 import '../services/open_orbit_map.dart';
 import '../services/project_store.dart';
@@ -15,6 +19,7 @@ import 'output_theme_picker.dart';
 class OrbitLocationsEditor extends StatefulWidget {
   final ReelProject project;
   final ProjectStore store;
+  final Future<String> Function(double, double) fetchGeometry;
   final OrbitLocation? selected, fetchingGeometry;
   final bool Function(OrbitLocation) failedGeometry;
   final ValueChanged<OrbitLocation> retryGeometry;
@@ -26,6 +31,7 @@ class OrbitLocationsEditor extends StatefulWidget {
     super.key,
     required this.project,
     required this.store,
+    required this.fetchGeometry,
     required this.selected,
     required this.fetchingGeometry,
     required this.failedGeometry,
@@ -81,25 +87,60 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
     widget.onChanged();
   }
 
-  Future<void> _capture(OrbitLocation location) async {
+  Future<void> _capture(OrbitLocation location, {bool findWall = false}) async {
     if (_busy) return;
     setState(() => _capturing = true);
     try {
       final place = PlaceDetails.fromJson(location.place.toJson());
-      final result = await captureOrbit(context, place);
+      final previousPath = location.mapPath;
+      final previousPlace = location.place;
+      ({List<int> bytes, String coverage})? result;
+      if (findWall) {
+        final data = await widget.fetchGeometry(
+          place.latitude!,
+          place.longitude!,
+        );
+        if (!mounted) return;
+        final geometry = OrbitScene.decode(data);
+        if (geometry.wallMount == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No suitable wall found. Your current capture is still in use.',
+              ),
+            ),
+          );
+          return;
+        }
+        result = (bytes: utf8.encode(data), coverage: geometry.coverage);
+      } else {
+        result = await captureOrbit(context, place);
+      }
       if (!mounted || result == null) return;
       final file = await writeMapAsset(
         widget.store,
         'orbit-${newId()}.json',
         result.bytes,
       );
-      if (!mounted || !locations.contains(location)) {
+      if (!mounted ||
+          !locations.contains(location) ||
+          location.place != previousPlace ||
+          location.mapPath != previousPath) {
         await file.delete();
         return;
       }
       location.place = place;
       location.mapPath = file.path;
-      _updateClips(location);
+      for (final clip in widget.project.clips) {
+        final settings = clip.streetview;
+        if (settings.locationId == location.id &&
+            (settings.mapPath == null || settings.mapPath == previousPath)) {
+          settings.mapPath = file.path;
+          settings.place.latitude = place.latitude;
+          settings.place.longitude = place.longitude;
+        }
+      }
+      widget.onChanged();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(result.coverage)));
@@ -266,19 +307,70 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                             ? const Text(
                                 'Geometry is required for 3D preview and export.',
                               )
-                            : null,
+                            : OrbitSceneBuilder(
+                                path:
+                                    clips.firstOrNull?.streetview.mapPath ??
+                                    selected.mapPath,
+                                builder: (scene, failed) => Text(
+                                  scene?.placementDescription ??
+                                      (failed
+                                          ? 'Could not read the saved geometry.'
+                                          : 'Checking media placement…'),
+                                ),
+                              ),
                       ),
                       if (selected.mapPath case final path?)
                         SizedBox(
-                          height: 170,
+                          height: clips.isEmpty ? 170 : 220,
                           child: ClipRect(
-                            child: OrbitMap(
-                              key: ValueKey(path),
-                              path: path,
-                              progress: 0,
-                              dark: widget.project.darkOutput,
-                            ),
+                            child: clips.isEmpty
+                                ? OrbitMap(
+                                    path: path,
+                                    progress: 0,
+                                    dark: widget.project.darkOutput,
+                                  )
+                                : OrbitJourneyCanvas(
+                                    project: widget.project,
+                                    position:
+                                        StreetviewTimeline.mediaStart(
+                                          widget.project,
+                                          widget.project.clips.indexOf(
+                                            clips.first,
+                                          ),
+                                        ) +
+                                        clips.first.duration / 2,
+                                    playing: false,
+                                    overlayOnly: false,
+                                    posterOnly: true,
+                                    posters: const {},
+                                  ),
                           ),
+                        ),
+                      if (selected.mapPath != null &&
+                          selected.place.latitude != null &&
+                          selected.place.longitude != null)
+                        OrbitSceneBuilder(
+                          path: selected.mapPath,
+                          builder: (scene, _) =>
+                              scene != null && scene.wallMount == null
+                              ? Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: _busy
+                                        ? null
+                                        : () => _capture(
+                                            selected,
+                                            findWall: true,
+                                          ),
+                                    icon: const Icon(Icons.location_city),
+                                    label: Text(
+                                      _capturing
+                                          ? 'Loading geometry…'
+                                          : 'Find a wall with open data',
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
                       Wrap(
                         spacing: 8,

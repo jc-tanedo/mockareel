@@ -250,11 +250,23 @@ void testStreetviewExport(
                   3;
               checks['back tap holds the final video frame on its wall'] =
                   await hasMedia(
-                    returning.last,
+                    returning.first,
                     x: center.dx.round(),
                     y: center.dy.round(),
                   ) &&
-                  !await hasMedia(returning.last, x: 150, y: 700);
+                  !await hasMedia(returning.first, x: 150, y: 700);
+              for (final i in [if (transition == 'map') 2, returnIndex]) {
+                final back = frames[i] as List;
+                final middle = await File(back[back.length ~/ 2]).readAsBytes();
+                final last = await File(back.last).readAsBytes();
+                checks['return $i lifts into its destination without a cut'] =
+                    !listEquals(await File(back.first).readAsBytes(), middle) &&
+                    !listEquals(middle, last) &&
+                    listEquals(
+                      last,
+                      await File(frames[i + 1].first).readAsBytes(),
+                    );
+              }
               final matrices =
                   args['clips'][secondMediaIndex]['orbitPlaneFrames'] as List;
               checks['native video uses the preview wall on every media frame'] =
@@ -271,10 +283,16 @@ void testStreetviewExport(
                       ).native,
                     ),
                   ).every((matches) => matches);
-              checks['opening includes the thumbnail tap'] = !listEquals(
-                await File(frames[0].first as String).readAsBytes(),
-                await File(frames[0].last as String).readAsBytes(),
-              );
+              final opening = frames[0] as List;
+              final first = await File(opening.first).readAsBytes();
+              final middle = await File(
+                opening[opening.length * 2 ~/ 3],
+              ).readAsBytes();
+              final last = await File(opening.last).readAsBytes();
+              checks['opening dives into the first photo without a cut'] =
+                  !listEquals(first, middle) &&
+                  !listEquals(middle, last) &&
+                  listEquals(last, await File(frames[1].first).readAsBytes());
             } else {
               checks['active texture exposed'] =
                   await alpha(overlays[1] as String, 540, 800) == 0;

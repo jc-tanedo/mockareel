@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'orbit_scene.dart';
+import 'streetview_layout.dart';
 
 /// Orthographic projection of an upright 9:16 media plane. Both Flutter's
 /// panel and the Media3 video texture use these coefficients at the same frame.
@@ -35,6 +36,39 @@ class OrbitMediaPose {
       _ => 1.0,
     };
     return OrbitMediaPose(progress, mount: scene?.wallMount);
+  }
+
+  /// Interpolate a north-up overhead view into the attached media camera.
+  /// [world] is eased by the timeline and runs backwards on return to Maps.
+  factory OrbitMediaPose.mapFlight(
+    OrbitScene? scene,
+    double world, {
+    required bool returning,
+  }) {
+    final end = OrbitMediaPose.at('media', returning ? 1 : 0, scene: scene);
+    if (world >= 1) return end;
+    final progress = world * end.progress;
+    final base = OrbitMediaPose(progress, mount: end.mount);
+    final heading = atan2(sin(end.heading), cos(end.heading)) * world;
+    final zoom = exp(log(.9) * (1 - world) + log(end.zoom) * world);
+    final pitch = atan2(.77, .64) * (1 - world);
+    final depth = .64 * cos(pitch) + .77 * sin(pitch);
+    final offset =
+        (StreetviewLayout.height * .54 - StreetviewLayout.mapHeight / 2) *
+        (1 - world) /
+        (.8 * zoom * depth);
+    return OrbitMediaPose(
+      progress,
+      mount: end.mount,
+      turn: heading - base.heading,
+      tilt: pitch,
+      distanceScale: zoom / base.zoom,
+      // Match the centre of the 2D map above its place sheet at takeoff.
+      focus:
+          Offset(sin(heading), cos(heading)) * offset +
+          (end.mount?.center ?? Offset.zero) * (world - base._framing),
+      lift: (end.mount?.baseAbovePin ?? 0) * (world - base._framing),
+    );
   }
 
   static double _heading(double progress, double turn, OrbitWallMount? mount) =>
