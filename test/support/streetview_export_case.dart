@@ -214,10 +214,35 @@ void testStreetviewExport(
                   await hasMedia(frames[1].last as String);
               final flight = frames[2] as List;
               if (transition == 'arrow') {
+                Future<Offset> panelCenter(int i, double time) async {
+                  final scene = await OrbitScene.load(
+                    p.clips[i].streetview.mapPath!,
+                  );
+                  return MatrixUtils.transformPoint(
+                        OrbitMediaPose.at('media', time, scene: scene).matrix,
+                        const Offset(180, 320),
+                      ) *
+                      3;
+                }
+
+                final from = await panelCenter(0, 1),
+                    to = await panelCenter(1, 0);
                 checks['dolly leaves the outgoing panel and reaches the next panel'] =
-                    await hasMedia(flight.first, x: 620, y: 915) &&
-                    !await hasMedia(flight[5], x: 620, y: 915) &&
-                    await hasMedia(flight.last, x: 580, y: 915);
+                    await hasMedia(
+                      flight.first,
+                      x: from.dx.round(),
+                      y: from.dy.round(),
+                    ) &&
+                    !await hasMedia(
+                      flight[5],
+                      x: from.dx.round(),
+                      y: from.dy.round(),
+                    ) &&
+                    await hasMedia(
+                      flight.last,
+                      x: to.dx.round(),
+                      y: to.dy.round(),
+                    );
               }
               checks['opening thumbnail displays the first clip'] =
                   await hasMedia(frames[0].first, x: 150, y: 1490);

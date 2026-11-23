@@ -20,11 +20,18 @@ class OrbitMediaPose {
     this.lift = 0,
   });
   double get _framing => (progress / .35).clamp(0.0, 1.0);
-  // Retain some surrounding streetscape even when framing a small facade.
-  double get zoom =>
-      (1 + .74 * progress) *
-      distanceScale /
-      pow(mount?.sizeFactor ?? 1, .94 * _framing);
+  double get zoom {
+    final wall = mount;
+    if (wall == null) return (1 + .74 * progress) * distanceScale;
+
+    // Establish the location at 450 m across, independent of facade size.
+    // Move closer in log space so a small wall doesn't cause a sudden jump.
+    final t = ((progress - .45) / .48).clamp(0.0, 1.0);
+    final approach = t * t * (3 - 2 * t);
+    final detailZoom = 1.45 / pow(wall.sizeFactor, .86);
+    return exp(approach * log(detailZoom)) * distanceScale;
+  }
+
   double get _panelScale => .30 * zoom * (mount?.sizeFactor ?? 1);
 
   factory OrbitMediaPose.at(String kind, double t, {OrbitScene? scene}) {

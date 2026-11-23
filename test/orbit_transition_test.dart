@@ -38,6 +38,30 @@ void main() {
       expect(saved.placementDescription, contains('Media on building wall'));
     },
   );
+  test(
+    'small facades start in neighborhood context and finish readable',
+    () async {
+      final station = await OrbitScene.load('assets/streetview3d/tokyo.json');
+      for (final scene in [city, station]) {
+        final first = OrbitMediaPose.at('media', 0, scene: scene);
+        expect(first.mount, isNotNull);
+        expect(450 / first.zoom, closeTo(450, .001));
+        expect(OrbitMediaPose.at('media', .25, scene: scene).zoom, first.zoom);
+        const viewport = Size(360, 640);
+        final pin = first.pin(viewport, .8 * first.zoom);
+        expect((Offset.zero & viewport).deflate(20).contains(pin), isTrue);
+        var previous = first.zoom;
+        for (int i = 1; i <= 30; i++) {
+          final pose = OrbitMediaPose.at('media', i / 30, scene: scene);
+          expect(pose.zoom, greaterThanOrEqualTo(previous));
+          previous = pose.zoom;
+        }
+        final end = OrbitMediaPose.at('media', 1, scene: scene);
+        expect(end.sx, inInclusiveRange(.24, .45));
+        expect(end.zoom, greaterThan(first.zoom));
+      }
+    },
+  );
   test('map flight meets the overhead map and the exact media pose', () {
     for (final scene in [flat, city]) {
       for (final returning in [true, false]) {
