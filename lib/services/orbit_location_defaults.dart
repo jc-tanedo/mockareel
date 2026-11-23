@@ -47,9 +47,11 @@ abstract final class OrbitLocationDefaults {
         current.locationSelected =
             previous.canCaptureMap || previous.place.latitude != null;
         current.locationOrigin = 'previous';
+        current.locationId = previous.locationId;
         current.mapPath = previous.mapPath;
         changed = true;
-      } else if (current.mapPath == null &&
+      } else if (current.locationId == null &&
+          current.mapPath == null &&
           previous.mapPath != null &&
           current.place.latitude != null &&
           current.place.longitude != null &&

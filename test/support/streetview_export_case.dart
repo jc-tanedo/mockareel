@@ -327,6 +327,11 @@ void testStreetviewExport(
         expect(find.byType(CircularProgressIndicator), findsNothing);
       }
 
+      if (orbit) {
+        await tester.pump();
+        await tester.tap(find.text('Clips').last);
+        await tester.pump();
+      }
       await settleMedia();
       await tester.tap(find.text('Export').last);
       await settleMedia();

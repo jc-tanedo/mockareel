@@ -12,6 +12,7 @@ import 'place_form_controllers.dart';
 import 'text_editor.dart';
 
 class MapsEditorScaffold extends StatelessWidget {
+  final Widget? locationsEditor;
   final int tab;
   final ReelProject project;
   final ProjectStore store;
@@ -59,6 +60,7 @@ class MapsEditorScaffold extends StatelessWidget {
 
   const MapsEditorScaffold({
     super.key,
+    this.locationsEditor,
     required this.tab,
     required this.project,
     required this.store,
@@ -108,6 +110,10 @@ class MapsEditorScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final orbit = project.isStreetview3d;
+    final labels = orbit
+        ? ['Locations', 'Clips', ...CreationSteps.labels.skip(2)]
+        : CreationSteps.labels;
     return PopScope(
       canPop: !exporting && !dirty,
       onPopInvokedWithResult: (didPop, result) {
@@ -158,10 +164,27 @@ class MapsEditorScaffold extends StatelessWidget {
                 if (!keyboard)
                   CreationStepHeading(
                     step: tab,
+                    stepLabels: labels,
+                    stepTitles: orbit
+                        ? [
+                            'Choose journey locations',
+                            'Arrange your clips',
+                            ...CreationSteps.titles.skip(2),
+                          ]
+                        : CreationSteps.titles,
+                    stepDescriptions: orbit
+                        ? [
+                            'Choose one or more places, then add clips to each.',
+                            'Set the order, timing and motion of your clips.',
+                            ...CreationSteps.descriptions.skip(2),
+                          ]
+                        : CreationSteps.descriptions,
                     onNext: () => onGoToStep(min(4, tab + 1)),
                   ),
                 Expanded(
-                  child: tab == 2
+                  child: tab == 0 && locationsEditor != null
+                      ? locationsEditor!
+                      : tab == 2
                       ? TextEditor(
                           keyboardVisible: keyboard,
                           key: ValueKey(project.id),
@@ -216,8 +239,11 @@ class MapsEditorScaffold extends StatelessWidget {
                 ? null
                 : CreationSteps(
                     selected: tab,
+                    customLabels: labels,
                     completed: [
-                      project.place.name.trim().isNotEmpty,
+                      orbit
+                          ? project.streetview.locations.isNotEmpty
+                          : project.place.name.trim().isNotEmpty,
                       project.clips.isNotEmpty,
                       project.tags.isNotEmpty,
                       project.music != null,

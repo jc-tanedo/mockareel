@@ -13,6 +13,7 @@ import '../services/native_renderer.dart';
 import '../services/project_store.dart';
 import '../widgets/export_monitor.dart';
 import '../widgets/maps_editor_scaffold.dart';
+import '../widgets/orbit_locations_editor.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/offscreen_capture_stage.dart';
 import '../widgets/place_form_controllers.dart';
@@ -51,6 +52,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   String? _captureHeroPath;
   Map<String, String> _capturePosters = {};
   Timer? _autosave;
+  OrbitLocation? _location;
   static const _buildKey = String.fromEnvironment('MAPS_API_KEY');
 
   @override
@@ -82,6 +84,8 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           _renderer.mediaCoordinates,
         );
         located = OrbitLocationDefaults.inherit(project.clips) || located;
+        located =
+            project.streetview.adoptClipLocations(project.clips) || located;
         if (!mounted) return;
       }
       _setProject(project);
@@ -94,6 +98,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
 
   void _setProject(ReelProject project) {
     _project = project;
+    _location = project.streetview.locations.firstOrNull;
     _selected = _captureIndex = 0;
     _captureHeroPath = _capturePosition = null;
     _captureSnapshot = false;
@@ -192,14 +197,52 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     ),
   );
 
-  Future<void> _pickMedia() => _runImport(
+  Future<void> _pickMedia() async {
+    if (!_project.isStreetview3d) return _importClips();
+    final locations = _project.streetview.locations;
+    if (locations.isEmpty) {
+      _goToStep(0);
+      _toast('Choose a location for your clips first.');
+      return;
+    }
+    final choice = await showDialog<({OrbitLocation? target})>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Where should these clips appear?'),
+        children: [
+          for (final location in locations)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, (target: location)),
+              child: Text(location.label),
+            ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, (target: null as OrbitLocation?)),
+            child: const Text('Use media GPS'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    await _importClips(choice.target);
+  }
+
+  Future<void> _importClips([OrbitLocation? target]) => _runImport(
     () => MapsEditorActions.pickMedia(
       isActive: () => mounted,
       project: _project,
       store: _store,
       renderer: _renderer,
+      location: target,
       onAdded: (index) {
         _selected = index;
+        if (_project.isStreetview3d) {
+          _project.streetview.adoptClipLocations(_project.clips);
+          _location =
+              _project.streetview.locationFor(_project.clips[index]) ??
+              _location;
+          _tab = 1;
+        }
         _previewRevision = newId();
         _change();
       },
@@ -383,6 +426,17 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     } else {
       _selected = missingClip;
     }
+    if (_project.isStreetview3d && missingClip != null) {
+      final target = _project.streetview.locationFor(
+        _project.clips[missingClip],
+      );
+      if (target == null) {
+        _timelineTool = 2;
+        _goToStep(1);
+        return;
+      }
+      _location = target;
+    }
     _goToStep(0);
   }
 
@@ -447,6 +501,19 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       );
     }
     return MapsEditorScaffold(
+      locationsEditor: _project.isStreetview3d
+          ? OrbitLocationsEditor(
+              project: _project,
+              store: _store,
+              selected: _location ?? _project.streetview.locations.firstOrNull,
+              onUseGps: () => _importClips(),
+              importing: _importing,
+              onSelect: (location) => setState(() => _location = location),
+              onChanged: _change,
+              onSettings: _settings,
+              onPickClips: _importClips,
+            )
+          : null,
       tab: _tab,
       project: _project,
       store: _store,

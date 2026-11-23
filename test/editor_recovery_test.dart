@@ -10,6 +10,7 @@ import 'package:mockareel/pages/maps_web_search_page.dart';
 import 'package:mockareel/services/export_maps.dart';
 import 'package:mockareel/widgets/maps_editor_scaffold.dart';
 import 'package:mockareel/widgets/maps_key_dialog.dart';
+import 'package:mockareel/widgets/orbit_locations_editor.dart';
 import 'package:mockareel/widgets/streetview_inspector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -269,9 +270,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(
         tester
-            .widget<StreetviewInspector>(find.byType(StreetviewInspector))
-            .clip,
-        same(clips.last),
+            .widget<OrbitLocationsEditor>(find.byType(OrbitLocationsEditor))
+            .selected
+            ?.id,
+        clips.last.streetview.locationId,
       );
       final tileSettings = find.text('Google 3D tile settings');
       await tester.ensureVisible(tileSettings);

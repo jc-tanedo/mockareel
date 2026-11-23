@@ -160,7 +160,12 @@ class ProjectStore {
           }
           (clips[i]['streetview'] as Map)['walkLayers'] = names;
         }
-        final path = settings.mapPath;
+      }
+      for (final fields in [
+        for (final clip in clips) clip['streetview'] as Map,
+        ...?(data['streetview']['locations'] as List?)?.cast<Map>(),
+      ]) {
+        final path = fields['mapPath'] as String?;
         if (path == null) continue;
         var relative = maps[path];
         if (relative == null) {
@@ -169,7 +174,7 @@ class ProjectStore {
           maps[path] = relative;
           await encoder.addFile(File(path), relative);
         }
-        (clips[i]['streetview'] as Map)['mapPath'] = relative;
+        fields['mapPath'] = relative;
       }
       if (project.feed.homeMedia != null) {
         final home = project.feed.homeMedia!;
@@ -248,18 +253,23 @@ class ProjectStore {
               for (final source in layers) await restoreExtra(source as String),
             ];
           }
-          final source = streetview?['mapPath'] as String?;
-          if (source != null) {
-            final restored = restoredMaps[source] ?? await restoreExtra(source);
-            restoredMaps[source] = restored;
-            streetview!['mapPath'] = restored;
-          }
           final post = clip['post'] as Map?;
           if (post?['avatarPath'] != null) {
             post!['avatarPath'] = await restoreExtra(
               post['avatarPath'] as String,
             );
           }
+        }
+        for (final fields in [
+          for (final clip in clips) ?(clip['streetview'] as Map?),
+          ...?((json['streetview'] as Map?)?['locations'] as List?)
+              ?.cast<Map>(),
+        ]) {
+          final source = fields['mapPath'] as String?;
+          if (source == null) continue;
+          final restored = restoredMaps[source] ?? await restoreExtra(source);
+          restoredMaps[source] = restored;
+          fields['mapPath'] = restored;
         }
         final home = (json['feed'] as Map?)?['homeMedia'] as Map?;
         if (home != null) {

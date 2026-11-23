@@ -1,4 +1,5 @@
-import 'project.dart' show PlaceDetails;
+import 'dart:convert';
+import 'project.dart' show PlaceDetails, ReelClip, newId;
 
 // Bounds also apply to imported projects, before timeline or renderer use.
 double _seconds(dynamic value, double fallback, double min, double max) =>
@@ -6,21 +7,131 @@ double _seconds(dynamic value, double fallback, double min, double max) =>
     ? value.toDouble().clamp(min, max)
     : fallback;
 
+class OrbitLocation {
+  final String id;
+  PlaceDetails place;
+  String? mapPath;
+  OrbitLocation({String? id, required this.place, this.mapPath})
+    : id = id ?? newId();
+  String get label {
+    if (place.name.trim().isNotEmpty) return place.name;
+    if (place.address.trim().isNotEmpty) return place.address;
+    if (place.latitude != null && place.longitude != null) {
+      return '${place.latitude!.toStringAsFixed(4)}, ${place.longitude!.toStringAsFixed(4)}';
+    }
+    return 'Dropped pin';
+  }
+
+  void assign(ReelClip clip) {
+    clip.streetview
+      ..locationId = id
+      ..locationSelected = true
+      ..locationOrigin = ''
+      ..place = PlaceDetails.fromJson(place.toJson())
+      ..mapPath = mapPath;
+  }
+
+  factory OrbitLocation.fromJson(Map<String, dynamic> json) => OrbitLocation(
+    id: json['id'] as String,
+    place: PlaceDetails.fromJson(json['place'] as Map<String, dynamic>),
+    mapPath: json['mapPath'] as String?,
+  );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'place': place.toJson(),
+    'mapPath': mapPath,
+  };
+}
+
 class StreetviewSettings {
   double openingMapSeconds, laterMapSeconds;
   bool endOnMap;
+  final List<OrbitLocation> locations;
+
+  OrbitLocation? locationFor(ReelClip clip) =>
+      locations.where((l) => l.id == clip.streetview.locationId).firstOrNull;
+
+  // Old reels stored places only on clips. Preserve their order and overrides.
+  bool adoptClipLocations(List<ReelClip> clips) {
+    final known = locations.map((l) => l.id).toSet();
+    String signature(PlaceDetails place, String? path) =>
+        jsonEncode([path, place.toJson()]);
+    final byPlace = {
+      for (final location in locations)
+        signature(location.place, location.mapPath): location,
+    };
+    var changed = false;
+    for (final clip in clips) {
+      final media = clip.streetview;
+      if (known.contains(media.locationId)) continue;
+      final place = media.place;
+      if (!media.canCaptureMap &&
+          media.mapPath == null &&
+          place.name.isEmpty &&
+          place.address.isEmpty &&
+          place.latitude == null) {
+        continue;
+      }
+      final key = signature(place, media.mapPath);
+      final location = byPlace.putIfAbsent(key, () {
+        final added = OrbitLocation(
+          place: PlaceDetails.fromJson(place.toJson()),
+          mapPath: media.mapPath,
+        );
+        locations.add(added);
+        known.add(added.id);
+        return added;
+      });
+      media.locationId = location.id;
+      changed = true;
+    }
+    return changed;
+  }
+
+  int addClipsAt(
+    OrbitLocation location,
+    List<ReelClip> clips,
+    List<ReelClip> added,
+  ) {
+    final last = clips.lastIndexWhere(
+      (c) => c.streetview.locationId == location.id,
+    );
+    var insertAt = last + 1;
+    if (last < 0) {
+      final later = locations
+          .skip(locations.indexOf(location) + 1)
+          .map((l) => l.id)
+          .toSet();
+      insertAt = clips.indexWhere(
+        (c) => later.contains(c.streetview.locationId),
+      );
+      if (insertAt < 0) insertAt = clips.length;
+    }
+    for (final clip in added) {
+      location.assign(clip);
+    }
+    clips.insertAll(insertAt, added);
+    return insertAt;
+  }
+
   StreetviewSettings({
     this.openingMapSeconds = 2,
     this.laterMapSeconds = 1.5,
     this.endOnMap = false,
-  });
+    List<OrbitLocation>? locations,
+  }) : locations = locations ?? [];
   factory StreetviewSettings.fromJson(Map<String, dynamic> j) =>
       StreetviewSettings(
+        locations: (j['locations'] as List?)
+            ?.map((e) => OrbitLocation.fromJson(e as Map<String, dynamic>))
+            .toList(),
         openingMapSeconds: _seconds(j['openingMapSeconds'], 2, .5, 30),
         laterMapSeconds: _seconds(j['laterMapSeconds'], 1.5, .5, 30),
         endOnMap: j['endOnMap'] == true,
       );
   Map<String, dynamic> toJson() => {
+    if (locations.isNotEmpty)
+      'locations': locations.map((l) => l.toJson()).toList(),
     'openingMapSeconds': openingMapSeconds,
     'laterMapSeconds': laterMapSeconds,
     'endOnMap': endOnMap,
@@ -37,6 +148,7 @@ class StreetviewMedia {
   String date, attribution, copyright, moreDatesLabel;
   bool locationSelected;
   String locationOrigin;
+  String? locationId;
   bool get canCaptureMap =>
       locationSelected ||
       (place.mapsUrl?.isNotEmpty ?? false) ||
@@ -70,6 +182,7 @@ class StreetviewMedia {
     this.moreDatesLabel = 'See more dates',
     this.locationSelected = false,
     this.locationOrigin = '',
+    this.locationId,
     this.showControls = true,
     this.showArrows = true,
     this.showLocation = true,
@@ -96,6 +209,7 @@ class StreetviewMedia {
     place: PlaceDetails.fromJson(
       Map<String, dynamic>.from(j['place'] as Map? ?? {}),
     ),
+    locationId: j['locationId'] as String?,
     locationOrigin: j['locationOrigin'] as String? ?? '',
     mapPath: j['mapPath'] as String?,
     walkDepth: switch (j['walkDepth']) {
@@ -146,6 +260,7 @@ class StreetviewMedia {
     'attribution': attribution,
     'copyright': copyright,
     'moreDatesLabel': moreDatesLabel,
+    if (locationId != null) 'locationId': locationId,
     if (locationOrigin.isNotEmpty) 'locationOrigin': locationOrigin,
     'locationSelected': locationSelected,
     'showControls': showControls,

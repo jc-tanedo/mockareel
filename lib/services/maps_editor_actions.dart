@@ -75,6 +75,7 @@ class MapsEditorActions {
     required ReelProject project,
     required ProjectStore store,
     required NativeRenderer renderer,
+    OrbitLocation? location,
     required void Function(int newSelectedIndex) onAdded,
     required void Function(String message) onToast,
     bool Function()? isActive,
@@ -87,16 +88,25 @@ class MapsEditorActions {
     );
     if (isActive?.call() == false) return;
     if (result.clips.isNotEmpty) {
-      if (project.isStreetview3d) {
-        await OrbitLocationDefaults.read(
-          result.clips,
-          renderer.mediaCoordinates,
+      if (location != null) {
+        if (!project.streetview.locations.contains(location)) return;
+        onAdded(
+          project.streetview.addClipsAt(location, project.clips, result.clips),
         );
-        if (isActive?.call() == false) return;
+      } else {
+        if (project.isStreetview3d) {
+          await OrbitLocationDefaults.read(
+            result.clips,
+            renderer.mediaCoordinates,
+          );
+          if (isActive?.call() == false) return;
+        }
+        project.clips.addAll(result.clips);
+        if (project.isStreetview3d) {
+          OrbitLocationDefaults.inherit(project.clips);
+        }
+        onAdded(project.clips.length - 1);
       }
-      project.clips.addAll(result.clips);
-      if (project.isStreetview3d) OrbitLocationDefaults.inherit(project.clips);
-      onAdded(project.clips.length - 1);
     }
     if (result.failures > 0) {
       onToast(

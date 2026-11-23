@@ -110,8 +110,10 @@ class MapsExportPanel extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Add at least one photo or video in Timeline '
-                          'to export.',
+                          project.isStreetview3d
+                              ? 'Add clips to a location to export.'
+                              : 'Add at least one photo or video in Timeline '
+                                    'to export.',
                           style: textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),

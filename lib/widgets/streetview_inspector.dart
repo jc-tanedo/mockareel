@@ -1,5 +1,5 @@
 import 'editor_section_card.dart';
-import 'dart:convert';
+import 'orbit_capture.dart';
 import 'dart:io';
 import '../services/photo_walk.dart';
 import '../services/orbit_location_defaults.dart';
@@ -10,9 +10,7 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/maps_web_result.dart';
 import '../pages/maps_web_search_page.dart';
-import '../pages/google_orbit_capture_page.dart';
 import '../model/orbit_scene.dart';
-import 'maps_key_dialog.dart';
 import '../pages/maps_web_header_page.dart';
 import '../services/project_store.dart';
 import 'place_actions_editor.dart';
@@ -100,40 +98,10 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       late final List<int> bytes;
       String? coverage;
       if (orbit) {
-        if (place.latitude == null || place.longitude == null) {
-          final coords = await showDialog<(double, double)>(
-            context: context,
-            builder: (_) => const _PinCoordinates(),
-          );
-          if (coords == null || !mounted || widget.clip != clip) return;
-          place.latitude = coords.$1;
-          place.longitude = coords.$2;
-        }
-        final config = await MapsAdvancedSettings.load(
-          defaultKey: const String.fromEnvironment('MAPS_API_KEY'),
-        );
-        if (!mounted || widget.clip != clip) return;
-        String? scene, fallbackReason;
-        if (config.key.trim().isNotEmpty) {
-          final result = await Navigator.of(context).push<GoogleOrbitResult>(
-            MaterialPageRoute(
-              builder: (_) => GoogleOrbitCapturePage(
-                apiKey: config.key.trim(),
-                latitude: place.latitude!,
-                longitude: place.longitude!,
-              ),
-            ),
-          );
-          if (result == null || !mounted || widget.clip != clip) return;
-          scene = result.scene;
-          fallbackReason = result.reason;
-        }
-        scene ??= await OpenOrbitMap.fetch(place.latitude!, place.longitude!);
-        coverage = [
-          ?fallbackReason,
-          OrbitScene.decode(scene).coverage,
-        ].join(' ');
-        bytes = utf8.encode(scene);
+        final result = await captureOrbit(context, place);
+        if (result == null) return;
+        coverage = result.coverage;
+        bytes = result.bytes;
       } else {
         final png = await Navigator.of(context).push<Uint8List>(
           MaterialPageRoute(
@@ -151,8 +119,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       final name = orbit
           ? 'orbit-${newId()}.json'
           : 'streetview-${newId()}.png';
-      pending = File('${widget.store.root!.path}/media/$name');
-      await pending.writeAsBytes(bytes, flush: true);
+      pending = await writeMapAsset(widget.store, name, bytes);
       if (!mounted || widget.clip != clip || _s.place != original) return;
 
       if (replacement != null) {
@@ -166,7 +133,10 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       }
       _s.mapPath = pending.path;
       pending = null;
-      if (orbit) OrbitLocationDefaults.inherit(widget.project.clips);
+      if (orbit) {
+        OrbitLocationDefaults.inherit(widget.project.clips);
+        widget.project.streetview.adoptClipLocations(widget.project.clips);
+      }
       widget.onChanged();
       if (coverage != null) {
         ScaffoldMessenger.of(
@@ -245,68 +215,70 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      EditorSectionCard(
-        title: const Text('Media location'),
-        subtitle: const Text('Location and captured map for this media'),
-        children: [
-          FilledButton.icon(
-            onPressed: _busy ? null : _location,
-            icon: const Icon(Icons.search),
-            label: const Text('Select this media’s location'),
-          ),
-          if (widget.project.isStreetview3d)
-            TextButton.icon(
-              onPressed: _busy ? null : widget.onSettings,
-              icon: const Icon(Icons.key),
-              label: const Text('Google 3D tile settings'),
+      if (!widget.project.isStreetview3d ||
+          widget.project.streetview.locationFor(widget.clip) == null)
+        EditorSectionCard(
+          title: const Text('Media location'),
+          subtitle: const Text('Location and captured map for this media'),
+          children: [
+            FilledButton.icon(
+              onPressed: _busy ? null : _location,
+              icon: const Icon(Icons.search),
+              label: const Text('Select this media’s location'),
             ),
-          if (widget.project.isStreetview3d)
-            TextButton.icon(
-              icon: const Icon(Icons.location_city),
-              label: const Text('Use Tokyo Station'),
-              onPressed: _busy
-                  ? null
-                  : () => _capture(
-                      replacement: PlaceDetails(
-                        name: 'Tokyo Station',
-                        address: 'Marunouchi, Tokyo',
-                        latitude: OpenOrbitMap.tokyoLat,
-                        longitude: OpenOrbitMap.tokyoLon,
-                      ),
-                    ),
-            ),
-          if (_s.canCaptureMap || _task == _InspectorTask.captureMap)
-            TextButton.icon(
-              onPressed: _busy ? null : _capture,
-              icon: const Icon(Icons.map_outlined),
-              label: Text(
-                _task == _InspectorTask.captureMap
-                    ? 'Capturing…'
-                    : _s.mapPath == null
-                    ? 'Capture map'
-                    : 'Replace captured map',
+            if (widget.project.isStreetview3d)
+              TextButton.icon(
+                onPressed: _busy ? null : widget.onSettings,
+                icon: const Icon(Icons.key),
+                label: const Text('Google 3D tile settings'),
               ),
-            ),
-          if (widget.project.isStreetview3d &&
-              _s.place.latitude != null &&
-              _s.place.longitude != null)
-            Text(
-              [
-                if (_s.locationOrigin == 'media')
-                  'Media GPS'
-                else if (_s.locationOrigin == 'previous')
-                  'Previous media'
-                else
-                  'Selected pin',
-                '${_s.place.latitude!.toStringAsFixed(5)}, ${_s.place.longitude!.toStringAsFixed(5)}',
-              ].join(' · '),
-            ),
-          if (widget.project.isStreetview3d && _s.mapPath != null)
-            _OrbitCoverage(path: _s.mapPath!),
-          _field('Place name', _s.place.name, (v) => _s.place.name = v),
-          _field('Address', _s.place.address, (v) => _s.place.address = v),
-        ],
-      ),
+            if (widget.project.isStreetview3d)
+              TextButton.icon(
+                icon: const Icon(Icons.location_city),
+                label: const Text('Use Tokyo Station'),
+                onPressed: _busy
+                    ? null
+                    : () => _capture(
+                        replacement: PlaceDetails(
+                          name: 'Tokyo Station',
+                          address: 'Marunouchi, Tokyo',
+                          latitude: OpenOrbitMap.tokyoLat,
+                          longitude: OpenOrbitMap.tokyoLon,
+                        ),
+                      ),
+              ),
+            if (_s.canCaptureMap || _task == _InspectorTask.captureMap)
+              TextButton.icon(
+                onPressed: _busy ? null : _capture,
+                icon: const Icon(Icons.map_outlined),
+                label: Text(
+                  _task == _InspectorTask.captureMap
+                      ? 'Capturing…'
+                      : _s.mapPath == null
+                      ? 'Capture map'
+                      : 'Replace captured map',
+                ),
+              ),
+            if (widget.project.isStreetview3d &&
+                _s.place.latitude != null &&
+                _s.place.longitude != null)
+              Text(
+                [
+                  if (_s.locationOrigin == 'media')
+                    'Media GPS'
+                  else if (_s.locationOrigin == 'previous')
+                    'Previous media'
+                  else
+                    'Selected pin',
+                  '${_s.place.latitude!.toStringAsFixed(5)}, ${_s.place.longitude!.toStringAsFixed(5)}',
+                ].join(' · '),
+              ),
+            if (widget.project.isStreetview3d && _s.mapPath != null)
+              _OrbitCoverage(path: _s.mapPath!),
+            _field('Place name', _s.place.name, (v) => _s.place.name = v),
+            _field('Address', _s.place.address, (v) => _s.place.address = v),
+          ],
+        ),
       if (!widget.project.isStreetview3d)
         EditorSectionCard(
           title: const Text('Map place details and buttons'),
@@ -519,67 +491,6 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       ),
     ],
   );
-}
-
-class _PinCoordinates extends StatefulWidget {
-  const _PinCoordinates();
-  @override
-  State<_PinCoordinates> createState() => _PinCoordinatesState();
-}
-
-class _PinCoordinatesState extends State<_PinCoordinates> {
-  String lat = '', lon = '';
-  @override
-  Widget build(BuildContext context) {
-    final latitude = double.tryParse(lat.trim()),
-        longitude = double.tryParse(lon.trim());
-    final valid =
-        latitude != null &&
-        latitude.abs() <= 85 &&
-        longitude != null &&
-        longitude.abs() <= 180;
-    return AlertDialog(
-      title: const Text('Enter pin coordinates'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'The selected place did not include coordinates. Enter its pin to load buildings and terrain.',
-            ),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Latitude'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              onChanged: (v) => setState(() => lat = v),
-            ),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Longitude'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              onChanged: (v) => setState(() => lon = v),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: valid
-              ? () => Navigator.pop(context, (latitude, longitude))
-              : null,
-          child: const Text('Load map'),
-        ),
-      ],
-    );
-  }
 }
 
 class _OrbitCoverage extends StatefulWidget {

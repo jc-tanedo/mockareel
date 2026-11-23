@@ -122,6 +122,11 @@ class MapsEditorInspector extends StatelessWidget {
         onPreviewUpdated: onPreviewUpdated,
       ),
       1 => MapsTimelineEditor(
+        onEditLocation: () => onGoToPlaceHeader(
+          project.streetview.locationFor(project.clips[selectedIndex]) == null
+              ? null
+              : selectedIndex,
+        ),
         onSettings: onSettings,
         project: project,
         selectedIndex: selectedIndex,
