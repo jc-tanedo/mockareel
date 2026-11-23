@@ -70,6 +70,14 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                     handler.post { result.success(path) }
                 } catch (e: Exception) { handler.post { result.error("MEDIA", "Could not create a video thumbnail: ${e.message}", null) } }
             }
+            "mediaCoordinates" -> worker.execute {
+                val location = try {
+                    MediaCoordinates.read(requireNotNull(call.argument<String>("path")), call.argument<Boolean>("video") == true)
+                } catch (_: Exception) {
+                    null // Unsupported files and stripped GPS tags can still be imported.
+                }
+                handler.post { result.success(location) }
+            }
             "inspect" -> worker.execute {
                 try {
                     val info = inspect(requireNotNull(call.argument<String>("path")))
@@ -401,7 +409,12 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                         val entry = FeedMotion.entry(sceneOffset + clock.elapsed(timeUs), transition)
                         Matrix().apply {
                             val camera = clip["cameraMotion"] as? Map<String, Any>
-                            if (camera != null) {
+                            val planeFrames = clip["orbitPlaneFrames"] as? List<*>
+                            if (!planeFrames.isNullOrEmpty()) {
+                                val frame = ((sceneOffset + clock.elapsed(timeUs)) * 30).roundToInt().coerceIn(0, planeFrames.lastIndex)
+                                val coefficients = planeFrames[frame] as List<*>
+                                setValues(FloatArray(9) { (coefficients[it] as Number).toFloat() })
+                            } else if (camera != null) {
                                 setValues(StreetviewMotion.matrix(sceneOffset + clock.elapsed(timeUs), total, camera))
                             } else if (clip["slowPanZoom"] == true) {
                                 val t = ((sceneOffset + clock.elapsed(timeUs)) / total).coerceIn(0.0, 1.0).toFloat()

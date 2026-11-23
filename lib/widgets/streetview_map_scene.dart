@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'orbit_map.dart';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
@@ -23,7 +22,6 @@ Widget streetviewRoundButton(
 class StreetviewMapScene extends StatelessWidget {
   final StreetviewMedia settings;
   final bool dark, showThumbnail;
-  final double? orbitProgress;
   final Widget thumbnail;
   const StreetviewMapScene({
     super.key,
@@ -31,7 +29,6 @@ class StreetviewMapScene extends StatelessWidget {
     required this.dark,
     required this.thumbnail,
     this.showThumbnail = true,
-    this.orbitProgress,
   });
 
   @override
@@ -51,13 +48,7 @@ class StreetviewMapScene extends StatelessWidget {
             top: 0,
             right: 0,
             height: StreetviewLayout.mapHeight,
-            child: orbitProgress == null
-                ? Image.file(File(settings.mapPath!), fit: BoxFit.contain)
-                : OrbitMap(
-                    path: settings.mapPath!,
-                    progress: orbitProgress!,
-                    dark: dark,
-                  ),
+            child: Image.file(File(settings.mapPath!), fit: BoxFit.contain),
           ),
         Positioned(
           left: 10,

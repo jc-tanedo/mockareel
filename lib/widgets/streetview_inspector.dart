@@ -1,6 +1,7 @@
 import 'editor_section_card.dart';
 import 'dart:io';
 import '../services/photo_walk.dart';
+import '../services/orbit_location_defaults.dart';
 import '../services/media_edits.dart';
 import '../services/open_orbit_map.dart';
 import 'dart:typed_data';
@@ -8,6 +9,9 @@ import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/maps_web_result.dart';
 import '../pages/maps_web_search_page.dart';
+import '../pages/google_orbit_capture_page.dart';
+import '../model/orbit_scene.dart';
+import 'maps_key_dialog.dart';
 import '../pages/maps_web_header_page.dart';
 import '../services/project_store.dart';
 import 'place_actions_editor.dart';
@@ -76,8 +80,12 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
     if (value == null || !mounted) return;
     _revision++;
     _s.place = value.place;
+    _s.locationOrigin = '';
     _s.locationSelected = true;
     _s.mapPath = null;
+    if (widget.project.isStreetview3d) {
+      OrbitLocationDefaults.inherit(widget.project.clips);
+    }
     widget.onChanged();
     await _capture();
   }
@@ -104,10 +112,33 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           place.longitude = coords.$2;
           widget.onChanged();
         }
-        final scene = await OpenOrbitMap.fetch(
-          place.latitude!,
-          place.longitude!,
+        final config = await MapsAdvancedSettings.load(
+          defaultKey: const String.fromEnvironment('MAPS_API_KEY'),
         );
+        if (!mounted || widget.clip != clip || _s.place != place) return;
+        String? scene;
+        String? fallbackReason;
+        if (config.key.trim().isNotEmpty) {
+          final result = await Navigator.of(context).push<GoogleOrbitResult>(
+            MaterialPageRoute(
+              builder: (_) => GoogleOrbitCapturePage(
+                apiKey: config.key.trim(),
+                latitude: place.latitude!,
+                longitude: place.longitude!,
+              ),
+            ),
+          );
+          if (result == null ||
+              !mounted ||
+              widget.clip != clip ||
+              _s.place != place) {
+            return;
+          }
+          scene = result.scene;
+          fallbackReason = result.reason;
+        }
+        scene ??= await OpenOrbitMap.fetch(place.latitude!, place.longitude!);
+        final captured = OrbitScene.decode(scene);
         if (!mounted || widget.clip != clip || _s.place != place) return;
         final file = File(
           '${widget.store.root!.path}/media/orbit-${newId()}.json',
@@ -118,7 +149,13 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           return;
         }
         _s.mapPath = file.path;
+        OrbitLocationDefaults.inherit(widget.project.clips);
         widget.onChanged();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text([?fallbackReason, captured.coverage].join(' ')),
+          ),
+        );
         return;
       }
       final bytes = await Navigator.of(context).push<Uint8List>(
@@ -220,11 +257,33 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ),
           if (widget.project.isStreetview3d)
             TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final current = await MapsAdvancedSettings.load(
+                        defaultKey: const String.fromEnvironment(
+                          'MAPS_API_KEY',
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      final updated = await MapsAdvancedSettings.show(
+                        context,
+                        initialKey: current.key,
+                        useApiHeaders: current.useApiHeaders,
+                      );
+                      await updated?.save();
+                    },
+              icon: const Icon(Icons.key),
+              label: const Text('Google 3D tile settings'),
+            ),
+          if (widget.project.isStreetview3d)
+            TextButton.icon(
               icon: const Icon(Icons.location_city),
               label: const Text('Use Tokyo Station'),
               onPressed: _busy
                   ? null
                   : () async {
+                      _s.locationOrigin = '';
                       _s.place = PlaceDetails(
                         name: 'Tokyo Station',
                         address: 'Marunouchi, Tokyo',
@@ -233,6 +292,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
                       );
                       _s.locationSelected = true;
                       _s.mapPath = null;
+                      OrbitLocationDefaults.inherit(widget.project.clips);
                       _revision++;
                       widget.onChanged();
                       await _capture();
@@ -250,25 +310,45 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
                     : 'Replace captured map',
               ),
             ),
+          if (widget.project.isStreetview3d &&
+              _s.place.latitude != null &&
+              _s.place.longitude != null)
+            Text(
+              [
+                if (_s.locationOrigin == 'media')
+                  'Media GPS'
+                else if (_s.locationOrigin == 'previous')
+                  'Previous media'
+                else
+                  'Selected pin',
+                '${_s.place.latitude!.toStringAsFixed(5)}, ${_s.place.longitude!.toStringAsFixed(5)}',
+              ].join(' · '),
+            ),
+          if (widget.project.isStreetview3d && _s.mapPath != null)
+            _OrbitCoverage(path: _s.mapPath!),
           _field('Place name', _s.place.name, (v) => _s.place.name = v),
           _field('Address', _s.place.address, (v) => _s.place.address = v),
         ],
       ),
-      EditorSectionCard(
-        title: const Text('Map place details and buttons'),
-        subtitle: const Text('Place information and rendered actions'),
-        children: [
-          _field('Category', _s.place.category, (v) => _s.place.category = v),
-          _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
-          PlaceActionsEditor(
-            key: ValueKey(_revision),
-            place: _s.place,
-            embedded: true,
-            suggestedActions: StreetviewPlaceSheet.actions(_s.place, map: true),
-            onChanged: widget.onChanged,
-          ),
-        ],
-      ),
+      if (!widget.project.isStreetview3d)
+        EditorSectionCard(
+          title: const Text('Map place details and buttons'),
+          subtitle: const Text('Place information and rendered actions'),
+          children: [
+            _field('Category', _s.place.category, (v) => _s.place.category = v),
+            _field('Rating', _s.place.rating, (v) => _s.place.rating = v),
+            PlaceActionsEditor(
+              key: ValueKey(_revision),
+              place: _s.place,
+              embedded: true,
+              suggestedActions: StreetviewPlaceSheet.actions(
+                _s.place,
+                map: true,
+              ),
+              onChanged: widget.onChanged,
+            ),
+          ],
+        ),
       MediaEditsEditor(
         key: ValueKey('effects-${widget.clip.id}'),
         clip: widget.clip,
@@ -402,7 +482,11 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ],
         ),
       EditorSectionCard(
-        title: const Text('Street View overlays'),
+        title: Text(
+          widget.project.isStreetview3d
+              ? 'Orbit labels and controls'
+              : 'Street View overlays',
+        ),
         subtitle: const Text('Labels and visibility for this media'),
         children: [
           _field('Capture date / age', _s.date, (v) => _s.date = v),
@@ -411,17 +495,23 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
             _s.streetviewTitle,
             (v) => _s.streetviewTitle = v,
           ),
-          _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
-          _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
+          if (!widget.project.isStreetview3d) ...[
+            _field('View badge', _s.aerialLabel, (v) => _s.aerialLabel = v),
+            _field('Nearby label', _s.nearbyLabel, (v) => _s.nearbyLabel = v),
 
-          _field(
-            'Source attribution',
-            _s.attribution,
-            (v) => _s.attribution = v,
-          ),
+            _field(
+              'Source attribution',
+              _s.attribution,
+              (v) => _s.attribution = v,
+            ),
+          ],
           _switch('Top controls', _s.showControls, (v) => _s.showControls = v),
           _switch('Navigation arrows', _s.showArrows, (v) => _s.showArrows = v),
-          _switch('Place sheet', _s.showLocation, (v) => _s.showLocation = v),
+          _switch(
+            widget.project.isStreetview3d ? 'Location label' : 'Place sheet',
+            _s.showLocation,
+            (v) => _s.showLocation = v,
+          ),
         ],
       ),
       EditorSectionCard(
@@ -512,4 +602,31 @@ class _PinCoordinatesState extends State<_PinCoordinates> {
       ],
     );
   }
+}
+
+class _OrbitCoverage extends StatefulWidget {
+  final String path;
+  const _OrbitCoverage({required this.path});
+  @override
+  State<_OrbitCoverage> createState() => _OrbitCoverageState();
+}
+
+class _OrbitCoverageState extends State<_OrbitCoverage> {
+  late var scene = OrbitScene.load(widget.path);
+  @override
+  void didUpdateWidget(_OrbitCoverage old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) scene = OrbitScene.load(widget.path);
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<OrbitScene>(
+    future: scene,
+    builder: (context, snapshot) => Text(
+      snapshot.data?.coverage ??
+          (snapshot.hasError
+              ? 'Orbit unavailable · replace captured map'
+              : 'Reading orbit…'),
+    ),
+  );
 }

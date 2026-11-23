@@ -6,6 +6,7 @@ import '../widgets/place_form_controllers.dart';
 import '../widgets/project_name_dialog.dart';
 import 'map_header_service.dart';
 import 'media_importer.dart';
+import 'orbit_location_defaults.dart';
 import 'native_renderer.dart';
 import 'project_store.dart';
 
@@ -82,10 +83,19 @@ class MapsEditorActions {
       store: store,
       renderer: renderer,
       defaultDuration: 3.5,
+      originalFiles: project.isStreetview3d,
     );
     if (isActive?.call() == false) return;
     if (result.clips.isNotEmpty) {
+      if (project.isStreetview3d) {
+        await OrbitLocationDefaults.read(
+          result.clips,
+          renderer.mediaCoordinates,
+        );
+        if (isActive?.call() == false) return;
+      }
       project.clips.addAll(result.clips);
+      if (project.isStreetview3d) OrbitLocationDefaults.inherit(project.clips);
       onAdded(project.clips.length - 1);
     }
     if (result.failures > 0) {

@@ -17,6 +17,19 @@ class NativeRenderer {
       Map<String, dynamic>.from(
         await channel.invokeMethod<Map>('inspect', {'path': path}) ?? {},
       );
+  Future<List<double>?> mediaCoordinates(ReelClip clip) async {
+    try {
+      return await channel.invokeListMethod<double>('mediaCoordinates', {
+        'path': clip.path,
+        'video': clip.isVideo,
+      });
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<String> thumbnail(String path, double seconds) async => (await channel
       .invokeMethod<String>('thumbnail', {'path': path, 'seconds': seconds}))!;
   Future<String> poster(ReelClip clip, {double position = 0}) async {

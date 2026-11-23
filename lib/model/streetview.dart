@@ -36,6 +36,7 @@ class StreetviewMedia {
   bool get walking => walkMove != 'hold' && walkLayers.length == 3;
   String date, attribution, copyright, moreDatesLabel;
   bool locationSelected;
+  String locationOrigin;
   bool get canCaptureMap =>
       locationSelected ||
       (place.mapsUrl?.isNotEmpty ?? false) ||
@@ -68,6 +69,7 @@ class StreetviewMedia {
     this.copyright = '© 2025 Google',
     this.moreDatesLabel = 'See more dates',
     this.locationSelected = false,
+    this.locationOrigin = '',
     this.showControls = true,
     this.showArrows = true,
     this.showLocation = true,
@@ -94,6 +96,7 @@ class StreetviewMedia {
     place: PlaceDetails.fromJson(
       Map<String, dynamic>.from(j['place'] as Map? ?? {}),
     ),
+    locationOrigin: j['locationOrigin'] as String? ?? '',
     mapPath: j['mapPath'] as String?,
     walkDepth: switch (j['walkDepth']) {
       final List d
@@ -143,6 +146,7 @@ class StreetviewMedia {
     'attribution': attribution,
     'copyright': copyright,
     'moreDatesLabel': moreDatesLabel,
+    if (locationOrigin.isNotEmpty) 'locationOrigin': locationOrigin,
     'locationSelected': locationSelected,
     'showControls': showControls,
     'showArrows': showArrows,

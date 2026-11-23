@@ -1,16 +1,18 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../model/orbit_scene.dart';
 
 class OrbitMap extends StatefulWidget {
   final String path;
-  final double progress;
+  final double progress, zoom;
   final bool dark;
   const OrbitMap({
     super.key,
     required this.path,
     required this.progress,
     required this.dark,
+    this.zoom = 1,
   });
   @override
   State<OrbitMap> createState() => _OrbitMapState();
@@ -43,7 +45,26 @@ class _OrbitMapState extends State<OrbitMap> {
       return Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(painter: OrbitPainter(map, widget.progress, widget.dark)),
+          if (map.atlas case final atlas?)
+            Image(
+              image: atlas,
+              excludeFromSemantics: true,
+              frameBuilder: (context, child, frame, sync) {
+                if (child is! RawImage || child.image == null) return child;
+                return CustomPaint(
+                  painter: _GoogleOrbitPainter(child.image!, widget.progress),
+                );
+              },
+            )
+          else
+            CustomPaint(
+              painter: OrbitPainter(
+                map,
+                widget.progress,
+                widget.dark,
+                zoom: widget.zoom,
+              ),
+            ),
           Align(
             alignment: Alignment.bottomCenter,
             child: ColoredBox(
@@ -65,15 +86,15 @@ class _OrbitMapState extends State<OrbitMap> {
 
 class OrbitPainter extends CustomPainter {
   final OrbitScene scene;
-  final double progress;
+  final double progress, zoom;
   final bool dark;
-  OrbitPainter(this.scene, this.progress, this.dark);
+  OrbitPainter(this.scene, this.progress, this.dark, {this.zoom = 1});
   @override
   void paint(Canvas canvas, Size size) {
     final angle = (-65 + 26 * progress) * pi / 180,
         c = cos(angle),
         s = sin(angle);
-    final scale = size.width / 450,
+    final scale = size.width / 450 * zoom,
         origin = Offset(size.width * .5, size.height * .54);
     final ground = scene.elevation(Offset.zero);
     double depth(Offset p) => p.dx * s + p.dy * c;
@@ -170,5 +191,36 @@ class OrbitPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(OrbitPainter old) =>
-      scene != old.scene || progress != old.progress || dark != old.dark;
+      scene != old.scene ||
+      progress != old.progress ||
+      dark != old.dark ||
+      zoom != old.zoom;
+}
+
+class _GoogleOrbitPainter extends CustomPainter {
+  final ui.Image atlas;
+  final double progress;
+  _GoogleOrbitPainter(this.atlas, this.progress);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final at = progress.clamp(0.0, 1.0) * 23;
+    final w = atlas.width / 6, h = atlas.height / 4;
+    void draw(int frame, double opacity) {
+      canvas.drawImageRect(
+        atlas,
+        Rect.fromLTWH((frame % 6) * w, (frame ~/ 6) * h, w, h * .5 / .54),
+        Offset.zero & size,
+        Paint()
+          ..filterQuality = FilterQuality.low
+          ..color = Colors.white.withValues(alpha: opacity),
+      );
+    }
+
+    draw(at.floor(), 1);
+    if (at.ceil() != at.floor()) draw(at.ceil(), at - at.floor());
+  }
+
+  @override
+  bool shouldRepaint(_GoogleOrbitPainter old) =>
+      old.atlas != atlas || old.progress != progress;
 }

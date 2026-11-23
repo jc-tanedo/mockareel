@@ -8,6 +8,7 @@ import '../services/maps_editor_actions.dart';
 import '../services/export_background_session.dart';
 import '../services/maps_export_pipeline.dart';
 import '../services/media_importer.dart';
+import '../services/orbit_location_defaults.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
 import '../widgets/export_monitor.dart';
@@ -74,8 +75,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (!mounted) return;
       _key = settings.key;
       _useApiHeaders = settings.useApiHeaders;
+      var located = false;
+      if (project.isStreetview3d) {
+        located = await OrbitLocationDefaults.read(
+          project.clips,
+          _renderer.mediaCoordinates,
+        );
+        located = OrbitLocationDefaults.inherit(project.clips) || located;
+        if (!mounted) return;
+      }
       _setProject(project);
       setState(() => _ready = true);
+      if (located) _change();
     } catch (e) {
       if (mounted) setState(() => _status = 'Storage error: $e');
     }

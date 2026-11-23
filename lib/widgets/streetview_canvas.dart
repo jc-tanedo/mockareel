@@ -6,7 +6,7 @@ import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
-import 'photo_walk_frame.dart';
+import 'orbit_journey_canvas.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
 
@@ -28,6 +28,16 @@ class StreetviewCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
+    if (project.isStreetview3d) {
+      return OrbitJourneyCanvas(
+        project: project,
+        position: position,
+        playing: playing,
+        overlayOnly: overlayOnly,
+        posterOnly: posterOnly,
+        posters: posters,
+      );
+    }
     final scene = StreetviewTimeline.at(project, position),
         i = scene.mediaIndex;
     final clip = project.clips[i], settings = clip.streetview;
@@ -50,13 +60,6 @@ class StreetviewCanvas extends StatelessWidget {
     // 100ms quick transition between map thumbnail and full sized media
     const transitionSec = 0.1;
     final isMedia = scene.kind == 'media';
-    final orbitProgress = project.isStreetview3d
-        ? (map
-              ? elapsed / scene.duration
-              : isMedia
-              ? 1.0
-              : 0.0)
-        : null;
     final isBack = scene.kind == 'back';
     // Arrow handoffs already arrive at full size. Only a map thumbnail
     // should expand into the next media scene.
@@ -118,25 +121,13 @@ class StreetviewCanvas extends StatelessWidget {
     final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
     final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
 
-    bool walking(ReelClip c) =>
-        project.isStreetview3d && !c.isTimed && c.streetview.walking;
-    Widget image(ReelClip c, double seconds) => walking(c)
-        ? FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: 360,
-              height: 640,
-              child: PhotoWalkFrame(clip: c, seconds: seconds),
-            ),
-          )
-        : ClipPoster(
-            clip: c,
-            position: seconds,
-            resolvedPath:
-                seconds >= c.duration && posters['${c.id}:end'] != null
-                ? posters['${c.id}:end']
-                : posters[c.id],
-          );
+    Widget image(ReelClip c, double seconds) => ClipPoster(
+      clip: c,
+      position: seconds,
+      resolvedPath: seconds >= c.duration && posters['${c.id}:end'] != null
+          ? posters['${c.id}:end']
+          : posters[c.id],
+    );
 
     Widget media(ReelClip c, double seconds, {bool pixels = true}) =>
         StreetviewCamera(
@@ -145,9 +136,7 @@ class StreetviewCanvas extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (walking(c))
-                PhotoWalkFrame(clip: c, seconds: seconds)
-              else if (pixels)
+              if (pixels)
                 posterOnly
                     ? image(c, seconds)
                     : MediaFrame(
@@ -161,15 +150,7 @@ class StreetviewCanvas extends StatelessWidget {
                             position < project.duration,
                       ),
               if (c.streetview.showArrows)
-                StreetviewCameraTransform(
-                  pose: walking(c)
-                      ? PhotoWalkFrame.pose(c, seconds, 2, overscan: false)
-                      : const StreetviewPose(1, 0, 0),
-                  child: Opacity(
-                    opacity: map ? 0 : 1,
-                    child: const StreetviewArrows(),
-                  ),
-                ),
+                Opacity(opacity: map ? 0 : 1, child: const StreetviewArrows()),
             ],
           ),
         );
@@ -208,22 +189,12 @@ class StreetviewCanvas extends StatelessWidget {
       ),
     );
 
-    final arrowX = settings.arrow == 'left'
-        ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
-        : 360 - StreetviewLayout.arrowLeft - StreetviewLayout.arrowWidth / 2;
-    const arrowY = StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2;
-    final walkArrow = walking(clip)
-        ? PhotoWalkFrame.pose(
-            clip,
-            clip.duration,
-            2,
-            overscan: false,
-          ).project(arrowX, arrowY)
-        : Point(arrowX, arrowY);
-    final arrow = StreetviewMotion.at(
-      clip,
-      clip.duration,
-    ).project(walkArrow.x, walkArrow.y);
+    final arrow = StreetviewMotion.at(clip, clip.duration).project(
+      settings.arrow == 'left'
+          ? StreetviewLayout.arrowLeft + StreetviewLayout.arrowWidth / 2
+          : 360 - StreetviewLayout.arrowLeft - StreetviewLayout.arrowWidth / 2,
+      StreetviewLayout.arrowTop + StreetviewLayout.arrowHeight / 2,
+    );
 
     return FittedBox(
       child: SizedBox(
@@ -244,7 +215,6 @@ class StreetviewCanvas extends StatelessWidget {
                   Positioned.fill(
                     key: const ValueKey('streetview-map-background'),
                     child: StreetviewMapScene(
-                      orbitProgress: orbitProgress,
                       settings: settings,
                       dark: project.darkOutput,
                       thumbnail: const SizedBox(),
@@ -341,7 +311,6 @@ class StreetviewCanvas extends StatelessWidget {
                 if (map && !liveMap)
                   Positioned.fill(
                     child: StreetviewMapScene(
-                      orbitProgress: orbitProgress,
                       settings: settings,
                       dark: project.darkOutput,
                       thumbnail: image(
@@ -355,7 +324,6 @@ class StreetviewCanvas extends StatelessWidget {
                 if (map)
                   Positioned.fill(
                     child: StreetviewMapScene(
-                      orbitProgress: orbitProgress,
                       settings: settings,
                       dark: project.darkOutput,
                       thumbnail: image(
@@ -369,7 +337,6 @@ class StreetviewCanvas extends StatelessWidget {
                   // scene so decoding cannot interrupt the shrinking card.
                   Positioned.fill(
                     child: StreetviewMapScene(
-                      orbitProgress: orbitProgress,
                       settings: settings,
                       dark: project.darkOutput,
                       thumbnail: const SizedBox(),

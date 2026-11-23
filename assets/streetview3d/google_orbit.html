@@ -1,0 +1,197 @@
+<!doctype html><meta charset="utf-8" /><meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+/>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #world {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #20262b;
+  }
+  .cesium-widget,
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+  #credits {
+    position: absolute;
+    bottom: 0;
+    background: #111;
+    color: white;
+    font: 12px sans-serif;
+  }
+  #credits img {
+    max-height: 18px;
+  }
+</style>
+<div id="world"></div>
+<div id="credits"></div>
+<script>
+  window.CESIUM_BASE_URL =
+    "https://cdn.jsdelivr.net/npm/cesium@1.127.0/Build/Cesium/";
+</script>
+<script
+  crossorigin="anonymous"
+  integrity="sha384-RkbKHQFQ6VckKTzzgjQZg/9Kv58EREjrW2kpwBFFjkw6B2TQ3he4kVMtuhxN38TE"
+  src="https://cdn.jsdelivr.net/npm/cesium@1.127.0/Build/Cesium/Cesium.js"
+></script>
+<script>
+  async function captureOrbit(key, latitude, longitude) {
+    const C = window.Cesium,
+      count = 24,
+      cols = 6,
+      width = 384,
+      height = 680;
+    let widget;
+    try {
+      widget = new C.CesiumWidget("world", {
+        globe: false,
+        baseLayer: false,
+        skyBox: false,
+        skyAtmosphere: false,
+        useDefaultRenderLoop: false,
+        creditContainer: "credits",
+        contextOptions: {
+          webgl: { preserveDrawingBuffer: true, alpha: false },
+        },
+      });
+      const scene = widget.scene;
+      const tiles = await C.Cesium3DTileset.fromUrl(
+        new C.Resource({
+          url: "https://tile.googleapis.com/v1/3dtiles/root.json",
+          queryParameters: { key },
+        }),
+        { maximumScreenSpaceError: 5, showCreditsOnScreen: true },
+      );
+      scene.primitives.add(tiles);
+      const canvas = scene.canvas;
+      canvas.width = width;
+      canvas.height = height;
+      scene.camera.frustum.aspectRatio = width / height;
+      let ground = 0;
+      function camera(t) {
+        scene.camera.lookAt(
+          C.Cartesian3.fromDegrees(longitude, latitude, ground),
+          new C.HeadingPitchRange(
+            C.Math.toRadians(25 + 26 * t),
+            C.Math.toRadians(-40),
+            880 / (1 + 0.74 * t),
+          ),
+        );
+      }
+      camera(0);
+      const atlas = document.createElement("canvas");
+      atlas.width = width * cols;
+      atlas.height = (height * count) / cols;
+      const ctx = atlas.getContext("2d"),
+        credits = new Set(["Google Maps"]);
+      let detailed = false;
+      tiles.tileVisible.addEventListener((tile) => {
+        if (tile.content && tile.geometricError < 35) detailed = true;
+      });
+      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      async function settle() {
+        let stable = 0;
+        for (let i = 0; i < 180; i++) {
+          detailed = false;
+          scene.initializeFrame();
+          scene.render();
+          stable = tiles.tilesLoaded && detailed ? stable + 1 : 0;
+          if (stable >= 3) return;
+          await delay(75);
+        }
+        throw Error("coverage");
+      }
+      // First find ground height from above, including high-altitude stations.
+      scene.camera.setView({
+        destination: C.Cartesian3.fromDegrees(longitude, latitude, 5500),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 },
+      });
+      // Coarser tiles are sufficient to locate the ground.
+      for (let i = 0; i < 180; i++) {
+        scene.initializeFrame();
+        scene.render();
+        if (i > 3 && tiles.tilesLoaded && scene.pickPositionSupported) {
+          const center = new C.Cartesian2(
+            canvas.clientWidth / 2,
+            canvas.clientHeight / 2,
+          );
+          const point = scene.pickPosition(center);
+          if (point) {
+            ground = C.Cartographic.fromCartesian(point).height;
+            break;
+          }
+        }
+        await delay(75);
+      }
+      for (let i = 0; i < count; i++) {
+        camera(i / (count - 1));
+        await settle();
+        if (i === 0 && scene.pickPositionSupported) {
+          // Low-detail regional imagery can be a textured flat plane even when
+          // tilesLoaded is true. Sample visible surfaces around the station.
+          const heights = [];
+          for (let x = 1; x <= 9; x++)
+            for (let y = 2; y <= 8; y++) {
+              const point = scene.pickPosition(
+                new C.Cartesian2(
+                  (canvas.clientWidth * x) / 10,
+                  (canvas.clientHeight * y) / 10,
+                ),
+              );
+              if (point)
+                heights.push(C.Cartographic.fromCartesian(point).height);
+            }
+          if (
+            heights.length < 4 ||
+            Math.max(...heights) - Math.min(...heights) < 3
+          )
+            throw Error("no local relief");
+        }
+        ctx.drawImage(
+          canvas,
+          (i % cols) * width,
+          Math.floor(i / cols) * height,
+          width,
+          height,
+        );
+        const creditBox = document.querySelector("#credits");
+        for (const n of creditBox.querySelectorAll(
+          ".cesium-credit-textContainer, .cesium-credit-imageContainer",
+        )) {
+          const credit = (n.textContent || "").trim();
+          if (credit) credits.add(credit);
+          for (const img of n.querySelectorAll("img")) {
+            if (img.alt || img.title) credits.add(img.alt || img.title);
+          }
+        }
+        OrbitCapture.postMessage(String(i + 1));
+      }
+      const result = JSON.stringify({
+        provider: "google-3d",
+        credit: [...credits].join(" · "),
+        atlas: atlas.toDataURL("image/jpeg", 0.85).split(",")[1],
+      });
+      // Keep individual Android WebView bridge messages below IPC limits.
+      for (let start = 0; start < result.length; start += 49152) {
+        OrbitCapture.postMessage("part:" + result.slice(start, start + 49152));
+      }
+      OrbitCapture.postMessage("complete");
+    } catch (error) {
+      const denied = [401, 403].includes(error.statusCode);
+      const missing = ["coverage", "no local relief"].includes(error.message);
+      OrbitCapture.postMessage(
+        denied ? "denied" : missing ? "coverage" : "unavailable",
+      );
+    } finally {
+      if (widget) widget.destroy();
+    }
+  }
+</script>

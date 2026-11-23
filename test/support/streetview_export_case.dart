@@ -185,6 +185,21 @@ void testStreetviewExport(
               checks['photo camera is rendered every frame'] =
                   (frames[1] as List).length == 15 &&
                   await hasMedia(frames[1].last as String);
+              final videoFrames = frames[secondMediaIndex] as List;
+              checks['video texture visible inside world panel'] =
+                  await alpha(videoFrames.last, 540, 700) == 0;
+              checks['world stays visible outside video panel'] =
+                  await alpha(videoFrames.last, 150, 700) == 255;
+              checks['photo occupies a bounded world surface'] =
+                  !await hasMedia(frames[1].last, x: 150, y: 700);
+              checks['return holds video inside station'] =
+                  await hasMedia(frames[returnIndex].last, x: 540, y: 900) &&
+                  !await hasMedia(frames[returnIndex].last, x: 150, y: 700);
+              final matrices =
+                  args['clips'][secondMediaIndex]['orbitPlaneFrames'] as List;
+              checks['native projection tracks the same frames'] =
+                  matrices.length == videoFrames.length &&
+                  matrices.first[0] != matrices.last[0];
               checks['orbit moves during opening'] = !listEquals(
                 await File(frames[0].first as String).readAsBytes(),
                 await File(frames[0].last as String).readAsBytes(),
@@ -195,7 +210,7 @@ void testStreetviewExport(
             }
             checks['movement composited'] =
                 await alpha(frames[2][4] as String, 540, 800) == 255;
-            for (final index in [2, returnIndex]) {
+            for (final index in orbit ? <int>[] : [2, returnIndex]) {
               final sceneFrames = frames[index] as List;
               for (var frame = 0; frame < sceneFrames.length; frame++) {
                 final back = index == returnIndex || transition == 'map';

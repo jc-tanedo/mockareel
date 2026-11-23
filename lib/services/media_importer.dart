@@ -65,8 +65,37 @@ class MediaImporter {
     required NativeRenderer renderer,
     double defaultDuration = 3.5,
     double? cardWidth,
+    bool originalFiles = false,
   }) async {
-    final files = await ImagePicker().pickMultipleMedia();
+    // DocumentsUI lets the creator choose the original under DCIM or Files.
+    // A gallery rendition may have its GPS tags removed before it reaches us.
+    final List<XFile> files;
+    if (originalFiles && Platform.isAndroid) {
+      final selected = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'heic',
+          'heif',
+          'avif',
+          'webp',
+          'gif',
+          'bmp',
+          'tif',
+          'tiff',
+          'dng',
+          ...videoExtensions,
+        ],
+      );
+      files = [
+        for (final f in selected)
+          if (f.path != null) XFile(f.path!, name: f.name),
+      ];
+    } else {
+      files = await ImagePicker().pickMultipleMedia();
+    }
     final clips = <ReelClip>[];
     var failures = 0;
     for (final file in files) {

@@ -76,7 +76,7 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
               const SizedBox(height: 8),
               Text(
                 'Add your own Google Cloud key to use API lookup or '
-                'automatic static map headers.',
+                'automatic static map headers, or Google 3D station orbits.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurfaceVariant,
                   height: 1.45,
@@ -93,7 +93,8 @@ class _MapsKeyDialogState extends State<MapsKeyDialog> {
               const SizedBox(height: 8),
               Text(
                 '1. Places API (New) — API place search and details.\n'
-                '2. Maps Static API — automatic map header images.\n\n'
+                '2. Maps Static API — automatic map header images.\n'
+                '3. Map Tiles API — photorealistic 3D orbits.\n\n'
                 'Enable billing for API requests. Maps SDK for Android, Maps '
                 'JavaScript API and Geocoding API are not required by '
                 'Mockareel.',

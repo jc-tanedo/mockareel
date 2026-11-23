@@ -26,30 +26,36 @@ class OpenOrbitMap {
       final lonScale = 111320 * cos(lat * pi / 180);
       try {
         final query =
-            '[out:json][timeout:20];(way(around:550,$lat,$lon)["building"];way(around:550,$lat,$lon)["leisure"="park"];way(around:550,$lat,$lon)["natural"="water"];);out geom 1000;';
+            '[out:json][timeout:20];(nwr(around:550,$lat,$lon)["building"];way(around:550,$lat,$lon)["building:part"];way(around:550,$lat,$lon)["leisure"="park"];way(around:550,$lat,$lon)["natural"="water"];);out geom 1000;';
         final bytes = await _get(
           client,
           Uri.https('overpass-api.de', '/api/interpreter', {'data': query}),
         );
         for (final way in jsonDecode(utf8.decode(bytes))['elements']) {
-          final coords = <int>[];
-          for (final p in way['geometry'] ?? []) {
-            coords.add(((p['lon'] - lon) * lonScale).round());
-            coords.add(((lat - p['lat']) * 111132).round());
+          for (final ring in _rings(way)) {
+            final coords = <int>[];
+            for (final p in ring) {
+              coords.add(((p['lon'] - lon) * lonScale).round());
+              coords.add(((lat - p['lat']) * 111132).round());
+            }
+            if (coords.length < 6 || coords.length > 16000) continue;
+            final tags = way['tags'];
+            final height =
+                tags['building'] != null || tags['building:part'] != null
+                ? (double.tryParse(
+                            '${tags['height']}'.replaceAll(
+                              RegExp(r'\s*m$'),
+                              '',
+                            ),
+                          ) ??
+                          (double.tryParse('${tags['building:levels']}') ?? 3) *
+                              3)
+                      .clamp(2, 900)
+                : tags['natural'] == 'water'
+                ? -3
+                : -2;
+            shapes.add([height, coords]);
           }
-          if (coords.length < 6 || coords.length > 16000) continue;
-          final tags = way['tags'];
-          final height = tags['building'] != null
-              ? (double.tryParse(
-                          '${tags['height']}'.replaceAll(RegExp(r'\s*m$'), ''),
-                        ) ??
-                        (double.tryParse('${tags['building:levels']}') ?? 3) *
-                            3)
-                    .clamp(2, 900)
-              : tags['natural'] == 'water'
-              ? -3
-              : -2;
-          shapes.add([height, coords]);
         }
       } on Exception {
         /* Terrain alone can still represent the selected place. */
@@ -70,6 +76,35 @@ class OpenOrbitMap {
       });
     } finally {
       client.close();
+    }
+  }
+
+  // Multipolygon stations often keep building tags on the relation, with
+  // their footprint split across several otherwise untagged outer ways.
+  static Iterable<List> _rings(Map way) sync* {
+    if (way['geometry'] case final List points) {
+      yield points;
+      return;
+    }
+    final parts = <List>[
+      for (final m in way['members'] ?? [])
+        if (m['role'] == 'outer' &&
+            m['geometry'] is List &&
+            m['geometry'].length >= 2)
+          List.of(m['geometry']),
+    ];
+    bool same(Map a, Map b) => a['lat'] == b['lat'] && a['lon'] == b['lon'];
+    while (parts.isNotEmpty) {
+      final ring = parts.removeLast();
+      while (!same(ring.first, ring.last)) {
+        final next = parts.indexWhere(
+          (p) => same(p.first, ring.last) || same(p.last, ring.last),
+        );
+        if (next < 0) break;
+        final p = parts.removeAt(next);
+        ring.addAll((same(p.first, ring.last) ? p : p.reversed).skip(1));
+      }
+      if (same(ring.first, ring.last)) yield ring;
     }
   }
 
