@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import '../model/streetview_timeline.dart';
+import '../services/export_maps.dart';
 import 'editor_section_card.dart';
 
 class MapsExportPanel extends StatelessWidget {
@@ -9,7 +9,7 @@ class MapsExportPanel extends StatelessWidget {
   final VoidCallback onExport;
   final void Function(bool snapshot) onExportPng;
   final VoidCallback onBackup;
-  final VoidCallback onSetupHeader;
+  final ValueChanged<int?> onSetupHeader;
 
   const MapsExportPanel({
     super.key,
@@ -25,13 +25,8 @@ class MapsExportPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final needsMap = project.isStreetview
-        ? StreetviewTimeline.scenes(project)
-              .where((s) => s.kind == 'map' || s.kind == 'ending-map')
-              .any(
-                (s) => project.clips[s.mediaIndex].streetview.mapPath == null,
-              )
-        : project.headerMode == 'map' && project.mapHeaderPath == null;
+    final missingClip = project.firstMissingMapClip;
+    final needsMap = missingClip != null || project.needsMapHeader;
     final durationLabel = project.duration.toStringAsFixed(
       project.isStreetview ? 2 : 1,
     );
@@ -146,8 +141,8 @@ class MapsExportPanel extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          project.isStreetview
-                              ? 'Capture the journey’s map screens in Place.'
+                          missingClip != null
+                              ? 'This clip needs a captured map.'
                               : 'Your map header needs an image.',
                           style: textTheme.bodySmall?.copyWith(
                             color: colors.onSecondaryContainer,
@@ -155,8 +150,12 @@ class MapsExportPanel extends StatelessWidget {
                         ),
                       ),
                       TextButton(
-                        onPressed: onSetupHeader,
-                        child: const Text('Set up header'),
+                        onPressed: () => onSetupHeader(missingClip),
+                        child: Text(
+                          missingClip == null
+                              ? 'Set up header'
+                              : 'Capture map for clip ${missingClip + 1}',
+                        ),
                       ),
                     ],
                   ),

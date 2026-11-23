@@ -1,4 +1,5 @@
 import 'editor_section_card.dart';
+import 'dart:convert';
 import 'dart:io';
 import '../services/photo_walk.dart';
 import '../services/orbit_location_defaults.dart';
@@ -23,20 +24,25 @@ class StreetviewInspector extends StatefulWidget {
   final ReelProject project;
   final ReelClip clip;
   final ProjectStore store;
+  final VoidCallback onSettings;
   final VoidCallback onChanged;
   const StreetviewInspector({
     super.key,
     required this.project,
     required this.clip,
     required this.store,
+    required this.onSettings,
     required this.onChanged,
   });
   @override
   State<StreetviewInspector> createState() => _StreetviewInspectorState();
 }
 
+enum _InspectorTask { captureMap, preparePhoto }
+
 class _StreetviewInspectorState extends State<StreetviewInspector> {
-  bool _busy = false;
+  _InspectorTask? _task;
+  bool get _busy => _task != null;
   int _revision = 0;
   StreetviewMedia get _s => widget.clip.streetview;
   Future<void> _move(String move) async {
@@ -47,7 +53,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       return;
     }
     final stamp = EditedMedia.stamp(clip);
-    setState(() => _busy = true);
+    setState(() => _task = _InspectorTask.preparePhoto);
     try {
       final walk = await PhotoWalk.prepare(clip, widget.store.root!);
       if (!mounted || widget.clip != clip || EditedMedia.stamp(clip) != stamp) {
@@ -67,60 +73,47 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         ).showSnackBar(SnackBar(content: Text('Could not prepare photo: $e')));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _task = null);
     }
   }
 
   Future<void> _location() async {
+    final clip = widget.clip;
     final value = await Navigator.of(context).push<MapsWebImport>(
       MaterialPageRoute(
         builder: (_) => MapsWebSearchPage(initial: _s.place.name),
       ),
     );
-    if (value == null || !mounted) return;
-    _revision++;
-    _s.place = value.place;
-    _s.locationOrigin = '';
-    _s.locationSelected = true;
-    _s.mapPath = null;
-    if (widget.project.isStreetview3d &&
-        _s.place.latitude != null &&
-        _s.place.longitude != null) {
-      OrbitLocationDefaults.inherit(widget.project.clips);
-    }
-    widget.onChanged();
-    await _capture();
+    if (value == null || !mounted || widget.clip != clip) return;
+    await _capture(replacement: value.place);
   }
 
-  Future<void> _capture() async {
-    if (_busy || !_s.canCaptureMap) return;
-    setState(() => _busy = true);
+  Future<void> _capture({PlaceDetails? replacement}) async {
+    if (_busy || (replacement == null && !_s.canCaptureMap)) return;
+    final clip = widget.clip;
+    final original = _s.place;
+    final place = replacement ?? PlaceDetails.fromJson(original.toJson());
+    final orbit = widget.project.isStreetview3d;
+    setState(() => _task = _InspectorTask.captureMap);
+    File? pending;
     try {
-      if (widget.project.isStreetview3d) {
-        final clip = widget.clip, place = _s.place;
-        final lat = place.latitude, lon = place.longitude;
-        if (lat == null || lon == null) {
+      late final List<int> bytes;
+      String? coverage;
+      if (orbit) {
+        if (place.latitude == null || place.longitude == null) {
           final coords = await showDialog<(double, double)>(
             context: context,
-            builder: (context) => const _PinCoordinates(),
+            builder: (_) => const _PinCoordinates(),
           );
-          if (coords == null ||
-              !mounted ||
-              widget.clip != clip ||
-              _s.place != place) {
-            return;
-          }
+          if (coords == null || !mounted || widget.clip != clip) return;
           place.latitude = coords.$1;
           place.longitude = coords.$2;
-          OrbitLocationDefaults.inherit(widget.project.clips);
-          widget.onChanged();
         }
         final config = await MapsAdvancedSettings.load(
           defaultKey: const String.fromEnvironment('MAPS_API_KEY'),
         );
-        if (!mounted || widget.clip != clip || _s.place != place) return;
-        String? scene;
-        String? fallbackReason;
+        if (!mounted || widget.clip != clip) return;
+        String? scene, fallbackReason;
         if (config.key.trim().isNotEmpty) {
           final result = await Navigator.of(context).push<GoogleOrbitResult>(
             MaterialPageRoute(
@@ -131,53 +124,55 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
               ),
             ),
           );
-          if (result == null ||
-              !mounted ||
-              widget.clip != clip ||
-              _s.place != place) {
-            return;
-          }
+          if (result == null || !mounted || widget.clip != clip) return;
           scene = result.scene;
           fallbackReason = result.reason;
         }
         scene ??= await OpenOrbitMap.fetch(place.latitude!, place.longitude!);
-        final captured = OrbitScene.decode(scene);
-        if (!mounted || widget.clip != clip || _s.place != place) return;
-        final file = File(
-          '${widget.store.root!.path}/media/orbit-${newId()}.json',
-        );
-        await file.writeAsString(scene, flush: true);
-        if (!mounted || widget.clip != clip || _s.place != place) {
-          await file.delete();
-          return;
-        }
-        _s.mapPath = file.path;
-        OrbitLocationDefaults.inherit(widget.project.clips);
-        widget.onChanged();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text([?fallbackReason, captured.coverage].join(' ')),
+        coverage = [
+          ?fallbackReason,
+          OrbitScene.decode(scene).coverage,
+        ].join(' ');
+        bytes = utf8.encode(scene);
+      } else {
+        final png = await Navigator.of(context).push<Uint8List>(
+          MaterialPageRoute(
+            builder: (_) => MapsWebHeaderPage(
+              place: place,
+              aspectRatio: 360 / StreetviewLayout.mapHeight,
+              showHeaderGuide: false,
+            ),
           ),
         );
-        return;
+        if (png == null) return;
+        bytes = png;
       }
-      final bytes = await Navigator.of(context).push<Uint8List>(
-        MaterialPageRoute(
-          builder: (_) => MapsWebHeaderPage(
-            place: _s.place,
-            aspectRatio: 360 / StreetviewLayout.mapHeight,
-            showHeaderGuide: false,
-          ),
-        ),
-      );
-      if (bytes == null || !mounted) return;
-      final file = File(
-        '${widget.store.root!.path}/media/streetview-${newId()}.png',
-      );
-      await file.writeAsBytes(bytes, flush: true);
-      if (!mounted) return;
-      _s.mapPath = file.path;
+      if (!mounted || widget.clip != clip || _s.place != original) return;
+      final name = orbit
+          ? 'orbit-${newId()}.json'
+          : 'streetview-${newId()}.png';
+      pending = File('${widget.store.root!.path}/media/$name');
+      await pending.writeAsBytes(bytes, flush: true);
+      if (!mounted || widget.clip != clip || _s.place != original) return;
+
+      if (replacement != null) {
+        _s.place = place;
+        _s.locationOrigin = '';
+        _s.locationSelected = true;
+        _revision++;
+      } else {
+        original.latitude = place.latitude;
+        original.longitude = place.longitude;
+      }
+      _s.mapPath = pending.path;
+      pending = null;
+      if (orbit) OrbitLocationDefaults.inherit(widget.project.clips);
       widget.onChanged();
+      if (coverage != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(coverage)));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -185,7 +180,8 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         ).showSnackBar(SnackBar(content: Text('Could not capture map: $e')));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _task = null);
+      if (pending != null && await pending.exists()) await pending.delete();
     }
   }
 
@@ -260,22 +256,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
           ),
           if (widget.project.isStreetview3d)
             TextButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      final current = await MapsAdvancedSettings.load(
-                        defaultKey: const String.fromEnvironment(
-                          'MAPS_API_KEY',
-                        ),
-                      );
-                      if (!context.mounted) return;
-                      final updated = await MapsAdvancedSettings.show(
-                        context,
-                        initialKey: current.key,
-                        useApiHeaders: current.useApiHeaders,
-                      );
-                      await updated?.save();
-                    },
+              onPressed: _busy ? null : widget.onSettings,
               icon: const Icon(Icons.key),
               label: const Text('Google 3D tile settings'),
             ),
@@ -285,28 +266,21 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
               label: const Text('Use Tokyo Station'),
               onPressed: _busy
                   ? null
-                  : () async {
-                      _s.locationOrigin = '';
-                      _s.place = PlaceDetails(
+                  : () => _capture(
+                      replacement: PlaceDetails(
                         name: 'Tokyo Station',
                         address: 'Marunouchi, Tokyo',
                         latitude: OpenOrbitMap.tokyoLat,
                         longitude: OpenOrbitMap.tokyoLon,
-                      );
-                      _s.locationSelected = true;
-                      _s.mapPath = null;
-                      OrbitLocationDefaults.inherit(widget.project.clips);
-                      _revision++;
-                      widget.onChanged();
-                      await _capture();
-                    },
+                      ),
+                    ),
             ),
-          if (_s.canCaptureMap)
+          if (_s.canCaptureMap || _task == _InspectorTask.captureMap)
             TextButton.icon(
               onPressed: _busy ? null : _capture,
               icon: const Icon(Icons.map_outlined),
               label: Text(
-                _busy
+                _task == _InspectorTask.captureMap
                     ? 'Capturing…'
                     : _s.mapPath == null
                     ? 'Capture map'
@@ -428,9 +402,10 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
                   ),
               ],
             ),
-            if (_busy)
-              const LinearProgressIndicator()
-            else if (_s.walkLayers.isEmpty)
+            if (_task == _InspectorTask.preparePhoto) ...[
+              const LinearProgressIndicator(),
+              const Text('Preparing photo walkthrough…'),
+            ] else if (_s.walkLayers.isEmpty)
               const Text(
                 'Choosing a move prepares this photo on your phone. First use downloads a 64 MB depth model.',
               ),

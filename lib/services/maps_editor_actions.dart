@@ -156,9 +156,9 @@ class MapsEditorActions {
   static Future<void> shareBackup({
     required ReelProject project,
     required ProjectStore store,
-    required Future<void> Function() onSave,
+    required Future<bool> Function() onSave,
   }) async {
-    await onSave();
+    if (!await onSave()) return;
     await MediaImporter.shareProjectBackup(project, store);
   }
 }

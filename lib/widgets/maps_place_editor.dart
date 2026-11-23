@@ -31,6 +31,7 @@ class MapsPlaceEditor extends StatelessWidget {
   final VoidCallback onGoToTimeline;
   final Widget clipStrip;
   final Widget addMediaButton;
+  final VoidCallback onSettings;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
 
@@ -58,6 +59,7 @@ class MapsPlaceEditor extends StatelessWidget {
     required this.onGoToTimeline,
     required this.clipStrip,
     required this.addMediaButton,
+    required this.onSettings,
     required this.onChanged,
     required this.onPreviewUpdated,
   });
@@ -110,6 +112,7 @@ class MapsPlaceEditor extends StatelessWidget {
         else ...[
           clipStrip,
           StreetviewInspector(
+            onSettings: onSettings,
             key: ValueKey(project.clips[selectedClipIndex].id),
             project: project,
             clip: project.clips[selectedClipIndex],

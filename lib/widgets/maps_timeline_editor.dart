@@ -21,6 +21,7 @@ class MapsTimelineEditor extends StatelessWidget {
   final ValueChanged<int> onSelectTool;
   final ValueChanged<int> onRemoveClip;
   final void Function(int index, int delta) onMoveClip;
+  final VoidCallback onSettings;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
 
@@ -37,6 +38,7 @@ class MapsTimelineEditor extends StatelessWidget {
     required this.onSelectTool,
     required this.onRemoveClip,
     required this.onMoveClip,
+    required this.onSettings,
     required this.onChanged,
     required this.onPreviewUpdated,
   });
@@ -369,6 +371,7 @@ class MapsTimelineEditor extends StatelessWidget {
                   children: [
                     if (timelineTool == 2 && project.isStreetview)
                       StreetviewInspector(
+                        onSettings: onSettings,
                         key: ValueKey(project.clips[selectedIndex].id),
                         project: project,
                         clip: project.clips[selectedIndex],

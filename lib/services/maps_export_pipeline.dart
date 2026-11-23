@@ -8,6 +8,7 @@ import '../model/orbit_media_pose.dart';
 import '../model/project.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
+import 'export_maps.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
 import '../widgets/export_monitor.dart';
@@ -48,18 +49,22 @@ class MapsExportPipeline {
   });
 
   Future<Map<String, String>> prepareCapture({bool snapshot = false}) async {
+    final missingClip = project.firstMissingMapClip;
+    if (missingClip != null) {
+      throw FormatException(
+        'Capture a map for clip ${missingClip + 1} (“${project.clips[missingClip].name}”) before exporting.',
+      );
+    }
+    if (project.needsMapHeader) {
+      throw const FormatException(
+        'Load a Google map or upload a map image in Place before exporting.',
+      );
+    }
     final hero = project.headerMode == 'photo' ? project.heroClip : null;
     String? heroPath = project.headerMode == 'map'
         ? project.mapHeaderPath
         : null;
     if (heroPath != null) await onPrecache(heroPath);
-    if (!project.isStreetview &&
-        project.headerMode == 'map' &&
-        heroPath == null) {
-      throw const FormatException(
-        'Load a Google map or upload a map image in Place before exporting.',
-      );
-    }
     if (hero != null) {
       heroPath = await renderer.poster(hero);
       await onPrecache(heroPath);
@@ -217,12 +222,6 @@ class MapsExportPipeline {
       for (var i = 0; i < scenes.length; i++) {
         final scene = scenes[i];
         final clip = project.clips[scene.mediaIndex];
-        if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
-            clip.streetview.mapPath == null) {
-          throw FormatException(
-            'Capture a map for “${clip.name}” before exporting.',
-          );
-        }
         // Whole-project precaching can evict early assets on longer reels.
         // Decode this scene's actual pixels immediately before its first paint;
         // otherwise a resolved Image.file can still capture a transparent frame.

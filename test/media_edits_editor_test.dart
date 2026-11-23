@@ -23,6 +23,7 @@ void main() {
           home: Scaffold(
             body: SingleChildScrollView(
               child: StreetviewInspector(
+                onSettings: () {},
                 key: ValueKey(index),
                 project: p,
                 clip: clips[index],

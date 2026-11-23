@@ -34,7 +34,6 @@ class MapsEditorScaffold extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onRename;
   final VoidCallback onSave;
-  final VoidCallback onPopSave;
   final ValueChanged<String> onMenuSelected;
   final ValueChanged<int> onGoToStep;
   final ValueChanged<int> onSelectPlaceTool;
@@ -46,7 +45,7 @@ class MapsEditorScaffold extends StatelessWidget {
   final VoidCallback onLoadMap;
   final VoidCallback onUploadMap;
   final VoidCallback onGoToTimeline;
-  final VoidCallback onGoToPlaceHeader;
+  final ValueChanged<int?> onGoToPlaceHeader;
   final VoidCallback onPickMedia;
   final VoidCallback onPickMusic;
   final VoidCallback onExport;
@@ -82,7 +81,6 @@ class MapsEditorScaffold extends StatelessWidget {
     required this.onBack,
     required this.onRename,
     required this.onSave,
-    required this.onPopSave,
     required this.onMenuSelected,
     required this.onGoToStep,
     required this.onSelectPlaceTool,
@@ -111,9 +109,9 @@ class MapsEditorScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return PopScope(
-      canPop: !exporting,
+      canPop: !exporting && !dirty,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop && dirty) onPopSave();
+        if (!didPop && !exporting && dirty) onBack();
       },
       child: Stack(
         children: [
@@ -181,6 +179,7 @@ class MapsEditorScaffold extends StatelessWidget {
                               : .56,
                           previewBuilder: previewBuilder,
                           inspector: MapsEditorInspector(
+                            onSettings: () => onMenuSelected('settings'),
                             tab: tab,
                             project: project,
                             store: store,

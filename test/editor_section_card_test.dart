@@ -31,6 +31,7 @@ void main() {
                 inspector: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: StreetviewInspector(
+                    onSettings: () {},
                     project: project,
                     clip: clip,
                     store: MemoryProjectStore(),

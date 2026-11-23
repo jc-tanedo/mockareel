@@ -115,15 +115,18 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     );
   }
 
-  Future<void> _save({bool silent = false}) async {
+  Future<bool> _save({bool silent = false}) async {
     _autosave?.cancel();
     try {
       final revision = _editRevision;
       await _store.save(_project);
-      if (mounted && revision == _editRevision) setState(() => _dirty = false);
+      if (!mounted || revision != _editRevision) return false;
+      setState(() => _dirty = false);
       if (!silent) _toast('Project and media saved on this device');
+      return true;
     } catch (_) {
-      if (mounted) _toast('Could not save project. Check device storage.');
+      _toast('Could not save project. Check device storage.');
+      return false;
     }
   }
 
@@ -234,11 +237,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     ),
   );
 
-  Future<void> _projects() async {
-    await _save(silent: true);
-    if (mounted) Navigator.of(context).pop();
-  }
-
   Future<void> _rename() => MapsEditorActions.renameProject(
     context: context,
     project: _project,
@@ -319,7 +317,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
           'Enable notifications in Android settings to see export progress.',
         );
       }
-      await _save(silent: true);
+      if (!await _save(silent: true)) return;
       await action(_createPipeline());
       complete = !_cancelled;
     } catch (e) {
@@ -379,23 +377,31 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     _previewRevision = newId();
   });
 
-  void _goToPlaceHeader() {
-    _placeTool = 2;
+  void _goToPlaceHeader(int? missingClip) {
+    if (missingClip == null) {
+      _placeTool = 2;
+    } else {
+      _selected = missingClip;
+    }
     _goToStep(0);
   }
 
   void _updatePreview() => _previewRevision = newId();
 
   Future<void> _back() async {
-    await _save(silent: true);
-    if (mounted && context.mounted) Navigator.of(context).pop();
+    if (await _save(silent: true) &&
+        mounted &&
+        !_exporting &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _onMenuSelected(String action) {
     if (action == 'settings') _settings();
     if (action == 'rename') _rename();
     if (action == 'backup') _backup();
-    if (action == 'projects') _projects();
+    if (action == 'projects') _back();
   }
 
   void _cancelExport() {
@@ -463,7 +469,6 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       onBack: _back,
       onRename: _rename,
       onSave: _save,
-      onPopSave: () => unawaited(_save(silent: true)),
       onMenuSelected: _onMenuSelected,
       onGoToStep: _goToStep,
       onSelectPlaceTool: (i) => setState(() => _placeTool = i),

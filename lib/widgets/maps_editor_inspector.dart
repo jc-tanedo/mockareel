@@ -28,12 +28,13 @@ class MapsEditorInspector extends StatelessWidget {
   final VoidCallback onLoadMap;
   final VoidCallback onUploadMap;
   final VoidCallback onGoToTimeline;
-  final VoidCallback onGoToPlaceHeader;
+  final ValueChanged<int?> onGoToPlaceHeader;
   final VoidCallback onPickMedia;
   final VoidCallback onPickMusic;
   final VoidCallback onExport;
   final ValueChanged<bool> onExportPng;
   final VoidCallback onBackup;
+  final VoidCallback onSettings;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
 
@@ -64,6 +65,7 @@ class MapsEditorInspector extends StatelessWidget {
     required this.onExport,
     required this.onExportPng,
     required this.onBackup,
+    required this.onSettings,
     required this.onChanged,
     required this.onPreviewUpdated,
   });
@@ -85,6 +87,7 @@ class MapsEditorInspector extends StatelessWidget {
     final addMedia = _addMediaButton();
     return switch (tab) {
       0 => MapsPlaceEditor(
+        onSettings: onSettings,
         project: project,
         placeTool: placeTool,
         importing: importing,
@@ -119,6 +122,7 @@ class MapsEditorInspector extends StatelessWidget {
         onPreviewUpdated: onPreviewUpdated,
       ),
       1 => MapsTimelineEditor(
+        onSettings: onSettings,
         project: project,
         selectedIndex: selectedIndex,
         timelineTool: timelineTool,

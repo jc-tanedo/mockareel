@@ -77,7 +77,8 @@ class _FeedEditorPageState extends State<FeedEditorPage>
     final revision = _revision;
     try {
       await widget.store.save(p);
-      if (mounted && revision == _revision) setState(() => _dirty = false);
+      if (!mounted || revision != _revision) return false;
+      setState(() => _dirty = false);
       return true;
     } catch (_) {
       _toast('Could not save project. Check device storage.');
@@ -94,7 +95,10 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   }
 
   Future<void> _back() async {
-    if (await _save() && mounted && context.mounted) {
+    if (await _save() &&
+        mounted &&
+        !_exporting &&
+        ModalRoute.of(context)?.isCurrent == true) {
       Navigator.of(context).pop();
     }
   }
@@ -109,7 +113,7 @@ class _FeedEditorPageState extends State<FeedEditorPage>
 
   Future<void> _backup() async {
     try {
-      await _save();
+      if (!await _save()) return;
       await MediaImporter.shareProjectBackup(p, widget.store);
     } catch (_) {
       _toast('Could not share the project backup.');
@@ -247,9 +251,9 @@ class _FeedEditorPageState extends State<FeedEditorPage>
   Widget build(BuildContext context) {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return PopScope(
-      canPop: !_exporting,
+      canPop: !_exporting && !_dirty,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop && _dirty) unawaited(_save());
+        if (!didPop && !_exporting && _dirty) unawaited(_back());
       },
       child: Stack(
         children: [
