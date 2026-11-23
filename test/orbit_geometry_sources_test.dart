@@ -145,8 +145,9 @@ void main() {
         'render_height',
       ).sublist(16384);
       final scene = await capture(lat, lon, (req) async {
-        if (req.url.host != 'tiles.openfreemap.org')
+        if (req.url.host != 'tiles.openfreemap.org') {
           return http.Response('', 404);
+        }
         if (req.url.path == '/planet') {
           return http.Response(
             jsonEncode({
