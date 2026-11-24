@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../model/export_phase.dart';
 import 'export_monitor.dart';
 
 class EditorExportOverlay extends StatelessWidget {

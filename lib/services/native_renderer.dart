@@ -1,11 +1,11 @@
-import 'media_preparation_queue.dart';
-import 'media_edits.dart';
-import 'gif_media.dart';
-import 'gif_videos.dart';
 import 'package:flutter/services.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
-import '../widgets/output_palette.dart';
+import '../theme/output_palette.dart';
+import 'gif_media.dart';
+import 'gif_videos.dart';
+import 'media_edits.dart';
+import 'media_preparation_queue.dart';
 
 class NativeRenderer {
   static const channel = MethodChannel('dev.mockareel/render');

@@ -1,6 +1,7 @@
-import 'orbit_map.dart';
-import '../model/orbit_scene.dart';
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
+import '../features/streetview_3d/presentation/orbit_location_picker.dart';
+import '../features/streetview_3d/presentation/orbit_map.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'clip_strip.dart';
@@ -8,7 +9,6 @@ import 'editor_section_card.dart';
 import 'editor_workspace.dart';
 import 'empty_placeholder.dart';
 import 'streetview_inspector.dart';
-import 'orbit_location_picker.dart';
 
 export 'clip_strip.dart';
 

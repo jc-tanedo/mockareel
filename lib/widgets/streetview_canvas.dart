@@ -1,12 +1,12 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/presentation/orbit_journey_canvas.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'media_frame.dart';
-import 'orbit_journey_canvas.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
 

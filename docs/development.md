@@ -22,16 +22,27 @@ Debug builds install as **Mockareel Debug** with a separate app ID. Packaged APK
 lib/
   main.dart                 # Entry point
   app.dart                  # Application routing and theme wiring
-  theme/                    # Shared editor design tokens and theme
+  features/streetview_3d/
+    model/                  # Geometry, media placement and camera paths
+    data/                   # Map sources, photo preparation and scene loading
+    presentation/           # Capture, location editing and journey rendering
+  theme/                    # Shared editor design tokens and output palettes
   model/                    # Project, media, post, settings and timeline data
   pages/                    # Library, Maps/FYP editors, exported-video viewer
   services/                 # Storage, bounded backup imports, Maps, native bridge
   widgets/                  # Shared preview surfaces, inspectors and dialogs
 android/app/src/main/kotlin/ # Android media rendering and gallery integration
-test/                       # Dart model, widget, storage and export-surface tests
+test/
+  features/                 # Maps, feed, Streetview and Streetview 3D suites
+  model/, services/, widgets/ # Shared behavior grouped by the code under test
+  support/                  # Fixtures and helpers shared across suites
 integration_test/           # Real-device media flow
 tool/                       # CI helpers, cloud setup and optional visual tools
 ```
+
+The 3D preview and export share an `OrbitSceneLoader`. It coalesces reads of the
+same asset, validates captured atlases and retains four decoded scenes for
+synchronous first paint. Scene geometry and project serialization live in models.
 
 Models do not depend on UI. Widgets/pages do not import the entry point. Preview
 and export share project data, timeline calculations and output widgets, with

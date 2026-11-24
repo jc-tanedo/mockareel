@@ -1,10 +1,10 @@
-import 'gif_media.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/project.dart';
+import 'gif_media.dart';
 import 'project_archive.dart';
 export 'project_archive.dart' show BackupLimits;
 
@@ -19,6 +19,16 @@ class ProjectStore {
     );
     for (final name in ['projects', 'media', 'exports']) {
       await Directory('${root!.path}/$name').create(recursive: true);
+    }
+  }
+
+  Future<File> writeMapAsset(String name, List<int> bytes) async {
+    final file = File('${root!.path}/media/$name');
+    try {
+      return await file.writeAsBytes(bytes, flush: true);
+    } catch (_) {
+      if (await file.exists()) await file.delete();
+      rethrow;
     }
   }
 

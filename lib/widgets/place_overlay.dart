@@ -1,16 +1,16 @@
-import 'browser_map_header_image.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
+import '../theme/output_palette.dart';
+import 'browser_map_header_image.dart';
 import 'media_frame.dart';
-import 'story_tags.dart';
-import 'output_palette.dart';
-import 'star_rating.dart';
-import 'place_review_card.dart';
 import 'place_action_row.dart';
+import 'place_review_card.dart';
 import 'place_tab_section.dart';
+import 'star_rating.dart';
 import 'story_chrome_overlay.dart';
+import 'story_tags.dart';
 
 /// Only the gallery rectangle is transparent. This surface is shared by the
 /// live preview, transparent PNG, and each frame of the native compositor.

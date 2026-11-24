@@ -1,8 +1,8 @@
 import 'dart:math';
-import 'ids.dart';
 import 'feed_post.dart';
-import 'streetview.dart';
+import 'ids.dart';
 import 'media_edits.dart';
+import 'streetview_data.dart';
 export 'media_edits.dart';
 
 class ReelClip {

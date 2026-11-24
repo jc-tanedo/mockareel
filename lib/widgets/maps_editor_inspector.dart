@@ -1,6 +1,6 @@
-import '../model/orbit_scene.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'audio_editor.dart';

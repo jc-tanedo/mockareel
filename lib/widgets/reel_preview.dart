@@ -1,16 +1,16 @@
-import '../model/streetview_timeline.dart';
-import 'streetview_canvas.dart';
-import '../model/feed_timeline.dart';
-import 'package:flutter/scheduler.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import '../model/feed_timeline.dart';
 import '../model/project.dart';
-import 'feed_canvas.dart';
+import '../model/streetview_timeline.dart';
 import '../model/template_layout.dart';
+import '../theme/output_palette.dart';
+import 'feed_canvas.dart';
 import 'media_frame.dart';
-import 'place_overlay.dart';
 import 'music_playback.dart';
-import 'output_palette.dart';
+import 'place_overlay.dart';
+import 'streetview_canvas.dart';
 import 'wavy_slider_track.dart';
 export 'place_overlay.dart';
 

@@ -3,15 +3,16 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
-import '../model/orbit_scene.dart';
-import '../model/orbit_media_pose.dart';
+import '../features/streetview_3d/data/orbit_scene_loader.dart';
+import '../features/streetview_3d/model/orbit_media_pose.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
+import '../model/export_phase.dart';
 import '../model/project.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
 import 'export_maps.dart';
-import '../services/native_renderer.dart';
-import '../services/project_store.dart';
-import '../widgets/export_monitor.dart';
+import 'native_renderer.dart';
+import 'project_store.dart';
 
 class MapsExportPipeline {
   final ReelProject project;
@@ -83,7 +84,7 @@ class MapsExportPipeline {
           await onPrecache(paths['${c.id}:end']!);
           if (project.isStreetview3d) {
             if (c.streetview.mapPath != null) {
-              await (await OrbitScene.load(c.streetview.mapPath!)).warmAtlas();
+              await OrbitSceneLoader.loadForExport(c.streetview.mapPath!);
             }
             if (c.streetview.walking && !c.isTimed) {
               for (final layer in c.streetview.walkLayers) {
@@ -227,15 +228,16 @@ class MapsExportPipeline {
         // otherwise a resolved Image.file can still capture a transparent frame.
         OrbitScene? geometry;
         if (project.isStreetview3d && clip.streetview.mapPath != null) {
-          geometry = await OrbitScene.load(clip.streetview.mapPath!);
-          await geometry.warmAtlas();
+          geometry = await OrbitSceneLoader.loadForExport(
+            clip.streetview.mapPath!,
+          );
           final nextPath =
               (scene.kind == 'arrow' || scene.kind == 'back') &&
                   scene.mediaIndex + 1 < project.clips.length
               ? project.clips[scene.mediaIndex + 1].streetview.mapPath
               : null;
           if (nextPath != null) {
-            await (await OrbitScene.load(nextPath)).warmAtlas();
+            await OrbitSceneLoader.loadForExport(nextPath);
           }
         }
         final nextMap =

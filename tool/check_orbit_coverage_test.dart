@@ -1,7 +1,7 @@
 // Live, opt-in probe. Run with flutter test tool/check_orbit_coverage_test.dart.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockareel/model/orbit_scene.dart';
-import 'package:mockareel/services/open_orbit_map.dart';
+import 'package:mockareel/features/streetview_3d/data/open_orbit_map.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_scene.dart';
 
 void main() {
   for (final (name, lat, lon) in [

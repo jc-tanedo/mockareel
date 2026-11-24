@@ -1,23 +1,23 @@
-import 'package:video_player/video_player.dart';
-import 'package:video_player_platform_interface/video_player_platform_interface.dart';
-import 'preview_video_platform.dart';
-import 'dart:io';
 import 'dart:convert';
-import 'package:mockareel/model/orbit_media_pose.dart';
-import 'package:mockareel/model/orbit_scene.dart';
+import 'dart:io';
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockareel/features/streetview_3d/data/orbit_scene_loader.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_media_pose.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
-import 'package:mockareel/widgets/reel_preview.dart';
-import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/media_edits.dart';
+import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/project_store.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'preview_video_platform.dart';
 
 void testStreetviewExport(
   String transition, {
@@ -130,10 +130,10 @@ void testStreetviewExport(
         if (orbit) {
           // Pin the composition for pixel assertions. The editor migration and
           // shuffle-order tests exercise random assignment separately.
-          final firstScene = await OrbitScene.load(
+          final firstScene = await OrbitSceneLoader.load(
             p.clips.first.streetview.mapPath!,
           );
-          final lastScene = await OrbitScene.load(
+          final lastScene = await OrbitSceneLoader.load(
             p.clips.last.streetview.mapPath!,
           );
           p.clips.first.streetview.wallId = firstScene.walls.keys.first;
@@ -226,7 +226,7 @@ void testStreetviewExport(
               final flight = frames[2] as List;
               if (transition == 'arrow') {
                 Future<Offset> panelCenter(int i, double time) async {
-                  final scene = await OrbitScene.load(
+                  final scene = await OrbitSceneLoader.load(
                     p.clips[i].streetview.mapPath!,
                   );
                   return MatrixUtils.transformPoint(
@@ -281,7 +281,7 @@ void testStreetviewExport(
                   await alpha(videoFrames.last, 150, 700) == 255;
               checks['photo occupies a bounded world surface'] =
                   !await hasMedia(frames[1].last, x: 150, y: 700);
-              final wall = await OrbitScene.load(
+              final wall = await OrbitSceneLoader.load(
                 p.clips.last.streetview.mapPath!,
               );
               final returning = frames[returnIndex] as List;

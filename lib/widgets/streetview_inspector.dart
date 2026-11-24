@@ -1,22 +1,22 @@
-import 'editor_section_card.dart';
-import 'orbit_capture.dart';
 import 'dart:io';
-import '../services/photo_walk.dart';
-import '../services/orbit_location_defaults.dart';
-import '../services/media_edits.dart';
-import '../services/open_orbit_map.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../model/project.dart';
+import '../features/streetview_3d/data/open_orbit_map.dart';
+import '../features/streetview_3d/data/orbit_location_defaults.dart';
+import '../features/streetview_3d/data/photo_walk.dart';
+import '../features/streetview_3d/presentation/orbit_capture.dart';
+import '../features/streetview_3d/presentation/orbit_coverage.dart';
 import '../model/maps_web_result.dart';
-import '../pages/maps_web_search_page.dart';
-import '../model/orbit_scene.dart';
-import '../pages/maps_web_header_page.dart';
-import '../services/project_store.dart';
-import 'place_actions_editor.dart';
-import 'media_edits_editor.dart';
-import 'streetview_chrome.dart';
+import '../model/project.dart';
 import '../model/streetview_layout.dart';
+import '../pages/maps_web_header_page.dart';
+import '../pages/maps_web_search_page.dart';
+import '../services/media_edits.dart';
+import '../services/project_store.dart';
+import 'editor_section_card.dart';
+import 'media_edits_editor.dart';
+import 'place_actions_editor.dart';
+import 'streetview_chrome.dart';
 
 class StreetviewInspector extends StatefulWidget {
   final ReelProject project;
@@ -119,7 +119,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
       final name = orbit
           ? 'orbit-${newId()}.json'
           : 'streetview-${newId()}.png';
-      pending = await writeMapAsset(widget.store, name, bytes);
+      pending = await widget.store.writeMapAsset(name, bytes);
       if (!mounted || widget.clip != clip || _s.place != original) return;
 
       if (replacement != null) {
@@ -274,7 +274,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
                 ].join(' · '),
               ),
             if (widget.project.isStreetview3d && _s.mapPath != null)
-              _OrbitCoverage(path: _s.mapPath!),
+              OrbitCoverage(path: _s.mapPath!),
             _field('Place name', _s.place.name, (v) => _s.place.name = v),
             _field('Address', _s.place.address, (v) => _s.place.address = v),
           ],
@@ -504,32 +504,5 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
         ],
       ),
     ],
-  );
-}
-
-class _OrbitCoverage extends StatefulWidget {
-  final String path;
-  const _OrbitCoverage({required this.path});
-  @override
-  State<_OrbitCoverage> createState() => _OrbitCoverageState();
-}
-
-class _OrbitCoverageState extends State<_OrbitCoverage> {
-  late var scene = OrbitScene.load(widget.path);
-  @override
-  void didUpdateWidget(_OrbitCoverage old) {
-    super.didUpdateWidget(old);
-    if (old.path != widget.path) scene = OrbitScene.load(widget.path);
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<OrbitScene>(
-    future: scene,
-    builder: (context, snapshot) => Text(
-      snapshot.data?.coverage ??
-          (snapshot.hasError
-              ? 'Orbit unavailable · replace captured map'
-              : 'Reading orbit…'),
-    ),
   );
 }

@@ -1,32 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import '../services/open_orbit_map.dart';
-import '../model/orbit_scene.dart';
-import '../model/streetview_timeline.dart';
-import '../services/orbit_wall_placement.dart';
-import '../services/static_map.dart';
-import '../widgets/orbit_capture.dart';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/data/open_orbit_map.dart';
+import '../features/streetview_3d/data/orbit_location_defaults.dart';
+import '../features/streetview_3d/data/orbit_scene_loader.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
+import '../features/streetview_3d/model/orbit_wall_placement.dart';
+import '../features/streetview_3d/presentation/orbit_locations_editor.dart';
+import '../model/export_phase.dart';
 import '../model/project.dart';
+import '../model/streetview_timeline.dart';
 import '../model/template_layout.dart';
-import '../services/maps_editor_actions.dart';
 import '../services/export_background_session.dart';
 import '../services/maps_export_pipeline.dart';
 import '../services/media_importer.dart';
-import '../services/orbit_location_defaults.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
-import '../widgets/export_monitor.dart';
+import '../services/static_map.dart';
 import '../widgets/maps_editor_scaffold.dart';
-import '../widgets/orbit_locations_editor.dart';
 import '../widgets/maps_key_dialog.dart';
 import '../widgets/offscreen_capture_stage.dart';
 import '../widgets/place_form_controllers.dart';
 import '../widgets/reel_preview.dart';
 import 'exported_video_page.dart';
+import 'maps_editor_actions.dart';
 
 class MapsEditorPage extends StatefulWidget {
   final ProjectStore? store;
@@ -90,7 +90,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       if (path == null || _checkedPlacement[clip] == source) continue;
       final OrbitScene scene;
       try {
-        scene = await OrbitScene.load(path);
+        scene = await OrbitSceneLoader.load(path);
       } catch (_) {
         // The location card reports unreadable captures and offers replacement.
         continue;
@@ -145,8 +145,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     try {
       final json = await widget.fetchGeometry(key.$2!, key.$3!);
       if (!current()) return;
-      final file = await writeMapAsset(
-        _store,
+      final file = await _store.writeMapAsset(
         'orbit-${newId()}.json',
         utf8.encode(json),
       );
@@ -191,7 +190,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     final service = StaticMapService();
     try {
       final bytes = await service.load(place, _key, portrait: true);
-      return await writeMapAsset(_store, 'overview-${newId()}.png', bytes);
+      return await _store.writeMapAsset('overview-${newId()}.png', bytes);
     } on Exception {
       return null;
     } finally {
