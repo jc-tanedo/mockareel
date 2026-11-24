@@ -77,6 +77,20 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      const channel = MethodChannel('dev.mockareel/place-geocoder');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => [
+          {
+            'name': 'FixtureCafe',
+            'localities': ['Fixture street'],
+            'latitude': 14.7,
+            'longitude': 120.2,
+          },
+        ],
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
       MapsWebImport? imported;
       final driver = FakeMapsLookup(
         (input, name) async => name == null
@@ -131,6 +145,7 @@ void main() {
       await tester.tap(find.text('Fixture Cafe'));
       await tester.pumpAndSettle();
       expect(find.text('555 0000'), findsOneWidget);
+      expect(find.text('14.70000, 120.20000'), findsOneWidget);
       await tester.ensureVisible(find.text('Fixture Reviewer'));
       await tester.tap(find.text('Fixture Reviewer'));
       await tester.pumpAndSettle();
@@ -138,6 +153,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(imported!.place.name, 'Fixture Cafe');
       expect(imported!.place.hasMenu, isTrue);
+      expect(
+        (imported!.place.latitude, imported!.place.longitude),
+        (14.7, 120.2),
+      );
       expect(imported!.review!.text, 'A review fixture');
       expect(driver.disposed, isTrue);
       expect(tester.takeException(), isNull);

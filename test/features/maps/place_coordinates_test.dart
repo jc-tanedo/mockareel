@@ -50,8 +50,8 @@ void main() {
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       final place = PlaceDetails(
-        name: 'Yomiuriland',
-        address: '4015-1 Yanokuchi, Inagi, Tokyo, Japan',
+        name: 'Yomiuri Land',
+        address: '4015-1 Yanokuchi, Inagi, Tokyo 206-8725',
       );
       final candidate = {
         'name': 'Yomiuriland',
@@ -75,7 +75,8 @@ void main() {
       candidates.add({
         ...candidate,
         'name': '4015-1',
-        'address': place.address,
+        'address': 'Japan, ${place.address}',
+        'country': 'Japan',
       });
       expect(await PlaceCoordinates.resolve(place), (35.6253, 139.51907));
       candidates.last['address'] = '4016-1 Yanokuchi, Inagi, Tokyo, Japan';

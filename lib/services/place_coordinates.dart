@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../model/maps_pin.dart';
 import '../model/maps_web_result.dart';
 import '../model/place_details.dart';
+import 'landmark_coordinates.dart';
 
 abstract final class PlaceCoordinates {
   static const _channel = MethodChannel('dev.mockareel/place-geocoder');
@@ -56,7 +57,7 @@ abstract final class PlaceCoordinates {
       if (pin != null) return pin;
     }
     if (place.name.trim().isEmpty || place.address.trim().isEmpty) return null;
-    final names = {_words(place.name), _words(place.localName)}..remove('');
+    final names = {_name(place.name), _name(place.localName)}..remove('');
     final address = _words(place.address);
     final pins = <(double, double)>{};
     for (final row in await _lookup('${place.name}, ${place.address}')) {
@@ -71,15 +72,25 @@ abstract final class PlaceCoordinates {
       );
       // Android often returns the street number as featureName. Require a
       // complete numbered address match before using such a result as a pin.
+      final rowAddress = _words(row['address'] as String? ?? '');
+      final country = _words(row['country'] as String? ?? '');
       final addressOnly =
           (name.isEmpty ||
               RegExp(r'^\d+[a-z]?(?: \d+[a-z]?)*$').hasMatch(name)) &&
           RegExp(r'\d').hasMatch(address) &&
-          address == _words(row['address'] as String? ?? '');
-      if (addressOnly || (sameLocality && names.contains(name))) pins.add(pin);
+          (address == rowAddress ||
+              (country.isNotEmpty &&
+                  (rowAddress == '$country $address' ||
+                      rowAddress == '$address $country')));
+      if (addressOnly || (sameLocality && names.contains(_name(name)))) {
+        pins.add(pin);
+      }
     }
-    return pins.length == 1 ? pins.single : null;
+    if (pins.length == 1) return pins.single;
+    return LandmarkCoordinates.lookup(place);
   }
+
+  static String _name(String value) => _words(value).replaceAll(' ', '');
 
   static String _words(String value) => value
       .toLowerCase()

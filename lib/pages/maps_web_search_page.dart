@@ -46,6 +46,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
   MapsWebSnapshot? _details;
   bool _ready = false, _busy = false, _showBrowser = false;
   bool _deviceResults = false;
+  PlaceDetails? _findingPin;
   String? _message;
   String _status = 'Starting search…';
   int _operation = 0, _review = -1;
@@ -111,6 +112,23 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                 'finishes loading.'
           : null;
       _showBrowser = false;
+      _findingPin = snapshot.place?.hasCoordinates == false
+          ? snapshot.place
+          : null;
+    });
+    final place = _findingPin;
+    if (place != null) unawaited(_findPin(place, _operation));
+  }
+
+  Future<void> _findPin(PlaceDetails place, int operation) async {
+    final pin = await PlaceCoordinates.resolve(place);
+    if (!mounted || _details?.place != place || _operation != operation) return;
+    setState(() {
+      if (pin != null) {
+        place.latitude = pin.$1;
+        place.longitude = pin.$2;
+      }
+      _findingPin = null;
     });
   }
 
@@ -119,6 +137,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
     FocusManager.instance.primaryFocus?.unfocus();
     final operation = ++_operation;
     setState(() {
+      _findingPin = null;
       _busy = true;
       _message = null;
     });
@@ -239,6 +258,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
 
   Widget _place() => MapsWebPlaceView(
     details: _details!,
+    findingPin: _findingPin != null,
     selectedReview: _review,
     onSelectReview: (v) => setState(() => _review = v ?? -1),
   );
@@ -513,15 +533,17 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                       child: SafeArea(
                         top: false,
                         child: FilledButton.icon(
-                          onPressed: () => Navigator.pop(
-                            context,
-                            MapsWebImport(
-                              _details!.place!,
-                              review: _review < 0
-                                  ? null
-                                  : _details!.reviews[_review],
-                            ),
-                          ),
+                          onPressed: _findingPin != null
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  MapsWebImport(
+                                    _details!.place!,
+                                    review: _review < 0
+                                        ? null
+                                        : _details!.reviews[_review],
+                                  ),
+                                ),
                           icon: const Icon(Icons.check),
                           label: const Text('Use this place'),
                         ),
