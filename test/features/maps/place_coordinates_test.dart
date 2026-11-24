@@ -14,6 +14,7 @@ void main() {
         (park, '8Q7XJGG9+4J'),
         ('$park@35.61,139.51,15z', 'JGG9+4J Inagi'),
         ('$park@35.61,139.51,15z', '7XJGG9+4J'),
+        ('$park@35.625,139.52,800m', 'G9+4J'),
       ]) {
         final place = MapsWebResult(
           name: 'Yomiuriland',
@@ -70,6 +71,14 @@ void main() {
         return candidates;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      expect(await PlaceCoordinates.resolve(place), isNull);
+      candidates.add({
+        ...candidate,
+        'name': '4015-1',
+        'address': place.address,
+      });
+      expect(await PlaceCoordinates.resolve(place), (35.6253, 139.51907));
+      candidates.last['address'] = '4016-1 Yanokuchi, Inagi, Tokyo, Japan';
       expect(await PlaceCoordinates.resolve(place), isNull);
       candidates.add(candidate);
       expect(await PlaceCoordinates.resolve(place), (35.6253, 139.51907));

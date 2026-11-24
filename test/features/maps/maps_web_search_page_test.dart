@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/maps_web_result.dart';
 import 'package:mockareel/model/project.dart';
@@ -15,6 +16,60 @@ const fixture = MapsWebResult(
   address: 'Fixture street',
 );
 void main() {
+  testWidgets('timeout offers Android candidates with selectable coordinates', (
+    tester,
+  ) async {
+    const geocoder = MethodChannel('dev.mockareel/place-geocoder');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      geocoder,
+      (call) async => [
+        {
+          'name': 'Yomiuriland',
+          'address': 'Inagi, Tokyo',
+          'latitude': 35.6253,
+          'longitude': 139.51907,
+        },
+      ],
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(geocoder, null));
+    final driver = FakeMapsLookup((_, _) => throw TimeoutException('fixture'));
+    MapsWebImport? imported;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            child: const Text('Choose location'),
+            onPressed: () async {
+              imported = await Navigator.of(context).push<MapsWebImport>(
+                MaterialPageRoute(
+                  builder: (_) => MapsWebSearchPage(
+                    driver: driver,
+                    browserOverride: const SizedBox(),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Choose location'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Yomiuriland');
+    await tester.tap(find.byTooltip('Search Google Maps'));
+    await tester.pumpAndSettle();
+    expect(find.text('Results from Android location search'), findsOneWidget);
+    await tester.tap(find.text('Yomiuriland').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this place'));
+    await tester.pumpAndSettle();
+    expect(
+      (imported?.place.latitude, imported?.place.longitude),
+      (35.6253, 139.51907),
+    );
+  });
+
   testWidgets(
     'native results, selected detail and optional review return an editable import',
     (tester) async {

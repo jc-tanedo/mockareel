@@ -24,8 +24,8 @@ internal class PlaceGeocoder(private val context: Context) : MethodChannel.Metho
             val addresses = Geocoder(context, Locale.ENGLISH).getFromLocationName(query, 5).orEmpty()
             result.success(addresses.filter { it.hasLatitude() && it.hasLongitude() }.map {
                 mapOf(
-                    "name" to it.featureName, "latitude" to it.latitude, "longitude" to it.longitude,
-                    "localities" to listOfNotNull(it.locality, it.subLocality, it.postalCode, it.thoroughfare, it.subAdminArea),
+                    "name" to it.featureName, "address" to it.getAddressLine(0), "latitude" to it.latitude, "longitude" to it.longitude,
+                    "localities" to listOfNotNull(it.locality, it.subLocality, it.postalCode, it.thoroughfare, it.subAdminArea, it.adminArea),
                 )
             })
         } catch (_: IOException) {

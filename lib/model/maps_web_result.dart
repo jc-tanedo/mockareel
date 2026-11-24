@@ -42,18 +42,13 @@ class MapsWebResult {
     String hours = '',
   }) {
     final uri = Uri.tryParse(url);
-    String decoded;
-    try {
-      decoded = Uri.decodeFull(url);
-    } on FormatException {
-      decoded = url;
-    }
+    final decoded = MapsPin.decoded(url);
     final pin = uri != null && MapsWebUrls.allowedNavigation(uri)
         ? MapsPin.fromListing(uri, plusCode: plusCode)
         : null;
     final id =
         RegExp(r'!(?:19|1)s(ChIJ[^!/?]+)').firstMatch(decoded)?[1] ??
-        uri?.queryParameters['query_place_id'];
+        (uri == null ? null : MapsPin.queryValue(uri, 'query_place_id'));
     final type = category.toLowerCase();
     return PlaceDetails(
       name: name,
@@ -192,16 +187,21 @@ abstract final class MapsWebUrls {
     );
   }
 
-  static Uri browserUri(Uri uri) =>
-      const {'www.google.com', 'maps.google.com'}.contains(uri.host) &&
-          uri.path.startsWith('/maps')
-      ? uri.replace(
-          queryParameters: {
-            ...uri.queryParametersAll,
-            'hl': ['en'],
-          },
-        )
-      : uri;
+  static Uri browserUri(Uri uri) {
+    if (!const {'www.google.com', 'maps.google.com'}.contains(uri.host) ||
+        !uri.path.startsWith('/maps')) {
+      return uri;
+    }
+    // Preserve unrelated parameters byte-for-byte, including opaque Google data.
+    final fields = uri.query
+        .split('&')
+        .where(
+          (field) =>
+              field.isNotEmpty &&
+              MapsPin.decoded(field.split('=').first) != 'hl',
+        );
+    return uri.replace(query: [...fields, 'hl=en'].join('&'));
+  }
 
   static bool allowedNavigation(Uri uri) =>
       uri.toString() == 'about:blank' ||

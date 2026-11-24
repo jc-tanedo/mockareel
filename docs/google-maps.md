@@ -4,6 +4,11 @@
 
 **No API key is needed for browser place search, browser map-header capture, manual editing or export.** The default flow searches Google Maps in an attached WebView and imports editable fields. **Place → Header → Load Google map** opens a map-framing screen; save the visible map as a project image. Uploaded maps and photo headers remain available.
 
+If a browser search times out on Android, the picker tries the same place name
+in Android location search. You can also type a place and city and choose
+**Use Android location search** from the search menu. Select the matching
+address to import its pin. Availability depends on the device’s geocoder.
+
 For API access, open the editor's **More project options → Advanced · Google Maps**, enter your own Google Cloud key and save. Choose **Use API lookup** in the search menu for API search. Enable **Use API map headers** in advanced settings to make **Load Google map** use the automatic static-image service instead of browser framing. Saving a key alone does not change header mode.
 
 ## APIs to enable

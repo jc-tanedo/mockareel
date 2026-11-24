@@ -61,7 +61,7 @@
     const websiteNode = main.querySelector('a[data-item-id="authority"]');
     const website = websiteNode?.href || '';
     const plusNode = main.querySelector('[data-item-id="oloc"]');
-    const plusCode = (label(plusNode) + ' ' + text(plusNode)).match(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,7}\b/i)?.[0] || '';
+    const plusCode = (label(plusNode) + ' ' + text(plusNode)).match(/\b[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,7}\b/i)?.[0] || '';
     place = {name, plusCode, category: bounded(category, 100), rating: rating(main), reviewCount: count(main), address: value('[data-item-id="address"]', /^Address:\s*/i), phone: value('[data-item-id^="phone:tel:"]', /^Phone:\s*/i), website: /^https?:\/\//i.test(website) ? website.slice(0, 500) : '', hours: bounded(hoursLine || text(hours).split('\n')[0]), url: safeLink(location.href), reviews};
   }
   let state = place ? 'place' : results.length ? 'results' : 'loading';
