@@ -2,6 +2,11 @@ class PlaceDetails {
   String name, category, rating, address, localName, reviewCount, price, hours;
   String? placeId, mapsUrl;
   double? latitude, longitude;
+  bool get hasCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.abs() <= 90 &&
+      longitude!.abs() <= 180;
   String phone, website;
   List<String> types;
   List<PlaceAction>? actionOverrides;

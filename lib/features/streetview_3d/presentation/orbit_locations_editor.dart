@@ -114,7 +114,7 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
         }
         result = (bytes: utf8.encode(data), coverage: geometry.coverage);
       } else {
-        result = await captureOrbit(context, place);
+        result = await captureOrbit(context, place, findPin: false);
       }
       if (!mounted || result == null) return;
       final file = await widget.store.writeMapAsset(
@@ -293,11 +293,13 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                           selected.mapPath != null
                               ? '3D geometry saved'
                               : widget.fetchingGeometry == selected
-                              ? 'Fetching 3D geometry…'
-                              : widget.failedGeometry(selected)
+                              ? (selected.place.hasCoordinates
+                                    ? 'Fetching 3D geometry…'
+                                    : 'Finding pin coordinates…')
+                              : widget.failedGeometry(selected) &&
+                                    selected.place.hasCoordinates
                               ? 'Geometry download failed'
-                              : selected.place.latitude == null ||
-                                    selected.place.longitude == null
+                              : !selected.place.hasCoordinates
                               ? 'Pin coordinates needed'
                               : 'Waiting for geometry',
                         ),
@@ -380,21 +382,28 @@ class _OrbitLocationsEditorState extends State<OrbitLocationsEditor> {
                                 _busy || widget.fetchingGeometry == selected
                                 ? null
                                 : selected.mapPath == null &&
-                                      selected.place.latitude != null &&
-                                      selected.place.longitude != null
+                                      selected.place.hasCoordinates
                                 ? () => widget.retryGeometry(selected)
                                 : () => _capture(selected),
                             icon: const Icon(Icons.location_city),
                             label: Text(
                               selected.mapPath != null
                                   ? 'Replace 3D capture'
-                                  : selected.place.latitude == null ||
-                                        selected.place.longitude == null
+                                  : !selected.place.hasCoordinates
                                   ? 'Enter pin coordinates'
                                   : 'Retry geometry',
                             ),
                           ),
+                          if (!selected.place.hasCoordinates &&
+                              widget.failedGeometry(selected))
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => widget.retryGeometry(selected),
+                              child: const Text('Retry pin lookup'),
+                            ),
                           if (widget.googleConfigured &&
+                              selected.place.hasCoordinates &&
                               widget.failedGeometry(selected))
                             TextButton(
                               onPressed: _busy

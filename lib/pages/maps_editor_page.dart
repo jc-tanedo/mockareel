@@ -19,6 +19,7 @@ import '../services/maps_export_pipeline.dart';
 import '../services/media_importer.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
+import '../services/place_coordinates.dart';
 import '../services/static_map.dart';
 import '../widgets/maps_editor_scaffold.dart';
 import '../widgets/maps_key_dialog.dart';
@@ -128,22 +129,47 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     final location = locations
         .where(
           (l) =>
-              l.mapPath == null &&
-              l.place.latitude != null &&
-              l.place.longitude != null &&
+              (l.mapPath == null || !l.place.hasCoordinates) &&
               !_failedPins.contains(_pin(l)),
         )
         .firstOrNull;
     if (location == null) return;
     final key = _pin(location);
+    final place = location.place;
+    final previousPath = location.mapPath;
     bool current() =>
         mounted &&
         locations.contains(location) &&
-        location.mapPath == null &&
+        identical(locations, _project.streetview.locations) &&
+        location.place == place &&
+        location.mapPath == previousPath &&
         _pin(location) == key;
     setState(() => _fetchingGeometry = location);
     try {
-      final json = await widget.fetchGeometry(key.$2!, key.$3!);
+      if (!place.hasCoordinates) {
+        final pin = await PlaceCoordinates.resolve(place);
+        if (!current()) return;
+        if (pin == null) {
+          _failedPins.add(key);
+          return;
+        }
+        place.latitude = pin.$1;
+        place.longitude = pin.$2;
+        for (final clip in _project.clips) {
+          final media = clip.streetview;
+          if (media.locationId == location.id && !media.place.hasCoordinates) {
+            media.place.latitude = pin.$1;
+            media.place.longitude = pin.$2;
+          }
+        }
+        _markDirty();
+        // The next pass downloads missing geometry with the resolved pin.
+        return;
+      }
+      final json = await widget.fetchGeometry(
+        place.latitude!,
+        place.longitude!,
+      );
       if (!current()) return;
       final file = await _store.writeMapAsset(
         'orbit-${newId()}.json',

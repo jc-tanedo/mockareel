@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mockareel/model/place_details.dart';
+import 'package:mockareel/services/place_coordinates.dart';
 import 'package:mockareel/widgets/maps_key_dialog.dart';
 import '../data/open_orbit_map.dart';
 import '../model/orbit_scene.dart';
@@ -8,13 +9,18 @@ import 'google_orbit_capture_page.dart';
 
 Future<({List<int> bytes, String coverage})?> captureOrbit(
   BuildContext context,
-  PlaceDetails place,
-) async {
-  if (place.latitude == null || place.longitude == null) {
-    final coords = await showDialog<(double, double)>(
-      context: context,
-      builder: (_) => const _PinCoordinates(),
-    );
+  PlaceDetails place, {
+  bool findPin = true,
+}) async {
+  if (!place.hasCoordinates) {
+    final resolved = findPin ? await PlaceCoordinates.resolve(place) : null;
+    if (!context.mounted) return null;
+    final coords =
+        resolved ??
+        await showDialog<(double, double)>(
+          context: context,
+          builder: (_) => const _PinCoordinates(),
+        );
     if (coords == null || !context.mounted) return null;
     place.latitude = coords.$1;
     place.longitude = coords.$2;

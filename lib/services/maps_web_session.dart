@@ -126,7 +126,7 @@ class MapsWebSession implements MapsLookupDriver {
       if (snapshot.state != 'results' && snapshot.state != 'place') continue;
       latest = snapshot;
       final current =
-          '${snapshot.results.map((p) => p.url).join('|')}:${snapshot.place?.name}:${snapshot.place?.rating}:${snapshot.place?.address}:${snapshot.place?.reviewCount}:${snapshot.reviews.length}';
+          '${snapshot.results.map((p) => p.url).join('|')}:${snapshot.place?.name}:${snapshot.place?.rating}:${snapshot.place?.address}:${snapshot.place?.latitude}:${snapshot.place?.longitude}:${snapshot.place?.reviewCount}:${snapshot.reviews.length}';
       stable = stamp == current ? stable + 1 : 0;
       stamp = current;
       // Give card/details hydration a little time without waiting for continual

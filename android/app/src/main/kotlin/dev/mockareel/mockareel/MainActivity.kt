@@ -8,6 +8,7 @@ import io.flutter.plugin.common.MethodChannel
 
 @UnstableApi
 class MainActivity : FlutterActivity() {
+    private var geocoderChannel: MethodChannel? = null
     private var depthChannel: MethodChannel? = null
     private var gifEncoder: GifVideoEncoder? = null
     private var mapSnapshot: MapSnapshot? = null
@@ -16,6 +17,10 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+        geocoderChannel = MethodChannel(
+            messenger, "dev.mockareel/place-geocoder",
+            io.flutter.plugin.common.StandardMethodCodec.INSTANCE, messenger.makeBackgroundTaskQueue(),
+        ).also { it.setMethodCallHandler(PlaceGeocoder(applicationContext)) }
         depthChannel = MethodChannel(
             messenger,
             "dev.mockareel/photo-depth",
@@ -38,6 +43,8 @@ class MainActivity : FlutterActivity() {
         exportSession?.onPermissionsResult(requestCode)
     }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        geocoderChannel?.setMethodCallHandler(null)
+        geocoderChannel = null
         depthChannel?.setMethodCallHandler(null)
         depthChannel = null
         ExportService.end(applicationContext, false)

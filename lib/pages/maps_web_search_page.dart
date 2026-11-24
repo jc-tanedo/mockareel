@@ -162,8 +162,14 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
       // coordinates that the final listing URL has dropped during navigation.
       final hint = item.toPlace();
       snapshot.place?.placeId ??= hint.placeId;
-      snapshot.place?.latitude ??= hint.latitude;
-      snapshot.place?.longitude ??= hint.longitude;
+      final place = snapshot.place;
+      if (place != null &&
+          (place.latitude == null || place.longitude == null) &&
+          hint.latitude != null &&
+          hint.longitude != null) {
+        place.latitude = hint.latitude;
+        place.longitude = hint.longitude;
+      }
       return snapshot;
     });
   }

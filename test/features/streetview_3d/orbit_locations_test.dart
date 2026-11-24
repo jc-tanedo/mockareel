@@ -28,6 +28,67 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
+    'opening a draft resolves its pin before fetching geometry and saves it on linked media',
+    (tester) async {
+      final place = PlaceDetails(
+        name: 'Yomiuriland',
+        address: 'Inagi, Tokyo, Japan',
+      );
+      final location = OrbitLocation(place: place);
+      final clip = ReelClip(
+        id: 'park',
+        path: 'park.jpg',
+        name: 'park',
+        isVideo: false,
+      );
+      location.assign(clip);
+      final project = ReelProject(
+        template: 'streetview-3d',
+        clips: [clip],
+        streetview: StreetviewSettings(locations: [location]),
+      );
+      final store = MemoryProjectStore();
+      const channel = MethodChannel('dev.mockareel/place-geocoder');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      var lookups = 0;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        lookups++;
+        return [
+          {
+            'name': 'Yomiuriland',
+            'localities': ['Inagi'],
+            'latitude': 35.6253,
+            'longitude': 139.51907,
+          },
+        ];
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final geometryPins = <(double, double)>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MapsEditorPage(
+            store: store,
+            initialProject: project,
+            fetchGeometry: (lat, lon) async {
+              geometryPins.add((lat, lon));
+              throw const FormatException('offline');
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      expect(lookups, 1);
+      expect(geometryPins, [(35.6253, 139.51907)]);
+      final restored = await store.restore();
+      final savedPlace = restored.streetview.locations.single.place;
+      final savedClip = restored.clips.single.streetview.place;
+      expect((savedPlace.latitude, savedPlace.longitude), geometryPins.single);
+      expect((savedClip.latitude, savedClip.longitude), geometryPins.single);
+    },
+  );
+
+  testWidgets(
     'choose locations before media, reopen draft and import a batch at the selected pin',
     (tester) async {
       final store = _PhotoStore();
