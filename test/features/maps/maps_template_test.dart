@@ -82,7 +82,10 @@ void main() {
         ],
       );
       expect(TemplateLayout.sheetOffset(p, 0), 130);
-      expect(TemplateLayout.sheetOffset(p, .5), closeTo(16.25, .0001));
+      expect(
+        TemplateLayout.sheetOffset(p, .5),
+        closeTo(-1.4072365752300486, .0001),
+      );
       expect(TemplateLayout.sheetOffset(p, 1), 0);
       expect(TemplateLayout.sheetOffset(p, 10), 0);
       expect(p.duration, 2);
@@ -91,6 +94,8 @@ void main() {
       final legacy = ReelProject.fromJson({'clips': []});
       expect(legacy.headerMode, 'photo');
       expect(legacy.sheetIntroSeconds, 0);
+      expect(ReelProject().sheetIntroSeconds, .65);
+      expect(ReelProject().slideSeconds, .48);
     },
   );
   test(

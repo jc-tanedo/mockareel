@@ -62,7 +62,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   double? _progress, _capturePosition;
   double _exportPosition = 0;
   ExportPhase _exportPhase = ExportPhase.preparing;
-  String _exportFormat = 'H.264 · 1080 × 1920 · 30 fps';
+  String _exportFormat = 'H.264 · 1080 × 1920 · 60 fps';
   String _key = '', _status = '', _previewRevision = 'initial';
   String? _captureHeroPath;
   Map<String, String> _capturePosters = {};
@@ -611,7 +611,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   );
 
   Future<void> _export() => _runExport(
-    format: 'H.264 · 1080 × 1920 · 30 fps',
+    format: 'H.264 · 1080 × 1920 · 60 fps',
     initialStatus: 'Preparing media…',
     action: (pipeline) async {
       if (_project.clips.isEmpty) return;

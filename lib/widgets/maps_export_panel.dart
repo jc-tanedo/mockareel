@@ -69,7 +69,7 @@ class MapsExportPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Vertical MP4 · H.264 · $musicLabel',
+                              'Vertical MP4 · H.264 · 60 fps · $musicLabel',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),

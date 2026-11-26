@@ -1,8 +1,10 @@
 import '../model/app_window_motion.dart';
 import '../model/feed_timeline.dart';
+import '../model/m3_motion.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/project.dart';
+import 'm3_ink_ripple.dart';
 import 'media_frame.dart';
 import 'home_surface.dart';
 import 'feed_chrome.dart';
@@ -52,6 +54,7 @@ class FeedCanvas extends StatelessWidget {
     bool home = false,
     bool hold = false,
     double? top,
+    double contentScale = 1.0,
   }) {
     return Positioned(
       key: ValueKey('post-${c.id}'),
@@ -71,20 +74,25 @@ class FeedCanvas extends StatelessWidget {
             child: SizedBox(
               width: 360,
               height: 640,
-              child: Stack(
-                children: [
-                  if (!overlayOnly || home)
-                    Positioned.fill(
-                      child: _media(
-                        c,
-                        elapsed,
-                        play: playing && !home && !hold,
+              child: Transform.scale(
+                scale: contentScale,
+                child: Stack(
+                  children: [
+                    if (!overlayOnly || home)
+                      Positioned.fill(
+                        child: _media(
+                          c,
+                          elapsed,
+                          play: playing && !home && !hold,
+                        ),
                       ),
-                    ),
-                  Positioned.fill(child: FeedPostSurface(post: c.post)),
-                  if (home)
-                    Positioned.fill(child: FeedChrome(time: project.feed.time)),
-                ],
+                    Positioned.fill(child: FeedPostSurface(post: c.post)),
+                    if (home)
+                      Positioned.fill(
+                        child: FeedChrome(time: project.feed.time),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -109,6 +117,17 @@ class FeedCanvas extends StatelessWidget {
       final entry = project.clips.isEmpty
           ? 0.0
           : FeedTimeline.entry(project, i, elapsed);
+      final searchExit = i == 0
+          ? FeedTimeline.searchExitDuration(project)
+          : 0.0;
+      final inSearchHandoff = searchExit > 0 && elapsed < searchExit;
+      final searchU = inSearchHandoff
+          ? (elapsed / searchExit).clamp(0.0, 1.0)
+          : 1.0;
+      final postScale = inSearchHandoff
+          ? M3Motion.lerp(0.94, 1.0, M3Motion.defaultSpatial.eval(searchU))
+          : 1.0;
+
       if (!overlayOnly) {
         children.add(
           const Positioned.fill(child: ColoredBox(color: Colors.black)),
@@ -142,7 +161,7 @@ class FeedCanvas extends StatelessWidget {
       }
       if (project.clips.isNotEmpty) {
         final c = project.clips[i];
-        children.add(_postLayer(c, elapsed));
+        children.add(_postLayer(c, elapsed, contentScale: postScale));
         if (!overlayOnly && !posterOnly && i + 1 < project.clips.length) {
           children.add(
             _postLayer(project.clips[i + 1], 0, top: 640, hold: true),
@@ -164,6 +183,35 @@ class FeedCanvas extends StatelessWidget {
           child: FeedChrome(time: f.time, search: f.hasSearch ? f.search : ''),
         ),
       );
+      if (inSearchHandoff) {
+        final searchScale = M3Motion.lerp(
+          1.0,
+          1.06,
+          M3Motion.defaultSpatial.eval(searchU),
+        );
+        final searchAlpha = (1.0 - M3Motion.defaultEffects.eval(searchU)).clamp(
+          0.0,
+          1.0,
+        );
+        if (searchAlpha > 0) {
+          children.add(
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: searchAlpha,
+                  child: Transform.scale(
+                    scale: searchScale,
+                    child: SearchSurface(
+                      settings: f,
+                      elapsed: f.typingSeconds + f.loadingSeconds + elapsed,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
     } else {
       final home = f.homeMedia;
       final opening = s.kind == 'home-open';
@@ -199,6 +247,25 @@ class FeedCanvas extends StatelessWidget {
           ),
         ),
       );
+      if (f.showIcons && window.iconRippleProgress > 0) {
+        final icon = f.launchIcon;
+        children.add(
+          Positioned(
+            key: const ValueKey('home-icon-ripple'),
+            left: icon.left,
+            top: icon.top,
+            width: icon.size,
+            height: icon.size,
+            child: Transform.scale(
+              scale: window.iconPressScale,
+              child: M3InkRipple(
+                progress: window.iconRippleProgress,
+                borderRadius: BorderRadius.circular(icon.radius),
+              ),
+            ),
+          ),
+        );
+      }
       if (project.clips.isNotEmpty) {
         final c = project.clips[opening ? 0 : project.clips.length - 1];
         // Preload the opening video even while its app tile is invisible. The

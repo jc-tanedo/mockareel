@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'feed_post.dart';
 import 'ids.dart';
+import 'm3_motion.dart';
 import 'media_edits.dart';
 import 'streetview_data.dart';
 export 'media_edits.dart';
@@ -49,7 +50,8 @@ class ReelClip {
       : isGif && loopGif
       ? max(0, sourceDuration - .001)
       : max(0, sourceDuration - duration);
-  double get minDuration => min(isGif ? 1 / 30 : .5, maxDuration);
+  double get minDuration =>
+      min(isGif ? 1 / M3Motion.exportFps : .5, maxDuration);
   void setGifLoop(bool value) {
     if (isGif && !value && sourceDuration > 0) {
       duration = min(duration, max(minDuration, sourceDuration - trimStart));

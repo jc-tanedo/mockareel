@@ -12,7 +12,7 @@ Card framing controls are width, height, zoom and horizontal crop. A selected me
 
 ## Motion
 
-At each card boundary, scroll offset moves from the preceding card's start to the new card's start using ease-out cubic. It then remains at that exact offset for the hold. Entry duration defaults to 0.42 seconds and is capped to 45% of a short card's total duration. There is no extra transition time added to the timeline. The reference-pace preset uses 1.56 seconds per card and a 0.35-second entry, giving five cards 7.8 seconds overall.
+At each card boundary, scroll offset moves from the preceding card's start to the new card's start using Material 3 Expressive spatial spring physics (with morphing pill indicators, caption fade-through and a wavy progress indicator). It then holds at that exact offset. Entry duration defaults to 0.48 seconds and is capped to 45% of a short card's total duration. Sheet opening reveal defaults to 0.65 seconds. There is no extra transition time added to the timeline. The reference-pace preset uses 1.56 seconds per card and a 0.35-second entry, giving five cards 7.8 seconds overall.
 
 Flutter preview and the Android compositor share the layout parameters. The native compositor positions the active video texture, draws the other visible cards from cached start/end stills, masks rounded edges and gallery bounds, then overlays the same UI PNG rasterized by Flutter. Native frame timestamps are normalized to each item's first decoded frame to accommodate trimmed videos and concatenation.
 

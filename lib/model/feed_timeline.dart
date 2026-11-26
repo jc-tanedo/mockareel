@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'm3_motion.dart';
 import 'project.dart';
 
 /// The same scene plan drives scrubbing, playback and native export.
@@ -32,6 +33,7 @@ abstract final class FeedTimeline {
 
   static double duration(ReelProject p) =>
       scenes(p).fold(0, (n, s) => n + s.duration);
+
   static FeedScene at(ReelProject p, double time) {
     final all = scenes(p);
     return all.firstWhere(
@@ -42,10 +44,19 @@ abstract final class FeedTimeline {
 
   static double postStart(ReelProject p, int index) =>
       p.feed.introDuration + p.startOf(index);
+
   static double transition(ReelProject p, int index) =>
       index == 0 ? 0 : min(p.slideSeconds, p.clips[index].duration * .45);
+
+  static double searchExitDuration(ReelProject p) =>
+      p.feed.hasSearch && p.clips.isNotEmpty
+      ? min(0.28, p.clips.first.duration * 0.35)
+      : 0.0;
+
   static double entry(ReelProject p, int index, double elapsed) {
     final d = transition(p, index);
-    return d <= 0 ? 0 : 640 * pow(1 - (elapsed / d).clamp(0, 1), 3).toDouble();
+    if (d <= 0 || elapsed >= d) return 0;
+    final q = M3Motion.quantize(elapsed, d);
+    return 640.0 * (1.0 - M3Motion.defaultSpatial.at(q, d));
   }
 }

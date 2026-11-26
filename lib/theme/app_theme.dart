@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'm3_motion_curves.dart';
 
 const ink = Color(0xff111015),
     panel = Color(0xff1d1b24),
@@ -109,6 +110,16 @@ ThemeData buildAppTheme([AppThemePreset? preset]) {
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    splashFactory: InkSparkle.splashFactory,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: M3ExpressivePageTransitionsBuilder(),
+        TargetPlatform.iOS: M3ExpressivePageTransitionsBuilder(),
+        TargetPlatform.linux: M3ExpressivePageTransitionsBuilder(),
+        TargetPlatform.macOS: M3ExpressivePageTransitionsBuilder(),
+        TargetPlatform.windows: M3ExpressivePageTransitionsBuilder(),
+      },
+    ),
     colorScheme: colorScheme,
     scaffoldBackgroundColor: colorScheme.surface,
     appBarTheme: AppBarTheme(

@@ -7,7 +7,7 @@ import 'package:mockareel/widgets/reel_preview.dart';
 
 void main() {
   test(
-    'spring settles exactly at the selected icon and screen without overshoot',
+    'M3 Expressive spring settles at icon and screen with bounded spatial overshoot and zero opacity bounce',
     () {
       for (final os in HomeOs.values) {
         final icon = HomeLayout.icon(os, 0);
@@ -17,12 +17,20 @@ void main() {
           elapsed: time,
           hold: .5,
         );
-        final idle = sample(true, .5);
+        final idle = sample(true, 0);
         expect(idle.left, icon.left);
         expect(idle.top, icon.top);
         expect(idle.width, icon.size);
         expect(idle.radius, icon.radius);
         expect(idle.opacity, 0);
+        expect(idle.iconRippleProgress, 0);
+        expect(idle.iconPressScale, 1.0);
+
+        final tap = sample(true, .5 - AppWindowMotion.iconTapSeconds / 2);
+        expect(tap.iconRippleProgress, greaterThan(0));
+        expect(tap.iconRippleProgress, lessThan(1));
+        expect(tap.iconPressScale, lessThan(1));
+
         final full = sample(true, .5 + AppWindowMotion.launchSeconds);
         expect(
           [
@@ -40,22 +48,29 @@ void main() {
           [closed.left, closed.top, closed.width, closed.opacity],
           [icon.left, icon.top, icon.size, 0],
         );
-        var previous = 0.0;
+        var prevOpacity = 0.0;
+        var prevBackdrop = 0.0;
         for (var i = 0; i <= 120; i++) {
           final frame = sample(
             true,
             .5 + AppWindowMotion.launchSeconds * i / 120,
           );
-          expect(frame.progress, inInclusiveRange(previous, 1));
-          previous = frame.progress;
+          expect(frame.progress, inInclusiveRange(0.0, 1.03));
+          expect(frame.width, greaterThanOrEqualTo(1.0));
+          expect(frame.height, greaterThanOrEqualTo(1.0));
+          expect(frame.radius, greaterThanOrEqualTo(0.0));
+          expect(frame.opacity, inInclusiveRange(prevOpacity, 1.0));
+          expect(frame.backdropEffects, inInclusiveRange(prevBackdrop, 1.0));
+          prevOpacity = frame.opacity;
+          prevBackdrop = frame.backdropEffects;
         }
-        expect(sample(true, .6).progress, greaterThan(.55));
+        expect(sample(true, .62).progress, greaterThan(.55));
         expect(
-          sample(true, .6).opacity,
-          1,
+          sample(true, .62).opacity,
+          greaterThan(.95),
           reason: 'Avoid a prolonged transparent window',
         );
-        expect(sample(false, .1).progress, lessThan(.35));
+        expect(sample(false, .1).progress, greaterThan(.2));
       }
     },
   );

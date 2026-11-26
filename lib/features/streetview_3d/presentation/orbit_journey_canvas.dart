@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/model/streetview_motion.dart';
@@ -45,12 +46,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final clip = project.clips[index], settings = clip.streetview;
     final plan = scene.kind == 'map' || scene.kind == 'ending-map';
     // Leave at least three movement samples even for a short arrow tap.
-    final lastFrame = ((scene.duration * 30).ceil() - 1) / 30;
+    const step = 1 / M3Motion.exportFps;
+    final lastFrame =
+        ((scene.duration * M3Motion.exportFps).ceil() - 1) / M3Motion.exportFps;
     final tapSeconds = arrow
-        ? min(StreetviewTimeline.rippleSeconds, max(0.0, lastFrame - 3 / 30))
+        ? min(StreetviewTimeline.rippleSeconds, max(0.0, lastFrame - 3 * step))
         : StreetviewTimeline.rippleSeconds;
     final t = arrow
-        ? ((elapsed - tapSeconds) / max(1 / 30, lastFrame - tapSeconds)).clamp(
+        ? ((elapsed - tapSeconds) / max(step, lastFrame - tapSeconds)).clamp(
             0.0,
             1.0,
           )
@@ -63,11 +66,11 @@ class OrbitJourneyCanvas extends StatelessWidget {
         ? min(.2, lastFrame * .25)
         : max(0.0, lastFrame - min(.85, lastFrame * .62));
     final flightFraction =
-        ((elapsed - flightStart) / max(1 / 30, lastFrame - flightStart)).clamp(
+        ((elapsed - flightStart) / max(step, lastFrame - flightStart)).clamp(
           0.0,
           1.0,
         );
-    final eased = Curves.easeInOut.transform(flightFraction);
+    final eased = M3Motion.cameraEase(flightFraction);
     final world = back
         ? 1 - eased
         : entering
@@ -78,12 +81,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final returningToNext = back && index + 1 < project.clips.length;
     final planClip = returningToNext ? project.clips[index + 1] : clip;
     final mapOpacity =
-        1 - Curves.easeInOut.transform((world / .67).clamp(0.0, 1.0));
-    final hudOpacity = Curves.easeInOut.transform(
+        1 - M3Motion.defaultEffects.eval((world / .67).clamp(0.0, 1.0));
+    final hudOpacity = M3Motion.defaultEffects.eval(
       ((world - .62) / .38).clamp(0.0, 1.0),
     );
     final direction = settings.arrow == 'left' ? -1 : 1;
-    final blend = Curves.easeInOut.transform(((t - .25) / .5).clamp(0.0, 1.0));
+    final blend = M3Motion.defaultEffects.eval(
+      ((t - .25) / .5).clamp(0.0, 1.0),
+    );
     Widget shot(int i, OrbitDolly? dolly) {
       final item = project.clips[i];
       final active = i == index, incoming = arrow && i == index + 1;
@@ -271,9 +276,9 @@ class OrbitJourneyCanvas extends StatelessWidget {
         : '';
     final entryTap = min(StreetviewTimeline.rippleSeconds, flightStart);
     final ripple = back
-        ? elapsed / max(1 / 30, flightStart)
+        ? elapsed / max(step, flightStart)
         : entering
-        ? (elapsed - flightStart + entryTap) / max(1 / 30, entryTap)
+        ? (elapsed - flightStart + entryTap) / max(step, entryTap)
         : -1.0;
     Widget canvas(OrbitDolly? dolly, OrbitScene? source) => FittedBox(
       child: SizedBox(

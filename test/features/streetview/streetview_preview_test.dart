@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -241,7 +242,9 @@ void main() {
             platform.commands.where((c) => c.startsWith('seek:')).length,
             seeks,
           );
-          await show(p.startOf(0) + .11);
+          await show(
+            p.startOf(0) + StreetviewTimeline.expandDuration(p.clips[0]),
+          );
           expect(bounds(0), full);
 
           final scenes = StreetviewTimeline.scenes(p);
@@ -269,7 +272,9 @@ void main() {
               await show(p.startOf(1));
               expect(bounds(1), thumbnail);
               expect(player(1), same(second));
-              await show(p.startOf(1) + .11);
+              await show(
+                p.startOf(1) + StreetviewTimeline.expandDuration(p.clips[1]),
+              );
               expect(bounds(1), full);
             }
           }
@@ -365,39 +370,52 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets(
-    'media UI capture leaves video transparent and renders standalone output',
+    'media UI capture exposes expanding cutout then leaves settled video transparent',
     (tester) async {
+      tester.view.physicalSize = const Size(400, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final p = project();
       final key = GlobalKey();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Center(
-            child: RepaintBoundary(
-              key: key,
-              child: SizedBox(
-                width: 360,
-                height: 640,
-                child: ReelCanvas(
-                  project: p,
-                  position: p.startOf(0),
-                  overlayOnly: true,
+      Future<ByteData> captureAt(double pos) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: RepaintBoundary(
+                key: key,
+                child: SizedBox(
+                  width: 360,
+                  height: 640,
+                  child: ReelCanvas(
+                    project: p,
+                    position: pos,
+                    overlayOnly: true,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-      final boundary =
-          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      await tester.runAsync(() async {
-        final image = await boundary.toImage();
-        final rgba = await image.toByteData();
-        expect(
-          rgba!.getUint8((320 * image.width + image.width ~/ 2) * 4 + 3),
-          0,
         );
-        image.dispose();
-      });
+        final boundary =
+            key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        late ByteData rgba;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          rgba = (await image.toByteData())!;
+          image.dispose();
+        });
+        return rgba;
+      }
+
+      final expanding = await captureAt(p.startOf(0));
+      expect(expanding.getUint8((511 * 360 + 53) * 4 + 3), 0);
+      expect(expanding.getUint8((320 * 360 + 180) * 4 + 3), 255);
+
+      final settled = await captureAt(
+        p.startOf(0) + StreetviewTimeline.expandDuration(p.clips[0]),
+      );
+      expect(settled.getUint8((320 * 360 + 180) * 4 + 3), 0);
       expect(find.text('Place 0'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },

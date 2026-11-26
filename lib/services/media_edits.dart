@@ -36,13 +36,13 @@ class EditedMedia {
     final key = sha256
         .convert(
           utf8.encode(
-            'source-edits-v2:$signature:${stat.size}:${stat.modified.microsecondsSinceEpoch}',
+            'source-edits-v3:$signature:${stat.size}:${stat.modified.microsecondsSinceEpoch}',
           ),
         )
         .toString();
     final dir =
         root ??
-        Directory('${Directory.systemTemp.path}/mockareel-source-edits-v2');
+        Directory('${Directory.systemTemp.path}/mockareel-source-edits-v3');
     await dir.create(recursive: true);
     final target = File('${dir.path}/$key.${request.isTimed ? 'mp4' : 'png'}');
     if (await target.exists() && await target.length() > 0) {

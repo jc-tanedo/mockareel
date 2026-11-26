@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/model/app_window_motion.dart';
 import 'package:mockareel/model/feed.dart';
+import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/pages/feed_editor_page.dart';
 import 'package:mockareel/services/native_renderer.dart';
@@ -104,8 +105,11 @@ void main() {
             final overlays = args['overlays'] as List;
             checks['search changes'] = !listEquals(
               await File(frames[0][0] as String).readAsBytes(),
-              await File(frames[0][15] as String).readAsBytes(),
+              await File(frames[0][30] as String).readAsBytes(),
             );
+            checks['search handoff retained'] =
+                (args['clips'] as List)[1]['searchEnterDuration'] == 0.175 &&
+                (frames[1] as List).length == 11;
             checks['active texture exposed'] =
                 await alpha(overlays[1] as String, 540, 800) == 0;
             checks['outgoing poster visible'] =
@@ -114,10 +118,11 @@ void main() {
                 await alpha(frames[2][3] as String, 540, 800) == 0;
             checks['closing animated'] =
                 (frames[3] as List).length ==
-                (p.feed.outroDuration * 30).ceil();
+                (p.feed.outroDuration * M3Motion.exportFps).ceil();
             checks['typing samples reused'] = frames[0][0] == frames[0][1];
             checks['home hold reused'] =
-                frames[3][(AppWindowMotion.closeSeconds * 30).ceil()] ==
+                frames[3][(AppWindowMotion.closeSeconds * M3Motion.exportFps)
+                    .ceil()] ==
                 (frames[3] as List).last;
             request = args;
           } catch (e) {

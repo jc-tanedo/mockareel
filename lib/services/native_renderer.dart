@@ -64,6 +64,7 @@ class NativeRenderer {
     ReelProject project,
     List<String> overlays, {
     List<String> introFrames = const [],
+    List<List<String>> slideFrames = const [],
   }) async {
     final generation = ++_generation;
     final clips = <Map<String, dynamic>>[],
@@ -99,6 +100,7 @@ class NativeRenderer {
             ? 0
             : project.sheetIntroSeconds,
         'introFrames': introFrames,
+        if (slideFrames.isNotEmpty) 'slideFrames': slideFrames,
       });
     });
     if (path == null) throw StateError('The renderer did not return a video.');
@@ -110,6 +112,7 @@ class NativeRenderer {
     required List<String> overlays,
     required List<List<String>> frames,
     required List<double> transitions,
+    List<double>? overlayDurations,
     MusicTrack? music,
   }) async {
     final generation = ++_generation;
@@ -140,6 +143,7 @@ class NativeRenderer {
         'layout': TemplateLayout.native,
         'sceneFrames': frames,
         'transitions': transitions,
+        if (overlayDurations != null) 'overlayDurations': overlayDurations,
         'music': music?.toJson(),
       });
     });

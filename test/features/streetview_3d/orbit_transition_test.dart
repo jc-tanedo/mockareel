@@ -379,7 +379,7 @@ void main() {
         const Offset(63, 476),
       );
       expect((actual - expected).distance, lessThan(1e-6));
-      await seek(29 / 30);
+      await seek(59 / 60);
       expect(
         tester
             .widgetList<OrbitMapView>(find.byType(OrbitMapView))

@@ -35,21 +35,22 @@ destination. The opening thumbnail always follows the first item.
 ## Timing
 
 The default opening map is 2 seconds, later maps 1.5 seconds, and transitions
-0.45 seconds. Map and transition durations are adjustable. Media duration,
+0.55 seconds. Map and transition durations are adjustable. Media duration,
 trim, GIF looping and framing use the shared editor controls. Transition time
 is added to the total rather than taken from a media segment.
 
-Tap ripples last 0.2 seconds. A map's thumbnail ripple occupies its final
-0.2 seconds; an arrow ripple occupies the first 0.2 seconds of the movement
-transition. The back-control ripple occupies the final 0.2 seconds of its
-transition. Each ripple is included in its containing scene exactly once.
-The optional ending adds a back-control transition and a final map hold, with
-no thumbnail tap to reenter Street View. By default the output ends on media.
+Tap ripples use clipped Material 3 ink/sparkle pulses lasting 0.28 seconds on
+map thumbnails (occupying the final 0.28 seconds of the map scene) and up to
+0.18 seconds on arrow and back controls. When entering Street View from a map,
+live media expands from the rounded thumbnail to fullscreen over 0.42 seconds via
+a Material 3 container transform in both preview and MP4 export. On return-to-Maps,
+the close-button ripple starts immediately and flows smoothly into the container
+shrink-to-thumbnail and ending map hold. By default the output ends on media.
 
 Use the **Camera motion** card to enable slow zoom, horizontal pan and a simulated
 turntable independently for each item. Adjust zoom amount, signed pan distance
 and turn angle (up to 15°), with **Reverse turn direction** to change the turn.
-Turntable applies a gentle perspective yaw to
+Turntable applies a gentle eased perspective yaw to
 ordinary media. All three motions carry the navigation arrows with the scene;
 the toolbar and place sheet stay fixed. Default zoom/pan amounts are 6% and eight
 logical pixels. The camera slightly overscans the source to keep edges filled.
@@ -93,10 +94,11 @@ Android devices with only one hardware encoder.
 ## Implementation and validation
 
 `StreetviewTimeline` describes every map, media and transition scene. The same
-scene plan drives scrubbing, live playback and export capture. Video/GIF players
+scene plan drives scrubbing, live playback and 60 fps export capture. Video/GIF players
 are retained and preloaded across scene boundaries, pause with preview and stop
 at the exact end. During arrow transitions, still end/start frames supply the
-movement effect; normal media segments retain native video/GIF motion.
+movement effect; normal media segments and map-to-media container expansions
+retain native video/GIF motion.
 
 MP4 export reuses the existing Android full-screen texture compositor and shared
 progress, cancellation, gallery and music handling. Only map/UI/transition frames

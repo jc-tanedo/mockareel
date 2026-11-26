@@ -173,7 +173,10 @@ void main() {
       const step = 328 * .5 + 8;
       expect(TemplateLayout.offset(p, 0), 0);
       expect(TemplateLayout.offset(p, 1.56), 0);
-      expect(TemplateLayout.offset(p, 1.56 + .175), closeTo(step * .875, 1e-8));
+      expect(
+        TemplateLayout.offset(p, 1.56 + .175),
+        closeTo(step * 1.0139572459460215, 1e-8),
+      );
       expect(TemplateLayout.offset(p, 1.56 + .35), step);
       expect(TemplateLayout.offset(p, 3.0), step);
       expect(TemplateLayout.offset(p, p.duration), step * 2);
@@ -217,9 +220,11 @@ void main() {
         rating: 4,
       );
       final opening = await frame(tester, p, 0, artifact: 'map-opening');
+      final bounce = await frame(tester, p, .5, transparent: true);
       final settled = await frame(tester, p, 1.1, artifact: 'map-review');
       expect(pixel(settled, 180, 30), const Color(0xff4caf50));
       expect(pixel(opening, 30, 300), Colors.white);
+      expect(pixel(bounce, 180, 639).a, 1);
       expect(pixel(settled, 30, 300), const Color(0xfff44336));
       expect(pixel(settled, 330, 620), const Color(0xffeef0f2));
       p.review.enabled = false;
@@ -246,7 +251,9 @@ void main() {
       expect(pixel(dark, 10, 300), const Color(0xff202124));
       expect(pixel(dark, 184, 300), const Color(0xff202124));
       expect(pixel(dark, 330, 620), const Color(0xff303134));
-      expect(pixel(dark, 50, 498), const Color(0xff8ab4f8));
+      expect([
+        for (var y = 493; y <= 499; y++) pixel(dark, 50, y),
+      ], contains(const Color(0xff8ab4f8)));
       expect(pixel(dark, 30, 300), pixel(light, 30, 300));
       expect(pixel(dark, 30, 30), pixel(light, 30, 30));
       final transparent = await frame(tester, p, .7, transparent: true);

@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../model/export_phase.dart';
+import '../theme/m3_motion_curves.dart';
+import 'm3_wavy_progress.dart';
+export '../model/export_phase.dart';
 
 /// A shared export workspace. The scene preview uses still media, so it never
 /// opens a competing video decoder while the native encoder is running.
@@ -20,7 +24,7 @@ class ExportMonitor extends StatefulWidget {
     required this.position,
     required this.duration,
     required this.preview,
-    this.format = 'H.264 · 1080 × 1920 · 30 fps',
+    this.format = 'H.264 · 1080 × 1920 · 60 fps',
     this.onCancel,
   });
 
@@ -255,7 +259,9 @@ class _ExportMonitorState extends State<ExportMonitor> {
                 for (var i = 0; i < 3; i++) ...[
                   if (i > 0) const SizedBox(width: 10),
                   Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: M3Curves.fastEffects,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 6,
@@ -313,15 +319,23 @@ class _ExportMonitorState extends State<ExportMonitor> {
               ),
             ),
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: value,
-                minHeight: 6,
+            if (value != null)
+              M3WavyProgressBar(
+                progress: value,
+                phase: widget.position * 3.2 * pi,
                 color: colors.primary,
-                backgroundColor: colors.surfaceContainerHighest,
+                trackColor: colors.surfaceContainerHighest,
+              )
+            else
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: null,
+                  minHeight: 6,
+                  color: colors.primary,
+                  backgroundColor: colors.surfaceContainerHighest,
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             Row(
               children: [

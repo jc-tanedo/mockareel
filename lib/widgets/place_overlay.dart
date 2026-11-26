@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../model/m3_motion.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
 import '../theme/output_palette.dart';
@@ -17,6 +19,9 @@ import 'story_tags.dart';
 class PlaceOverlay extends StatelessWidget {
   final ReelProject project;
   final int index;
+  final int? previousIndex;
+  final double slideProgress;
+  final double introProgress;
   final String? heroPath;
   final bool showTags;
   final double sheetOffset;
@@ -24,17 +29,18 @@ class PlaceOverlay extends StatelessWidget {
     super.key,
     required this.project,
     this.index = 0,
+    this.previousIndex,
+    this.slideProgress = 1.0,
+    this.introProgress = 1.0,
     this.heroPath,
     this.showTags = true,
     this.sheetOffset = 0,
   });
+
   @override
   Widget build(BuildContext context) {
     final p = project.place;
     final colors = OutputPalette(dark: project.darkOutput);
-    final caption = index >= 0 && index < project.clips.length
-        ? project.clips[index].caption
-        : '';
     final hero = project.headerMode == 'map'
         ? project.mapHeaderPath
         : heroPath ??
@@ -58,6 +64,54 @@ class PlaceOverlay extends StatelessWidget {
         height: 1.2,
       ),
     );
+
+    final prevIdx = previousIndex ?? index;
+    final sliding =
+        slideProgress < 1.0 &&
+        prevIdx != index &&
+        prevIdx >= 0 &&
+        prevIdx < project.clips.length;
+    final outAlpha = sliding ? M3Motion.fadeThroughOut(slideProgress) : 0.0;
+    final inAlpha = sliding ? M3Motion.fadeThroughIn(slideProgress) : 1.0;
+    final outDrift = sliding
+        ? -4.0 *
+              M3Motion.fastSpatial.eval((slideProgress / 0.35).clamp(0.0, 1.0))
+        : 0.0;
+    final inDrift = sliding
+        ? 4.0 *
+              (1.0 -
+                  M3Motion.fastSpatial.eval(
+                    ((slideProgress - 0.35) / 0.65).clamp(0.0, 1.0),
+                  ))
+        : 0.0;
+
+    final activeCaption = index >= 0 && index < project.clips.length
+        ? project.clips[index].caption
+        : '';
+    final prevCaption = sliding ? project.clips[prevIdx].caption : '';
+
+    Widget captionBox(String text) => Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .72),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: line(text, size: 14, color: Colors.white, lines: 2),
+    );
+
+    final dotSpatial = M3Motion.fastSpatial
+        .eval(slideProgress.clamp(0.0, 1.0))
+        .clamp(0.0, 1.15);
+    final dotEffects = M3Motion.fastEffects
+        .eval(slideProgress.clamp(0.0, 1.0))
+        .clamp(0.0, 1.0);
+    final introScrim = introProgress < 1.0
+        ? (0.20 * (1.0 - M3Motion.defaultEffects.eval(introProgress))).clamp(
+            0.0,
+            1.0,
+          )
+        : 0.0;
+
     return MediaQuery.withNoTextScaling(
       child: FittedBox(
         fit: BoxFit.contain,
@@ -78,44 +132,62 @@ class PlaceOverlay extends StatelessWidget {
                 decoration: TextDecoration.none,
               ),
               child: Stack(
+                clipBehavior: Clip.hardEdge,
                 children: [
                   Positioned(
                     left: 0,
                     top: 0,
                     width: 360,
-                    height: 94 + sheetOffset,
-                    child: ColoredBox(
-                      color: const Color(0xff193d43),
-                      child: hero == null
-                          ? (project.headerMode == 'map'
-                                ? const Center(
-                                    child: Icon(
-                                      Icons.map_outlined,
-                                      color: Colors.white38,
-                                      size: 34,
+                    height: max(0.0, 94 + sheetOffset),
+                    child: ClipRect(
+                      child: ColoredBox(
+                        color: const Color(0xff193d43),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Transform.translate(
+                              offset: Offset(0, -0.18 * sheetOffset),
+                              child: hero == null
+                                  ? (project.headerMode == 'map'
+                                        ? const Center(
+                                            child: Icon(
+                                              Icons.map_outlined,
+                                              color: Colors.white38,
+                                              size: 34,
+                                            ),
+                                          )
+                                        : project.heroClip == null
+                                        ? const Center(
+                                            child: Icon(
+                                              Icons.photo_outlined,
+                                              color: Colors.white38,
+                                              size: 34,
+                                            ),
+                                          )
+                                        : ClipPoster(
+                                            clip: project.heroClip!,
+                                            applyCrop: false,
+                                          ))
+                                  : project.headerMode == 'map' &&
+                                        project.mapSource == 'browser'
+                                  ? BrowserMapHeaderImage(path: hero)
+                                  : Image.file(
+                                      File(hero),
+                                      fit: BoxFit.cover,
+                                      alignment: Alignment.bottomCenter,
+                                      errorBuilder: (_, __, ___) =>
+                                          const SizedBox(),
                                     ),
-                                  )
-                                : project.heroClip == null
-                                ? const Center(
-                                    child: Icon(
-                                      Icons.photo_outlined,
-                                      color: Colors.white38,
-                                      size: 34,
-                                    ),
-                                  )
-                                : ClipPoster(
-                                    clip: project.heroClip!,
-                                    applyCrop: false,
-                                  ))
-                          : project.headerMode == 'map' &&
-                                project.mapSource == 'browser'
-                          ? BrowserMapHeaderImage(path: hero)
-                          : Image.file(
-                              File(hero),
-                              fit: BoxFit.cover,
-                              alignment: Alignment.bottomCenter,
-                              errorBuilder: (_, __, ___) => const SizedBox(),
                             ),
+                            if (introScrim > 0)
+                              ColoredBox(
+                                color: Colors.black.withValues(
+                                  alpha: introScrim,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(
@@ -135,6 +207,7 @@ class PlaceOverlay extends StatelessWidget {
                     child: Transform.translate(
                       offset: Offset(0, sheetOffset),
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           Positioned(
                             left: 0,
@@ -176,11 +249,13 @@ class PlaceOverlay extends StatelessWidget {
                             height: 250,
                             child: ColoredBox(color: colors.surface),
                           ),
+                          // Bottom overshoot skirt guarantees subtle upward spring bounce
+                          // never exposes a transparent strip below y=640.
                           Positioned(
                             left: 0,
                             right: 0,
                             top: 500,
-                            bottom: 0,
+                            bottom: -24,
                             child: ColoredBox(color: colors.surface),
                           ),
                           Positioned(
@@ -297,24 +372,36 @@ class PlaceOverlay extends StatelessWidget {
                               colors: colors,
                             ),
                           ),
-                          if (caption.isNotEmpty)
+                          if (activeCaption.isNotEmpty ||
+                              prevCaption.isNotEmpty)
                             Positioned(
                               left: TemplateLayout.galleryLeft + 10,
                               right: TemplateLayout.galleryLeft + 10,
                               top: 446,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: .72),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: line(
-                                  caption,
-                                  size: 14,
-                                  color: Colors.white,
-                                  lines: 2,
-                                ),
-                              ),
+                              child: sliding
+                                  ? Stack(
+                                      children: [
+                                        if (prevCaption.isNotEmpty &&
+                                            outAlpha > 0)
+                                          Opacity(
+                                            opacity: outAlpha,
+                                            child: Transform.translate(
+                                              offset: Offset(0, outDrift),
+                                              child: captionBox(prevCaption),
+                                            ),
+                                          ),
+                                        if (activeCaption.isNotEmpty &&
+                                            inAlpha > 0)
+                                          Opacity(
+                                            opacity: inAlpha,
+                                            child: Transform.translate(
+                                              offset: Offset(0, inDrift),
+                                              child: captionBox(activeCaption),
+                                            ),
+                                          ),
+                                      ],
+                                    )
+                                  : captionBox(activeCaption),
                             ),
                           if (project.review.visible)
                             Positioned(
@@ -347,11 +434,41 @@ class PlaceOverlay extends StatelessWidget {
                             Positioned(
                               right: 18,
                               top: 242,
-                              child: line(
-                                '${index + 1} / ${project.clips.length}',
-                                size: 7,
-                                color: colors.progress,
-                              ),
+                              child: sliding
+                                  ? Stack(
+                                      alignment: Alignment.centerRight,
+                                      children: [
+                                        if (outAlpha > 0)
+                                          Opacity(
+                                            opacity: outAlpha,
+                                            child: Transform.translate(
+                                              offset: Offset(0, outDrift),
+                                              child: line(
+                                                '${prevIdx + 1} / ${project.clips.length}',
+                                                size: 7,
+                                                color: colors.progress,
+                                              ),
+                                            ),
+                                          ),
+                                        if (inAlpha > 0)
+                                          Opacity(
+                                            opacity: inAlpha,
+                                            child: Transform.translate(
+                                              offset: Offset(0, inDrift),
+                                              child: line(
+                                                '${index + 1} / ${project.clips.length}',
+                                                size: 7,
+                                                color: colors.progress,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    )
+                                  : line(
+                                      '${index + 1} / ${project.clips.length}',
+                                      size: 7,
+                                      color: colors.progress,
+                                    ),
                             ),
                             Positioned(
                               left: 16,
@@ -361,18 +478,65 @@ class PlaceOverlay extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   for (var i = 0; i < project.clips.length; i++)
-                                    Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 2,
-                                      ),
-                                      width: i == index ? 5 : 3,
-                                      height: i == index ? 5 : 3,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: i == index
-                                            ? colors.progress
-                                            : colors.inactiveDot,
-                                      ),
+                                    Builder(
+                                      builder: (_) {
+                                        final double dotW;
+                                        final double dotH;
+                                        final Color dotColor;
+                                        if (sliding && i == index) {
+                                          dotW = M3Motion.lerp(
+                                            4.0,
+                                            14.0,
+                                            dotSpatial,
+                                          ).clamp(3.0, 18.0);
+                                          dotH = M3Motion.lerp(
+                                            4.0,
+                                            5.0,
+                                            dotSpatial,
+                                          ).clamp(3.0, 6.0);
+                                          dotColor = Color.lerp(
+                                            colors.inactiveDot,
+                                            colors.progress,
+                                            dotEffects,
+                                          )!;
+                                        } else if (sliding && i == prevIdx) {
+                                          dotW = M3Motion.lerp(
+                                            14.0,
+                                            4.0,
+                                            dotSpatial,
+                                          ).clamp(3.0, 18.0);
+                                          dotH = M3Motion.lerp(
+                                            5.0,
+                                            4.0,
+                                            dotSpatial,
+                                          ).clamp(3.0, 6.0);
+                                          dotColor = Color.lerp(
+                                            colors.progress,
+                                            colors.inactiveDot,
+                                            dotEffects,
+                                          )!;
+                                        } else {
+                                          final active = i == index;
+                                          dotW = active ? 14.0 : 4.0;
+                                          dotH = active ? 5.0 : 4.0;
+                                          dotColor = active
+                                              ? colors.progress
+                                              : colors.inactiveDot;
+                                        }
+                                        return Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 2,
+                                          ),
+                                          width: dotW,
+                                          height: dotH,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                            color: dotColor,
+                                          ),
+                                        );
+                                      },
                                     ),
                                 ],
                               ),

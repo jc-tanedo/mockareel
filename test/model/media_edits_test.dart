@@ -218,7 +218,7 @@ void main() {
       expect(saved.edits.spots.single.y, .4);
       expect(saved.streetview.canCaptureMap, true);
       expect(await File(saved.path).readAsBytes(), [1, 2, 3]);
-      expect(saved.path, isNot(contains('source-edits-v2')));
+      expect(saved.path, isNot(contains('source-edits-v3')));
     },
   );
   test(

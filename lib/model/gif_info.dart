@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'm3_motion.dart';
 
 /// GIF container timing without decompressing image pixels. Delays of 0/10 ms
 /// follow browser behavior (100 ms); disposal/compositing stays with Flutter.
@@ -99,11 +100,11 @@ class GifInfo {
     return delaysMs.length - 1;
   }
 
-  /// Quantize once to the app's 30 fps output clock; reuse the same GIF frame
+  /// Quantize once to the app's 60 fps output clock; reuse the same GIF frame
   /// across samples and loop only within the user's selected source phase.
   List<int> samples(double start, double length, bool loop) =>
-      List.generate((length * 30).ceil(), (i) {
-        var t = start + i / 30;
+      List.generate((length * M3Motion.exportFps).ceil(), (i) {
+        var t = start + i / M3Motion.exportFps;
         t = loop ? t % duration : t.clamp(0, duration - .000001);
         return frameAt(t);
       });
