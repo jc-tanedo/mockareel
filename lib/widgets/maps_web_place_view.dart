@@ -4,11 +4,13 @@ import '../model/maps_web_result.dart';
 class MapsWebPlaceView extends StatelessWidget {
   final MapsWebSnapshot details;
   final int selectedReview;
+  final bool findingPin;
   final ValueChanged<int?> onSelectReview;
 
   const MapsWebPlaceView({
     super.key,
     required this.details,
+    required this.findingPin,
     required this.selectedReview,
     required this.onSelectReview,
   });
@@ -90,6 +92,14 @@ class MapsWebPlaceView extends StatelessWidget {
                 const SizedBox(height: 12),
                 for (final field in [
                   (Icons.place_outlined, place.address),
+                  (
+                    Icons.my_location,
+                    place.hasCoordinates
+                        ? '${place.latitude!.toStringAsFixed(5)}, ${place.longitude!.toStringAsFixed(5)}'
+                        : findingPin
+                        ? 'Finding pin coordinates…'
+                        : 'Pin coordinates unavailable',
+                  ),
                   (Icons.schedule, place.hours),
                   (Icons.phone_outlined, place.phone),
                   (Icons.language, place.website),

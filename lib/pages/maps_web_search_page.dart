@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../model/maps_web_result.dart';
 import '../model/project.dart';
 import '../services/maps_web_session.dart';
+import '../services/place_coordinates.dart';
 import '../widgets/empty_placeholder.dart';
 import '../widgets/maps_web_place_view.dart';
 import '../widgets/place_search_dialog.dart';
@@ -44,6 +45,8 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
   List<MapsWebResult> _results = [];
   MapsWebSnapshot? _details;
   bool _ready = false, _busy = false, _showBrowser = false;
+  bool _deviceResults = false;
+  PlaceDetails? _findingPin;
   String? _message;
   String _status = 'Starting search…';
   int _operation = 0, _review = -1;
@@ -95,7 +98,10 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
     setState(() {
       _details = snapshot.place == null ? null : snapshot;
       _review = -1;
-      if (snapshot.results.isNotEmpty) _results = snapshot.results;
+      if (snapshot.results.isNotEmpty) {
+        _results = snapshot.results;
+        _deviceResults = snapshot.state == 'device-results';
+      }
       _message = snapshot.state == 'empty'
           ? 'No places found. Try a name and city.'
           : snapshot.state == 'interaction'
@@ -106,14 +112,32 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                 'finishes loading.'
           : null;
       _showBrowser = false;
+      _findingPin = snapshot.place?.hasCoordinates == false
+          ? snapshot.place
+          : null;
+    });
+    final place = _findingPin;
+    if (place != null) unawaited(_findPin(place, _operation));
+  }
+
+  Future<void> _findPin(PlaceDetails place, int operation) async {
+    final pin = await PlaceCoordinates.resolve(place);
+    if (!mounted || _details?.place != place || _operation != operation) return;
+    setState(() {
+      if (pin != null) {
+        place.latitude = pin.$1;
+        place.longitude = pin.$2;
+      }
+      _findingPin = null;
     });
   }
 
   Future<void> _run(Future<MapsWebSnapshot> Function() action) async {
-    if (!_ready || _busy) return;
+    if (_busy) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final operation = ++_operation;
     setState(() {
+      _findingPin = null;
       _busy = true;
       _message = null;
     });
@@ -134,15 +158,44 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
     }
   }
 
-  Future<void> _search() async {
-    if (_query.text.trim().isEmpty || _busy || !_ready) return;
+  bool get _android =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  Future<void> _search({bool deviceOnly = false}) async {
+    final input = _query.text.trim();
+    if (input.isEmpty || _busy || (!_ready && !deviceOnly)) return;
     setState(() {
       _results = [];
+      _deviceResults = false;
       _details = null;
       _showBrowser = false;
-      _status = 'Searching Google Maps…';
+      _status = deviceOnly
+          ? 'Searching Android locations…'
+          : 'Searching Google Maps…';
     });
-    await _run(() => _driver!.lookup(_query.text));
+    await _run(() async {
+      final operation = _operation;
+      if (!deviceOnly) {
+        try {
+          return await _driver!.lookup(input);
+        } on TimeoutException {
+          if (!_android ||
+              !mounted ||
+              operation != _operation ||
+              input.contains('://')) {
+            rethrow;
+          }
+          setState(() => _status = 'Searching Android locations…');
+        }
+      }
+      final candidates = await PlaceCoordinates.search(input);
+      if (candidates.isEmpty) {
+        throw const FormatException(
+          'Android returned no location matches. Try a place name and city, or show the Maps browser.',
+        );
+      }
+      return MapsWebSnapshot(state: 'device-results', results: candidates);
+    });
   }
 
   void _cancel() {
@@ -155,15 +208,31 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
   }
 
   Future<void> _select(MapsWebResult item) async {
+    final hint = item.toPlace();
+    if (_deviceResults) {
+      _apply(MapsWebSnapshot(state: 'place', place: hint));
+      return;
+    }
     setState(() => _status = 'Reading place details…');
     await _run(() async {
-      final snapshot = await _driver!.lookup(item.url, expectedName: item.name);
+      final MapsWebSnapshot snapshot;
+      try {
+        snapshot = await _driver!.lookup(item.url, expectedName: item.name);
+      } on TimeoutException {
+        return MapsWebSnapshot(state: 'place', place: hint);
+      }
       // Search-card URLs can include an official Places ID and exact target
       // coordinates that the final listing URL has dropped during navigation.
-      final hint = item.toPlace();
       snapshot.place?.placeId ??= hint.placeId;
-      snapshot.place?.latitude ??= hint.latitude;
-      snapshot.place?.longitude ??= hint.longitude;
+      final place = snapshot.place;
+      if (place != null && place.address.isEmpty) place.address = hint.address;
+      if (place != null &&
+          (place.latitude == null || place.longitude == null) &&
+          hint.latitude != null &&
+          hint.longitude != null) {
+        place.latitude = hint.latitude;
+        place.longitude = hint.longitude;
+      }
       return snapshot;
     });
   }
@@ -189,6 +258,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
 
   Widget _place() => MapsWebPlaceView(
     details: _details!,
+    findingPin: _findingPin != null,
     selectedReview: _review,
     onSelectReview: (v) => setState(() => _review = v ?? -1),
   );
@@ -245,8 +315,10 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                       return Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          'Results from Google Maps · '
-                          'Refine your search for more places.',
+                          _deviceResults
+                              ? 'Results from Android location search'
+                              : 'Results from Google Maps · '
+                                    'Refine your search for more places.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -324,7 +396,7 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
             : null,
         title: const Text('Google Maps'),
         actions: [
-          if (_details != null && !_busy)
+          if (_details != null && !_deviceResults && !_busy)
             IconButton(
               tooltip: 'Refresh place details',
               onPressed: () => _run(() => _driver!.readPage()),
@@ -341,14 +413,22 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                   : Icons.open_in_browser,
             ),
           ),
-          if (widget.requestApiKey != null)
+          if (widget.requestApiKey != null || _android)
             PopupMenuButton<String>(
-              onSelected: (_) => _apiSearch(),
+              enabled: !_busy,
+              onSelected: (value) =>
+                  value == 'android' ? _search(deviceOnly: true) : _apiSearch(),
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'api',
-                  child: Text('Use API lookup'),
-                ),
+                if (_android)
+                  const PopupMenuItem(
+                    value: 'android',
+                    child: Text('Use Android location search'),
+                  ),
+                if (widget.requestApiKey != null)
+                  const PopupMenuItem(
+                    value: 'api',
+                    child: Text('Use API lookup'),
+                  ),
               ],
             ),
         ],
@@ -453,15 +533,17 @@ class _MapsWebSearchPageState extends State<MapsWebSearchPage> {
                       child: SafeArea(
                         top: false,
                         child: FilledButton.icon(
-                          onPressed: () => Navigator.pop(
-                            context,
-                            MapsWebImport(
-                              _details!.place!,
-                              review: _review < 0
-                                  ? null
-                                  : _details!.reviews[_review],
-                            ),
-                          ),
+                          onPressed: _findingPin != null
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  MapsWebImport(
+                                    _details!.place!,
+                                    review: _review < 0
+                                        ? null
+                                        : _details!.reviews[_review],
+                                  ),
+                                ),
                           icon: const Icon(Icons.check),
                           label: const Text('Use this place'),
                         ),

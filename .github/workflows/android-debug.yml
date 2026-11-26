@@ -5,6 +5,11 @@ on:
   pull_request:
     branches: [main, work]
   workflow_dispatch:
+    inputs:
+      check_geometry:
+        description: Check live open-data coverage at three sample pins
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -37,6 +42,10 @@ jobs:
         run: python3 tool/ci/debug_signing.py
       - name: Analyze and test
         run: bash tool/ci/check_android.sh
+      - name: Verify live geometry coverage
+        if: inputs.check_geometry || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verify geometry]'))
+        continue-on-error: true
+        run: flutter test --no-pub tool/check_orbit_coverage_test.dart --reporter expanded
       - name: Build debug APK
         run: bash tool/ci/build_apk.sh debug
       - uses: ./.github/actions/setup-s3

@@ -121,3 +121,21 @@ With Python Playwright, Pillow and system Chromium installed, run
 `python3 tool/check_maps_header.py` for the offline browser fixture. It checks
 that initial and late-added map controls are hidden, external zoom still works,
 and map labels and pins remain visible. Separate PNG tests verify the manually added attribution.
+
+
+## Streetview 3D
+
+Choose **Streetview 3D**, import a photo and tap **Use Tokyo Station** in **Media location** to preview an offline orbit of the station. **Google 3D tile settings** accepts your Google Cloud key with billing and the Map Tiles API enabled. With a key, capture first tries a Google Photorealistic 3D Tiles orbit at the selected pin. The rendered orbit and its credits travel with the project. Without a key, detailed coverage or a working connection to Google, the editor uses the Tokyo preset or requests open building footprints and elevation for the selected place. The capture status shows the source and whether any open building footprints loaded. Tap **Replace captured map** to refresh an older station.
+
+Maps imports can read a pin from an explicit coordinate link or the selected
+listing’s Plus Code. When a new or saved 3D location still needs coordinates,
+Android looks up its name and address. A single matching place in the same
+locality is saved with the project and its linked media. If the lookup is
+offline or ambiguous, use **Retry pin lookup** or **Enter pin coordinates**.
+
+
+On Android, **Add media** in this template opens the file picker so you can choose originals from DCIM or Files. The editor reads photo EXIF GPS and embedded MP4/QuickTime coordinates before applying media edits. A clip with no readable coordinates gets a copy of the preceding clip’s location and any saved map. If the first clip has no coordinates, select its place in **Media location**. Selected coordinates and their source are shown there, and each clip can be changed independently. Some galleries and messaging apps remove GPS tags before sharing a file.
+
+Each photo, video or GIF appears on an upright surface at its own pin. The camera circles the station and approaches the media surface, and the map remains visible around it. The source credit stays at the bottom of the scene during playback and export.
+
+In **Photo walkthrough**, choose **Step left**, **Step right** or **Walk forward**. The first move downloads the MiDaS depth model (about 66 MB). Android then estimates depth from the edited photo, fills exposed areas with nearby pixels and projects the photo onto a textured mesh. Fine details behind foreground objects are approximate. Each prepared photo works offline and its depth data travels with project backups. Videos and GIFs play normally. Use **Transition to next media** to choose how to leave each clip.

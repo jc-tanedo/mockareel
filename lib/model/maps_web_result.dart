@@ -1,8 +1,16 @@
 import 'dart:convert';
 import 'project.dart';
+import 'maps_pin.dart';
 
 class MapsWebResult {
-  final String name, url, category, address, rating, reviewCount, summary;
+  final String name,
+      url,
+      category,
+      address,
+      rating,
+      reviewCount,
+      summary,
+      plusCode;
   const MapsWebResult({
     required this.name,
     required this.url,
@@ -11,6 +19,7 @@ class MapsWebResult {
     this.rating = '',
     this.reviewCount = '',
     this.summary = '',
+    this.plusCode = '',
   });
   factory MapsWebResult.fromJson(Map<String, dynamic> j) => MapsWebResult(
     name: _string(j, 'name', 180),
@@ -20,6 +29,7 @@ class MapsWebResult {
     rating: _string(j, 'rating', 8),
     reviewCount: _string(j, 'reviewCount', 20),
     summary: _string(j, 'summary', 400),
+    plusCode: _string(j, 'plusCode', 180),
   );
   static String _string(Map<String, dynamic> j, String key, int max) {
     final s = j[key] is String ? (j[key] as String).trim() : '';
@@ -32,20 +42,13 @@ class MapsWebResult {
     String hours = '',
   }) {
     final uri = Uri.tryParse(url);
-    String decoded;
-    try {
-      decoded = Uri.decodeFull(url);
-    } on FormatException {
-      decoded = url;
-    }
-    final coordinates = RegExp(
-      r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)',
-    ).firstMatch(decoded);
-    final lat = coordinates == null ? null : double.tryParse(coordinates[1]!);
-    final lng = coordinates == null ? null : double.tryParse(coordinates[2]!);
+    final decoded = MapsPin.decoded(url);
+    final pin = uri != null && MapsWebUrls.allowedNavigation(uri)
+        ? MapsPin.fromListing(uri, plusCode: plusCode)
+        : null;
     final id =
         RegExp(r'!(?:19|1)s(ChIJ[^!/?]+)').firstMatch(decoded)?[1] ??
-        uri?.queryParameters['query_place_id'];
+        (uri == null ? null : MapsPin.queryValue(uri, 'query_place_id'));
     final type = category.toLowerCase();
     return PlaceDetails(
       name: name,
@@ -60,8 +63,8 @@ class MapsWebResult {
               uri.scheme == 'https'
           ? url
           : null,
-      latitude: lat != null && lat.abs() <= 90 ? lat : null,
-      longitude: lng != null && lng.abs() <= 180 ? lng : null,
+      latitude: pin?.$1,
+      longitude: pin?.$2,
       phone: phone,
       website: website,
       hours: hours,
@@ -184,16 +187,21 @@ abstract final class MapsWebUrls {
     );
   }
 
-  static Uri browserUri(Uri uri) =>
-      const {'www.google.com', 'maps.google.com'}.contains(uri.host) &&
-          uri.path.startsWith('/maps')
-      ? uri.replace(
-          queryParameters: {
-            ...uri.queryParametersAll,
-            'hl': ['en'],
-          },
-        )
-      : uri;
+  static Uri browserUri(Uri uri) {
+    if (!const {'www.google.com', 'maps.google.com'}.contains(uri.host) ||
+        !uri.path.startsWith('/maps')) {
+      return uri;
+    }
+    // Preserve unrelated parameters byte-for-byte, including opaque Google data.
+    final fields = uri.query
+        .split('&')
+        .where(
+          (field) =>
+              field.isNotEmpty &&
+              MapsPin.decoded(field.split('=').first) != 'hl',
+        );
+    return uri.replace(query: [...fields, 'hl=en'].join('&'));
+  }
 
   static bool allowedNavigation(Uri uri) =>
       uri.toString() == 'about:blank' ||

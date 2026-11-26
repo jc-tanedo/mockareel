@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'audio_editor.dart';
@@ -28,14 +29,16 @@ class MapsEditorInspector extends StatelessWidget {
   final VoidCallback onLoadMap;
   final VoidCallback onUploadMap;
   final VoidCallback onGoToTimeline;
-  final VoidCallback onGoToPlaceHeader;
+  final ValueChanged<int?> onGoToPlaceHeader;
   final VoidCallback onPickMedia;
   final VoidCallback onPickMusic;
   final VoidCallback onExport;
   final ValueChanged<bool> onExportPng;
   final VoidCallback onBackup;
+  final VoidCallback onSettings;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
+  final ValueChanged<OrbitScene> onShuffleWall;
 
   const MapsEditorInspector({
     super.key,
@@ -64,8 +67,10 @@ class MapsEditorInspector extends StatelessWidget {
     required this.onExport,
     required this.onExportPng,
     required this.onBackup,
+    required this.onSettings,
     required this.onChanged,
     required this.onPreviewUpdated,
+    required this.onShuffleWall,
   });
 
   Widget _addMediaButton() => OutlinedButton.icon(
@@ -85,6 +90,7 @@ class MapsEditorInspector extends StatelessWidget {
     final addMedia = _addMediaButton();
     return switch (tab) {
       0 => MapsPlaceEditor(
+        onSettings: onSettings,
         project: project,
         placeTool: placeTool,
         importing: importing,
@@ -119,6 +125,12 @@ class MapsEditorInspector extends StatelessWidget {
         onPreviewUpdated: onPreviewUpdated,
       ),
       1 => MapsTimelineEditor(
+        onEditLocation: () => onGoToPlaceHeader(
+          project.streetview.locationFor(project.clips[selectedIndex]) == null
+              ? null
+              : selectedIndex,
+        ),
+        onSettings: onSettings,
         project: project,
         selectedIndex: selectedIndex,
         timelineTool: timelineTool,
@@ -132,6 +144,7 @@ class MapsEditorInspector extends StatelessWidget {
         onMoveClip: onMoveClip,
         onChanged: onChanged,
         onPreviewUpdated: onPreviewUpdated,
+        onShuffleWall: onShuffleWall,
       ),
       3 => AudioEditor(
         project: project,

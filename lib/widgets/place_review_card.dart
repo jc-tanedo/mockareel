@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
-import 'output_palette.dart';
+import '../theme/output_palette.dart';
 import 'star_rating.dart';
 
 class PlaceReviewCard extends StatelessWidget {

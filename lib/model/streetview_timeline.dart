@@ -1,4 +1,10 @@
-import 'project.dart';
+import 'reel_clip.dart';
+import 'streetview_data.dart';
+
+abstract interface class StreetviewJourney {
+  List<ReelClip> get clips;
+  StreetviewSettings get streetview;
+}
 
 class StreetviewScene {
   final String kind;
@@ -12,7 +18,7 @@ class StreetviewScene {
 /// another scene or extend the output. A return-to-map tap is a separate scene.
 abstract final class StreetviewTimeline {
   static const rippleSeconds = .2;
-  static List<StreetviewScene> scenes(ReelProject p) {
+  static List<StreetviewScene> scenes(StreetviewJourney p) {
     if (p.clips.isEmpty) return [];
     final result = <StreetviewScene>[];
     var start = 0.0;
@@ -40,9 +46,9 @@ abstract final class StreetviewTimeline {
     return result;
   }
 
-  static double duration(ReelProject p) =>
+  static double duration(StreetviewJourney p) =>
       scenes(p).fold(0, (n, s) => n + s.duration);
-  static StreetviewScene at(ReelProject p, double time) {
+  static StreetviewScene at(StreetviewJourney p, double time) {
     final all = scenes(p);
     return all.firstWhere(
       (s) => time < s.start + s.duration,
@@ -51,7 +57,7 @@ abstract final class StreetviewTimeline {
     );
   }
 
-  static double mediaStart(ReelProject p, int index) =>
+  static double mediaStart(StreetviewJourney p, int index) =>
       scenes(p)
           .where((s) => s.kind == 'media' && s.mediaIndex == index)
           .firstOrNull

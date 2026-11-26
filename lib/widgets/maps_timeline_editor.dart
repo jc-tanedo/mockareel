@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
+import '../features/streetview_3d/presentation/orbit_location_picker.dart';
+import '../features/streetview_3d/presentation/orbit_map.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'clip_strip.dart';
@@ -21,8 +24,10 @@ class MapsTimelineEditor extends StatelessWidget {
   final ValueChanged<int> onSelectTool;
   final ValueChanged<int> onRemoveClip;
   final void Function(int index, int delta) onMoveClip;
+  final VoidCallback onSettings, onEditLocation;
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
+  final ValueChanged<OrbitScene> onShuffleWall;
 
   const MapsTimelineEditor({
     super.key,
@@ -37,8 +42,11 @@ class MapsTimelineEditor extends StatelessWidget {
     required this.onSelectTool,
     required this.onRemoveClip,
     required this.onMoveClip,
+    required this.onSettings,
+    required this.onEditLocation,
     required this.onChanged,
     required this.onPreviewUpdated,
+    required this.onShuffleWall,
   });
 
   Widget _framingControl(
@@ -367,8 +375,72 @@ class MapsTimelineEditor extends StatelessWidget {
                   key: ValueKey('timeline-inspector-$timelineTool'),
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                   children: [
+                    if (project.isStreetview3d &&
+                        project.streetview.locations.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OrbitLocationPicker(
+                                locations: project.streetview.locations,
+                                selected: project.streetview.locationFor(
+                                  project.clips[selectedIndex],
+                                ),
+                                label: 'Clip location',
+                                onChanged: (location) {
+                                  location.assign(project.clips[selectedIndex]);
+                                  onPreviewUpdated();
+                                  onChanged();
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: onEditLocation,
+                              tooltip: 'Edit locations',
+                              icon: const Icon(
+                                Icons.edit_location_alt_outlined,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (project.isStreetview3d)
+                      OrbitSceneBuilder(
+                        path: project.clips[selectedIndex].streetview.mapPath,
+                        builder: (scene, failed) {
+                          final media = project.clips[selectedIndex].streetview;
+                          final count = scene?.walls.length ?? 0;
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              count == 1
+                                  ? 'Only one suitable wall'
+                                  : count == 0
+                                  ? 'Media at pin'
+                                  : '$count suitable walls',
+                            ),
+                            subtitle: Text(
+                              scene?.describeWall(media.wallId) ??
+                                  (failed
+                                      ? 'Could not read the saved geometry.'
+                                      : media.mapPath == null
+                                      ? 'Choose a pin with 3D geometry to place this clip.'
+                                      : 'Checking geometry…'),
+                            ),
+                            trailing: count > 1
+                                ? TextButton.icon(
+                                    icon: const Icon(Icons.shuffle),
+                                    label: const Text('Shuffle wall'),
+                                    onPressed: () => onShuffleWall(scene!),
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
                     if (timelineTool == 2 && project.isStreetview)
                       StreetviewInspector(
+                        onSettings: onSettings,
                         key: ValueKey(project.clips[selectedIndex].id),
                         project: project,
                         clip: project.clips[selectedIndex],
@@ -392,10 +464,13 @@ class MapsTimelineEditor extends StatelessWidget {
                   children: [
                     EmptyPlaceholder(
                       icon: Icons.video_collection_outlined,
-                      title: 'Start with your photos & videos',
-                      description:
-                          'Add media, tap a clip to edit it, '
-                          'then set the pace.',
+                      title: project.isStreetview3d
+                          ? 'Add clips to a location'
+                          : 'Start with your photos & videos',
+                      description: project.isStreetview3d
+                          ? 'Choose where the clips should appear, then select photos or videos.'
+                          : 'Add media, tap a clip to edit it, '
+                                'then set the pace.',
                       action: addMediaButton,
                     ),
                   ],

@@ -367,6 +367,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  intl:
+    dependency: transitive
+    description:
+      name: intl
+      sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.3"
   jni:
     dependency: transitive
     description:
@@ -391,6 +399,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  latlong2:
+    dependency: transitive
+    description:
+      name: latlong2
+      sha256: "84b776b100a84a684a0aaa3fa4dc2c9b1931c658de533701ee4e09bfa991f8dc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.10.1"
   leak_tracker:
     dependency: transitive
     description:
@@ -559,6 +575,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  pmtiles:
+    dependency: "direct main"
+    description:
+      name: pmtiles
+      sha256: f51ada966879d3b68edc35b3a83b5d31a274a70ae1d3275bd0a9e2a9f6d53c61
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
+  pool:
+    dependency: transitive
+    description:
+      name: pool
+      sha256: "4177f68c237ea2128d1bee66ac17b2ce05ba3dbaafcbdd54c5d40a39d0b6b11c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.3"
   posix:
     dependency: transitive
     description:
@@ -575,6 +607,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.6"
+  protobuf:
+    dependency: transitive
+    description:
+      name: protobuf
+      sha256: "13b6717366aa7ec3792dd62c19c7d33a785708224365f2db23c5ca01f1c1a0f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.0"
   pub_semver:
     dependency: transitive
     description:
@@ -812,6 +852,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.3"
+  vector_tile:
+    dependency: "direct main"
+    description:
+      name: vector_tile
+      sha256: "43e32cd8e4a1ceede6ad61fbce1ac0ecc84380b6e6fbee52883f08774b12576f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
   video_player:
     dependency: "direct main"
     description:

@@ -1,7 +1,7 @@
 name: mockareel
 description: Create mock app reels from your photos and videos.
 publish_to: 'none'
-version: 0.15.0+24
+version: 0.16.3+28
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -22,6 +22,8 @@ dependencies:
   archive: ^4.5.2
   webview_flutter: ^4.14.1
   webview_flutter_android: ^4.14.1
+  pmtiles: ^2.2.0
+  vector_tile: ^4.0.0
 
 dev_dependencies:
   video_player_platform_interface: ^6.9.0
@@ -36,3 +38,4 @@ flutter:
   assets:
     - assets/maps_dom.js
     - assets/maps_header.js
+    - assets/streetview3d/

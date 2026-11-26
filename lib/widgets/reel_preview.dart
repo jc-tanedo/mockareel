@@ -1,16 +1,16 @@
-import '../model/streetview_timeline.dart';
-import 'streetview_canvas.dart';
-import '../model/feed_timeline.dart';
-import 'package:flutter/scheduler.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import '../model/feed_timeline.dart';
 import '../model/project.dart';
-import 'feed_canvas.dart';
+import '../model/streetview_timeline.dart';
 import '../model/template_layout.dart';
+import '../theme/output_palette.dart';
+import 'feed_canvas.dart';
 import 'media_frame.dart';
-import 'place_overlay.dart';
 import 'music_playback.dart';
-import 'output_palette.dart';
+import 'place_overlay.dart';
+import 'streetview_canvas.dart';
 import 'wavy_slider_track.dart';
 export 'place_overlay.dart';
 
@@ -19,6 +19,7 @@ class TimelinePreview extends StatefulWidget {
   final int selected;
   final double maxHeight;
   final bool startAtBeginning;
+  final double? initialPosition;
   final bool loop;
   final bool autoPlay;
   const TimelinePreview({
@@ -26,6 +27,7 @@ class TimelinePreview extends StatefulWidget {
     required this.project,
     this.selected = 0,
     this.startAtBeginning = false,
+    this.initialPosition,
     this.maxHeight = 420,
     this.loop = true,
     this.autoPlay = true,
@@ -92,7 +94,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_tick);
-    _position = _selectedStart;
+    _position = widget.initialPosition ?? _selectedStart;
   }
 
   @override

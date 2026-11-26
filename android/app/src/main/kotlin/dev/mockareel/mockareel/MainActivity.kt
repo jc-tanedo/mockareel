@@ -8,12 +8,25 @@ import io.flutter.plugin.common.MethodChannel
 
 @UnstableApi
 class MainActivity : FlutterActivity() {
+    private var geocoderChannel: MethodChannel? = null
+    private var depthChannel: MethodChannel? = null
     private var gifEncoder: GifVideoEncoder? = null
     private var mapSnapshot: MapSnapshot? = null
     private var exportSession: ExportSessionHost? = null
     private var renderer: ReelRenderer? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        geocoderChannel = MethodChannel(
+            messenger, "dev.mockareel/place-geocoder",
+            io.flutter.plugin.common.StandardMethodCodec.INSTANCE, messenger.makeBackgroundTaskQueue(),
+        ).also { it.setMethodCallHandler(PlaceGeocoder(applicationContext)) }
+        depthChannel = MethodChannel(
+            messenger,
+            "dev.mockareel/photo-depth",
+            io.flutter.plugin.common.StandardMethodCodec.INSTANCE,
+            messenger.makeBackgroundTaskQueue(),
+        ).also { it.setMethodCallHandler(WalkDepth(applicationContext)) }
         exportSession = ExportSessionHost(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(exportSession)
         gifEncoder = GifVideoEncoder(applicationContext)
@@ -30,6 +43,10 @@ class MainActivity : FlutterActivity() {
         exportSession?.onPermissionsResult(requestCode)
     }
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        geocoderChannel?.setMethodCallHandler(null)
+        geocoderChannel = null
+        depthChannel?.setMethodCallHandler(null)
+        depthChannel = null
         ExportService.end(applicationContext, false)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "dev.mockareel/export-session").setMethodCallHandler(null)
         exportSession = null

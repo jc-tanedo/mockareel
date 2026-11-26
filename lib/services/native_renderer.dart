@@ -1,11 +1,11 @@
-import 'media_preparation_queue.dart';
-import 'media_edits.dart';
-import 'gif_media.dart';
-import 'gif_videos.dart';
 import 'package:flutter/services.dart';
 import '../model/project.dart';
 import '../model/template_layout.dart';
-import '../widgets/output_palette.dart';
+import '../theme/output_palette.dart';
+import 'gif_media.dart';
+import 'gif_videos.dart';
+import 'media_edits.dart';
+import 'media_preparation_queue.dart';
 
 class NativeRenderer {
   static const channel = MethodChannel('dev.mockareel/render');
@@ -17,6 +17,19 @@ class NativeRenderer {
       Map<String, dynamic>.from(
         await channel.invokeMethod<Map>('inspect', {'path': path}) ?? {},
       );
+  Future<List<double>?> mediaCoordinates(ReelClip clip) async {
+    try {
+      return await channel.invokeListMethod<double>('mediaCoordinates', {
+        'path': clip.path,
+        'video': clip.isVideo,
+      });
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<String> thumbnail(String path, double seconds) async => (await channel
       .invokeMethod<String>('thumbnail', {'path': path, 'seconds': seconds}))!;
   Future<String> poster(ReelClip clip, {double position = 0}) async {

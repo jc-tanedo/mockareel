@@ -1,22 +1,32 @@
-import 'package:video_player/video_player.dart';
-import 'package:video_player_platform_interface/video_player_platform_interface.dart';
-import 'preview_video_platform.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mockareel/features/streetview_3d/data/orbit_scene_loader.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_media_pose.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
-import 'package:mockareel/widgets/reel_preview.dart';
+import 'package:mockareel/services/media_edits.dart';
 import 'package:mockareel/services/native_renderer.dart';
 import 'package:mockareel/services/project_store.dart';
+import 'package:mockareel/widgets/reel_preview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'preview_video_platform.dart';
 
-void testStreetviewExport(String transition, {bool smallImageCache = false}) {
+void testStreetviewExport(
+  String transition, {
+  bool smallImageCache = false,
+  bool orbit = false,
+  bool samePin = false,
+}) {
   testWidgets(
-    'Streetview $transition MP4 preserves media (small cache: $smallImageCache)',
+    'Streetview $transition MP4 preserves media (small cache: $smallImageCache, same pin: $samePin)',
     (tester) async {
       final cache = PaintingBinding.instance.imageCache;
       final cacheLimit = cache.maximumSizeBytes;
@@ -61,8 +71,27 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
         await mapPhoto.writeAsBytes(mapPng!.buffer.asUint8List());
         mapImage.dispose();
         mapPicture.dispose();
+        final mapAsset = orbit
+            ? await File('${dir.path}/orbit.json').writeAsString(
+                await rootBundle.loadString('assets/streetview3d/tokyo.json'),
+              )
+            : mapPhoto;
+        final wallAsset = orbit
+            ? await File('${dir.path}/wall.json').writeAsString(
+                jsonEncode({
+                  'credit': 'Wall fixture',
+                  'grid': List.filled(625, 10),
+                  'shapes': [
+                    [
+                      24,
+                      [-25, -15, 5, -15, 5, 15, -25, 15],
+                    ],
+                  ],
+                }),
+              )
+            : mapPhoto;
         p = ReelProject(
-          template: 'streetview',
+          template: orbit ? 'streetview-3d' : 'streetview',
           streetview: StreetviewSettings(
             openingMapSeconds: .5,
             laterMapSeconds: .5,
@@ -78,8 +107,18 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
                 sourceDuration: 3,
                 duration: .5,
                 streetview: StreetviewMedia(
-                  place: PlaceDetails(name: 'Place $i', address: 'Address $i'),
-                  mapPath: mapPhoto.path,
+                  place: PlaceDetails(
+                    name: samePin ? 'Station' : 'Place $i',
+                    address: samePin ? 'Shared pin' : 'Address $i',
+                    latitude: 35.0,
+                    longitude: samePin ? 139 : 139.0 + i * .002,
+                  ),
+                  mapPath: i == 1 || samePin ? wallAsset.path : mapAsset.path,
+                  walkDepth: orbit && i == 0
+                      ? List.generate(1024, (n) => n % 256)
+                      : [],
+                  walkMove: orbit && i == 0 ? 'right' : 'hold',
+                  walkLayers: orbit && i == 0 ? List.filled(3, photo.path) : [],
                   panZoom: i == 1,
                   turntable: i == 1,
                   transition: transition,
@@ -88,6 +127,20 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
               ),
           ],
         );
+        if (orbit) {
+          // Pin the composition for pixel assertions. The editor migration and
+          // shuffle-order tests exercise random assignment separately.
+          final firstScene = await OrbitSceneLoader.load(
+            p.clips.first.streetview.mapPath!,
+          );
+          final lastScene = await OrbitSceneLoader.load(
+            p.clips.last.streetview.mapPath!,
+          );
+          p.clips.first.streetview.wallId = firstScene.walls.keys.first;
+          p.clips.last.streetview.wallId = lastScene.walls.keys.last;
+          p.streetview.adoptClipLocations(p.clips);
+          p.streetview.locations.last.overviewPath = mapPhoto.path;
+        }
       });
       p.clips[1].edits = MediaEdits(
         fisheye: true,
@@ -166,11 +219,137 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
                 await alpha(overlays[1] as String, 975, 90) > 0;
             checks['static media retains place sheet'] =
                 await alpha(overlays[1] as String, 540, 1800) > 0;
-            checks['active texture exposed'] =
-                await alpha(overlays[1] as String, 540, 800) == 0;
+            if (orbit) {
+              checks['photo camera is rendered every frame'] =
+                  (frames[1] as List).length == 15 &&
+                  await hasMedia(frames[1].last as String);
+              final flight = frames[2] as List;
+              if (transition == 'arrow') {
+                Future<Offset> panelCenter(int i, double time) async {
+                  final scene = await OrbitSceneLoader.load(
+                    p.clips[i].streetview.mapPath!,
+                  );
+                  return MatrixUtils.transformPoint(
+                        OrbitMediaPose.at(
+                          'media',
+                          time,
+                          scene: scene,
+                          wallId: p.clips[i].streetview.wallId,
+                        ).matrix,
+                        const Offset(180, 320),
+                      ) *
+                      3;
+                }
+
+                final from = await panelCenter(0, 1),
+                    to = await panelCenter(1, 0);
+                checks['dolly leaves the outgoing panel and reaches the next panel'] =
+                    await hasMedia(
+                      flight.first,
+                      x: from.dx.round(),
+                      y: from.dy.round(),
+                    ) &&
+                    (samePin
+                        ? p.clips.first.streetview.wallId !=
+                              p.clips.last.streetview.wallId
+                        : !await hasMedia(
+                            flight[5],
+                            x: from.dx.round(),
+                            y: from.dy.round(),
+                          )) &&
+                    await hasMedia(
+                      flight.last,
+                      x: to.dx.round(),
+                      y: to.dy.round(),
+                    );
+              }
+              checks['opening thumbnail displays the first clip'] =
+                  await hasMedia(frames[0].first, x: 150, y: 1490);
+              for (final mapIndex in [
+                if (transition == 'map') secondMediaIndex - 1,
+                endingMapIndex,
+              ]) {
+                final color = await pixel(frames[mapIndex].first, 540, 800);
+                checks['2D scene $mapIndex displays the destination map and thumbnail'] =
+                    color[2] > color[1] + 50 &&
+                    await hasMedia(frames[mapIndex].first, x: 150, y: 1490);
+              }
+              final videoFrames = frames[secondMediaIndex] as List;
+              checks['video texture visible inside world panel'] =
+                  await alpha(videoFrames.last, 540, 700) == 0;
+              checks['world stays visible outside video panel'] =
+                  await alpha(videoFrames.last, 150, 700) == 255;
+              checks['photo occupies a bounded world surface'] =
+                  !await hasMedia(frames[1].last, x: 150, y: 700);
+              final wall = await OrbitSceneLoader.load(
+                p.clips.last.streetview.mapPath!,
+              );
+              final returning = frames[returnIndex] as List;
+              final lastReturn = OrbitMediaPose.at(
+                'media',
+                1,
+                scene: wall,
+                wallId: p.clips.last.streetview.wallId,
+              );
+              final center =
+                  MatrixUtils.transformPoint(
+                    lastReturn.matrix,
+                    const Offset(180, 320),
+                  ) *
+                  3;
+              checks['back tap holds the final video frame on its wall'] =
+                  await hasMedia(
+                    returning.first,
+                    x: center.dx.round(),
+                    y: center.dy.round(),
+                  ) &&
+                  !await hasMedia(returning.first, x: 150, y: 700);
+              for (final i in [if (transition == 'map') 2, returnIndex]) {
+                final back = frames[i] as List;
+                final middle = await File(back[back.length ~/ 2]).readAsBytes();
+                final last = await File(back.last).readAsBytes();
+                checks['return $i lifts into its destination without a cut'] =
+                    !listEquals(await File(back.first).readAsBytes(), middle) &&
+                    !listEquals(middle, last) &&
+                    listEquals(
+                      last,
+                      await File(frames[i + 1].first).readAsBytes(),
+                    );
+              }
+              final matrices =
+                  args['clips'][secondMediaIndex]['orbitPlaneFrames'] as List;
+              checks['native video uses the preview wall on every media frame'] =
+                  wall.wallMount != null &&
+                  matrices.length == videoFrames.length &&
+                  List.generate(
+                    matrices.length,
+                    (f) => listEquals(
+                      matrices[f] as List,
+                      OrbitMediaPose.at(
+                        'media',
+                        f / 30 / p.clips.last.duration,
+                        scene: wall,
+                        wallId: p.clips.last.streetview.wallId,
+                      ).native,
+                    ),
+                  ).every((matches) => matches);
+              final opening = frames[0] as List;
+              final first = await File(opening.first).readAsBytes();
+              final middle = await File(
+                opening[opening.length * 2 ~/ 3],
+              ).readAsBytes();
+              final last = await File(opening.last).readAsBytes();
+              checks['opening dives into the first photo without a cut'] =
+                  !listEquals(first, middle) &&
+                  !listEquals(middle, last) &&
+                  listEquals(last, await File(frames[1].first).readAsBytes());
+            } else {
+              checks['active texture exposed'] =
+                  await alpha(overlays[1] as String, 540, 800) == 0;
+            }
             checks['movement composited'] =
                 await alpha(frames[2][4] as String, 540, 800) == 255;
-            for (final index in [2, returnIndex]) {
+            for (final index in orbit ? <int>[] : [2, returnIndex]) {
               final sceneFrames = frames[index] as List;
               for (var frame = 0; frame < sceneFrames.length; frame++) {
                 final back = index == returnIndex || transition == 'map';
@@ -199,8 +378,10 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
               }
               if (index == returnIndex || transition == 'map') {
                 final rgba = await pixel(sceneFrames.last as String, 540, 800);
-                checks['scene $index shrinks media to reveal the map'] =
-                    rgba[2] > rgba[1] + 30 && rgba[2] > rgba[0] + 30;
+                checks['scene $index shrinks media to reveal the map'] = orbit
+                    ? rgba[3] == 255 &&
+                          !await hasMedia(sceneFrames.last as String)
+                    : rgba[2] > rgba[1] + 30 && rgba[2] > rgba[0] + 30;
               }
             }
             checks['ending map animated'] =
@@ -251,6 +432,9 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
         await dir.delete(recursive: true);
       });
       await tester.runAsync(() async {
+        // Complete the real file copy and edit debounce before widget pumping
+        // switches to the fake clock. The encoder still consumes the same asset.
+        await EditedMedia.instance.prepare(p.clips[1]);
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData.dark(useMaterial3: true),
@@ -281,6 +465,11 @@ void testStreetviewExport(String transition, {bool smallImageCache = false}) {
         expect(find.byType(CircularProgressIndicator), findsNothing);
       }
 
+      if (orbit) {
+        await tester.pump();
+        await tester.tap(find.text('Clips').last);
+        await tester.pump();
+      }
       await settleMedia();
       await tester.tap(find.text('Export').last);
       await settleMedia();

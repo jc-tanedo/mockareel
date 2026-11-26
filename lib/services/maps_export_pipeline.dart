@@ -3,12 +3,16 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
+import '../features/streetview_3d/data/orbit_scene_loader.dart';
+import '../features/streetview_3d/model/orbit_media_pose.dart';
+import '../features/streetview_3d/model/orbit_scene.dart';
+import '../model/export_phase.dart';
 import '../model/project.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
-import '../services/native_renderer.dart';
-import '../services/project_store.dart';
-import '../widgets/export_monitor.dart';
+import 'export_maps.dart';
+import 'native_renderer.dart';
+import 'project_store.dart';
 
 class MapsExportPipeline {
   final ReelProject project;
@@ -46,18 +50,22 @@ class MapsExportPipeline {
   });
 
   Future<Map<String, String>> prepareCapture({bool snapshot = false}) async {
+    final missingClip = project.firstMissingMapClip;
+    if (missingClip != null) {
+      throw FormatException(
+        '${project.isStreetview3d ? 'Fetch 3D geometry' : 'Capture a map'} for clip ${missingClip + 1} (“${project.clips[missingClip].name}”) before exporting.',
+      );
+    }
+    if (project.needsMapHeader) {
+      throw const FormatException(
+        'Load a Google map or upload a map image in Place before exporting.',
+      );
+    }
     final hero = project.headerMode == 'photo' ? project.heroClip : null;
     String? heroPath = project.headerMode == 'map'
         ? project.mapHeaderPath
         : null;
     if (heroPath != null) await onPrecache(heroPath);
-    if (!project.isStreetview &&
-        project.headerMode == 'map' &&
-        heroPath == null) {
-      throw const FormatException(
-        'Load a Google map or upload a map image in Place before exporting.',
-      );
-    }
     if (hero != null) {
       heroPath = await renderer.poster(hero);
       await onPrecache(heroPath);
@@ -74,7 +82,16 @@ class MapsExportPipeline {
             position: c.duration - .001,
           );
           await onPrecache(paths['${c.id}:end']!);
-          if (c.streetview.mapPath != null) {
+          if (project.isStreetview3d) {
+            if (c.streetview.mapPath != null) {
+              await OrbitSceneLoader.loadForExport(c.streetview.mapPath!);
+            }
+            if (c.streetview.walking && !c.isTimed) {
+              for (final layer in c.streetview.walkLayers) {
+                await onPrecache(layer);
+              }
+            }
+          } else if (c.streetview.mapPath != null) {
             await onPrecache(c.streetview.mapPath!);
           }
         }
@@ -206,26 +223,59 @@ class MapsExportPipeline {
       for (var i = 0; i < scenes.length; i++) {
         final scene = scenes[i];
         final clip = project.clips[scene.mediaIndex];
-        if ((scene.kind == 'map' || scene.kind == 'ending-map') &&
-            clip.streetview.mapPath == null) {
-          throw FormatException(
-            'Capture a map for “${clip.name}” before exporting.',
-          );
-        }
         // Whole-project precaching can evict early assets on longer reels.
         // Decode this scene's actual pixels immediately before its first paint;
         // otherwise a resolved Image.file can still capture a transparent frame.
+        OrbitScene? geometry;
+        if (project.isStreetview3d && clip.streetview.mapPath != null) {
+          geometry = await OrbitSceneLoader.loadForExport(
+            clip.streetview.mapPath!,
+          );
+          final nextPath =
+              (scene.kind == 'arrow' || scene.kind == 'back') &&
+                  scene.mediaIndex + 1 < project.clips.length
+              ? project.clips[scene.mediaIndex + 1].streetview.mapPath
+              : null;
+          if (nextPath != null) {
+            await OrbitSceneLoader.loadForExport(nextPath);
+          }
+        }
+        final nextMap =
+            project.isStreetview3d &&
+                scene.kind == 'back' &&
+                scene.mediaIndex + 1 < project.clips.length
+            ? project.clips[scene.mediaIndex + 1]
+            : clip;
+        final overview = project.streetview.locationFor(nextMap)?.overviewPath;
         final assets = <String>{
-          if (scene.kind == 'map') posters[clip.id]!,
+          if (overview != null &&
+              (scene.kind == 'map' ||
+                  scene.kind == 'ending-map' ||
+                  scene.kind == 'back'))
+            overview,
+          if (project.isStreetview3d &&
+              !clip.isTimed &&
+              clip.streetview.walking)
+            ...clip.streetview.walkLayers,
+          if (project.isStreetview3d &&
+              scene.kind == 'arrow' &&
+              project.clips[scene.mediaIndex + 1].streetview.walking)
+            ...project.clips[scene.mediaIndex + 1].streetview.walkLayers,
+          if (scene.kind == 'map' ||
+              (project.isStreetview3d &&
+                  scene.kind == 'media' &&
+                  !clip.isTimed))
+            posters[clip.id]!,
           if (scene.kind == 'ending-map' ||
               scene.kind == 'back' ||
               scene.kind == 'arrow')
             posters['${clip.id}:end']!,
-          if (scene.kind == 'arrow')
+          if (scene.kind == 'arrow' || nextMap != clip)
             posters[project.clips[scene.mediaIndex + 1].id]!,
           if ((scene.kind == 'map' ||
                   scene.kind == 'ending-map' ||
                   scene.kind == 'back') &&
+              !project.isStreetview3d &&
               clip.streetview.mapPath != null)
             clip.streetview.mapPath!,
         };
@@ -238,9 +288,9 @@ class MapsExportPipeline {
             media &&
             clip.streetview.showArrows &&
             StreetviewMotion.active(clip);
-        final count = media && !animatedArrows
-            ? 1
-            : (scene.duration * 30).ceil();
+        final staticOverlay =
+            media && !animatedArrows && !project.isStreetview3d;
+        final count = staticOverlay ? 1 : (scene.duration * 30).ceil();
         final paths = <String>[];
 
         for (var f = 0; f < count; f++) {
@@ -258,13 +308,23 @@ class MapsExportPipeline {
         }
 
         overlays.add(paths.last);
-        frames.add(media && !animatedArrows ? [] : paths);
+        frames.add(staticOverlay ? [] : paths);
         clips.add(
           media
               ? {
                   ...clip.toJson(),
                   'slowPanZoom': clip.streetview.panZoom,
                   'cameraMotion': StreetviewMotion.native(clip),
+                  if (project.isStreetview3d && clip.isTimed)
+                    'orbitPlaneFrames': [
+                      for (int f = 0; f < count; f++)
+                        OrbitMediaPose.at(
+                          'media',
+                          (f / 30) / scene.duration,
+                          scene: geometry,
+                          wallId: clip.streetview.wallId,
+                        ).native,
+                    ],
                 }
               : {
                   ...clip.toJson(),

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../features/streetview_3d/presentation/orbit_journey_canvas.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
@@ -27,6 +28,16 @@ class StreetviewCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (project.clips.isEmpty) return const ColoredBox(color: Colors.black);
+    if (project.isStreetview3d) {
+      return OrbitJourneyCanvas(
+        project: project,
+        position: position,
+        playing: playing,
+        overlayOnly: overlayOnly,
+        posterOnly: posterOnly,
+        posters: posters,
+      );
+    }
     final scene = StreetviewTimeline.at(project, position),
         i = scene.mediaIndex;
     final clip = project.clips[i], settings = clip.streetview;

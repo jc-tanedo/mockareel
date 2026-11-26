@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-
-enum ExportPhase { preparing, encoding, finishing }
+import '../model/export_phase.dart';
 
 /// A shared export workspace. The scene preview uses still media, so it never
 /// opens a competing video decoder while the native encoder is running.

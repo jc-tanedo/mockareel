@@ -1,10 +1,10 @@
-import 'gif_media.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/project.dart';
+import 'gif_media.dart';
 import 'project_archive.dart';
 export 'project_archive.dart' show BackupLimits;
 
@@ -19,6 +19,16 @@ class ProjectStore {
     );
     for (final name in ['projects', 'media', 'exports']) {
       await Directory('${root!.path}/$name').create(recursive: true);
+    }
+  }
+
+  Future<File> writeMapAsset(String name, List<int> bytes) async {
+    final file = File('${root!.path}/media/$name');
+    try {
+      return await file.writeAsBytes(bytes, flush: true);
+    } catch (_) {
+      if (await file.exists()) await file.delete();
+      rethrow;
     }
   }
 
@@ -150,16 +160,33 @@ class ProjectStore {
       }
       final maps = <String, String>{};
       for (var i = 0; i < project.clips.length; i++) {
-        final path = project.clips[i].streetview.mapPath;
-        if (path == null) continue;
-        var relative = maps[path];
-        if (relative == null) {
-          relative =
-              'media/streetview-map-${maps.length}.${path.split('.').last}';
-          maps[path] = relative;
-          await encoder.addFile(File(path), relative);
+        final settings = project.clips[i].streetview;
+        if (settings.walkLayers.length == 3) {
+          final names = <String>[];
+          for (final path in settings.walkLayers) {
+            final name = 'media/walk-$i-${names.length}.png';
+            await encoder.addFile(File(path), name);
+            names.add(name);
+          }
+          (clips[i]['streetview'] as Map)['walkLayers'] = names;
         }
-        (clips[i]['streetview'] as Map)['mapPath'] = relative;
+      }
+      for (final fields in [
+        for (final clip in clips) clip['streetview'] as Map,
+        ...?(data['streetview']['locations'] as List?)?.cast<Map>(),
+      ]) {
+        for (final key in ['mapPath', 'overviewPath']) {
+          final path = fields[key] as String?;
+          if (path == null) continue;
+          var relative = maps[path];
+          if (relative == null) {
+            relative =
+                'media/streetview-map-${maps.length}.${path.split('.').last}';
+            maps[path] = relative;
+            await encoder.addFile(File(path), relative);
+          }
+          fields[key] = relative;
+        }
       }
       if (project.feed.homeMedia != null) {
         final home = project.feed.homeMedia!;
@@ -229,17 +256,33 @@ class ProjectStore {
         final restoredMaps = <String, String>{};
         for (final clip in clips) {
           final streetview = clip['streetview'] as Map?;
-          final source = streetview?['mapPath'] as String?;
-          if (source != null) {
-            final restored = restoredMaps[source] ?? await restoreExtra(source);
-            restoredMaps[source] = restored;
-            streetview!['mapPath'] = restored;
+          final layers = streetview?['walkLayers'];
+          if (layers != null) {
+            if (layers is! List || layers.length != 3) {
+              throw const FormatException('Invalid photo walk layers.');
+            }
+            streetview!['walkLayers'] = [
+              for (final source in layers) await restoreExtra(source as String),
+            ];
           }
           final post = clip['post'] as Map?;
           if (post?['avatarPath'] != null) {
             post!['avatarPath'] = await restoreExtra(
               post['avatarPath'] as String,
             );
+          }
+        }
+        for (final fields in [
+          for (final clip in clips) ?(clip['streetview'] as Map?),
+          ...?((json['streetview'] as Map?)?['locations'] as List?)
+              ?.cast<Map>(),
+        ]) {
+          for (final key in ['mapPath', 'overviewPath']) {
+            final source = fields[key] as String?;
+            if (source == null) continue;
+            final restored = restoredMaps[source] ?? await restoreExtra(source);
+            restoredMaps[source] = restored;
+            fields[key] = restored;
           }
         }
         final home = (json['feed'] as Map?)?['homeMedia'] as Map?;
