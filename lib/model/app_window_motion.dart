@@ -81,4 +81,16 @@ abstract final class AppWindowMotion {
       iconRippleProgress: iconRippleProgress,
     );
   }
+
+  static Map<String, dynamic> native({
+    required HomeIconPosition icon,
+    required bool opening,
+    required double hold,
+  }) => {
+    'opening': opening,
+    'hold': hold,
+    'iconLeft': icon.left,
+    'iconTop': icon.top,
+    'iconSize': icon.size,
+  };
 }

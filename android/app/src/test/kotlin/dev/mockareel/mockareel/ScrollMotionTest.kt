@@ -2,6 +2,7 @@ package dev.mockareel.mockareel
 
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.max
 
 class ScrollMotionTest {
     @Test fun incomingCardUsesM3DefaultSpatialAndSnapsToGalleryLeft() {
@@ -49,5 +50,39 @@ class ScrollMotionTest {
         assertEquals(23, FeedMotion.frame(.399999, 24))
         assertEquals(-1, FeedMotion.frame(0.0, 0))
         assertEquals(FeedMotion.entry(1.0 / 60, .4), FeedMotion.entry(.016667, .4), .001f)
+    }
+
+    @Test fun feedWindowTransformMatchesM3LaunchAndCloseRects() {
+        val openCfg = mapOf<String, Any>(
+            "opening" to true,
+            "hold" to 0.5,
+            "iconLeft" to 20.0,
+            "iconTop" to 100.0,
+            "iconSize" to 56.0,
+        )
+        val openStart = FeedMotion.windowTransform(0.0, 1.05, openCfg)
+        assertEquals(56f / 360f, openStart[0], .0001f)
+        assertEquals(2f * (20f + 28f) / 360f - 1f, openStart[1], .0001f)
+        assertEquals(1f - 2f * (100f + 28f) / 640f, openStart[2], .0001f)
+
+        val openMid = FeedMotion.windowTransform(0.75, 1.05, openCfg)
+        val qMid = M3Motion.quantize(0.75, 1.05)
+        val pMid = M3Motion.slowSpatial.eval(((qMid - 0.5) / 0.55).coerceIn(0.0, 1.0))
+        val midW = 56.0 + (360.0 - 56.0) * pMid
+        val midH = 56.0 + (640.0 - 56.0) * pMid
+        assertEquals(max(midW / 360.0, midH / 640.0).toFloat(), openMid[0], .0001f)
+
+        val openEnd = FeedMotion.windowTransform(1.05, 1.05, openCfg)
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f), openEnd, .0001f)
+
+        val closeCfg = mapOf<String, Any>(
+            "opening" to false,
+            "hold" to 0.5,
+            "iconLeft" to 20.0,
+            "iconTop" to 100.0,
+            "iconSize" to 56.0,
+        )
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f), FeedMotion.windowTransform(0.0, 0.95, closeCfg), .0001f)
+        assertArrayEquals(openStart, FeedMotion.windowTransform(0.45, 0.95, closeCfg), .0001f)
     }
 }

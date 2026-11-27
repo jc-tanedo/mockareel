@@ -95,6 +95,7 @@ class NativeRenderer {
           dark: project.darkOutput,
         ).progress.toARGB32(),
         'slideSeconds': project.slideSeconds,
+        'clipAudioVolume': project.clipAudioVolume,
         'music': project.music?.toJson(),
         'sheetIntroSeconds': introFrames.isEmpty
             ? 0
@@ -113,6 +114,7 @@ class NativeRenderer {
     required List<List<String>> frames,
     required List<double> transitions,
     List<double>? overlayDurations,
+    double clipAudioVolume = 0,
     MusicTrack? music,
   }) async {
     final generation = ++_generation;
@@ -144,6 +146,7 @@ class NativeRenderer {
         'sceneFrames': frames,
         'transitions': transitions,
         if (overlayDurations != null) 'overlayDurations': overlayDurations,
+        'clipAudioVolume': clipAudioVolume,
         'music': music?.toJson(),
       });
     });

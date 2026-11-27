@@ -107,7 +107,7 @@ class AudioEditor extends StatelessWidget {
                 },
               ),
               Text(
-                'Press play above to hear the soundtrack with your reel. Original clip audio is muted.',
+                'Press play above to hear your soundtrack and clip audio mix.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
                   height: 1.5,
@@ -139,6 +139,20 @@ class AudioEditor extends StatelessWidget {
                   onChanged();
                 },
               ),
+              EditorSlider(
+                label: 'Fade out',
+                valueLabel: m.fadeOutSeconds <= .05
+                    ? 'Off'
+                    : '${m.fadeOutSeconds.toStringAsFixed(1)}s',
+                value: m.fadeOutSeconds,
+                min: 0,
+                max: 5,
+                onChanged: (v) {
+                  m.fadeOutSeconds = v < .05 ? 0 : v;
+                  m.normalize();
+                  onChanged();
+                },
+              ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Loop to fit reel'),
@@ -151,6 +165,67 @@ class AudioEditor extends StatelessWidget {
               ),
             ],
           ),
+        EditorSectionCard(
+          title: const Text('Original clip audio'),
+          subtitle: const Text(
+            'Mix source audio from video clips with your soundtrack',
+          ),
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Keep original video audio'),
+              value: project.clipAudioVolume > 0,
+              onChanged: (v) {
+                project.clipAudioVolume = v ? .8 : 0;
+                onChanged();
+              },
+            ),
+            if (project.clipAudioVolume > 0) ...[
+              EditorSlider(
+                label: 'Clip audio volume',
+                valueLabel: '${(project.clipAudioVolume * 100).round()}%',
+                value: project.clipAudioVolume,
+                min: 0,
+                max: 1,
+                onChanged: (v) {
+                  project.clipAudioVolume = v < .02 ? 0 : v;
+                  onChanged();
+                },
+              ),
+              if (project.clips.any((c) => c.isVideo && !c.isGif))
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (var i = 0; i < project.clips.length; i++)
+                      if (project.clips[i].isVideo && !project.clips[i].isGif)
+                        FilterChip(
+                          selected: !project.clips[i].muted,
+                          avatar: Icon(
+                            project.clips[i].muted
+                                ? Icons.volume_off
+                                : Icons.volume_up,
+                            size: 16,
+                          ),
+                          label: Text('Clip ${i + 1}'),
+                          onSelected: (_) {
+                            project.clips[i].muted = !project.clips[i].muted;
+                            onChanged();
+                          },
+                        ),
+                  ],
+                )
+              else
+                Text(
+                  'Photos and GIFs are silent; video clips will play at this volume.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+            ],
+          ],
+        ),
       ],
     );
   }

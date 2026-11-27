@@ -219,6 +219,10 @@ class OrbitDolly {
         ? fallback * (32 * arc * (start.mount?.sizeFactor ?? 1))
         : Offset.zero;
     final nominalZoom = exp(lerpDouble(log(start.zoom), log(end.zoom), u)!);
+    final crossPin = !shared && !repeated && delta.distance > 15;
+    final spanFactor = crossPin
+        ? (delta.distance / 450.0).clamp(0.0, 1.0)
+        : 0.0;
     final double zoom;
     if (distinctWalls) {
       final avgWall =
@@ -232,11 +236,14 @@ class OrbitDolly {
         frameBothZoom,
       ).clamp(1.0, nominalZoom);
       zoom = exp(lerpDouble(log(nominalZoom), log(transitZoom), arc)!);
+    } else if (repeated) {
+      zoom = lerpDouble(nominalZoom, nominalZoom * 1.16, arc)!;
     } else {
-      final transitZoom = repeated
-          ? nominalZoom * 1.16
-          : min(nominalZoom, 230 / max(1.0, delta.distance));
-      zoom = lerpDouble(nominalZoom, transitZoom, arc)!;
+      final transitZoom = min(
+        nominalZoom * (crossPin ? .74 : 1.0),
+        240.0 / max(1.0, delta.distance),
+      ).clamp(.48, nominalZoom);
+      zoom = exp(lerpDouble(log(nominalZoom), log(transitZoom), arc)!);
     }
     double reliefOf(OrbitScene? scene) =>
         scene == null || scene.atlas != null ? 0 : scene.localRelief;
@@ -247,7 +254,7 @@ class OrbitDolly {
     )!.clamp(0.0, 180.0);
     final tilt = distinctWalls
         ? arc * (.045 + .045 * turnFraction + min(.05, relief / 2400))
-        : arc * (.065 + relief / 1800);
+        : arc * (.065 + .11 * spanFactor + relief / 1800);
     double datum(OrbitScene? scene) =>
         scene == null || scene.atlas != null ? 0 : scene.elevation(Offset.zero);
     const sourceHeight = 0.0;
@@ -275,7 +282,7 @@ class OrbitDolly {
           rise(destination, target, destFocus),
           u,
         )! +
-        arc * min(relief * .14, 25 / zoom);
+        arc * (min(relief * .14, 25 / zoom) + 28.0 * spanFactor);
     OrbitMediaPose local(OrbitMediaPose endpoint, Offset focus, double ground) {
       final base = OrbitMediaPose(
         progress,

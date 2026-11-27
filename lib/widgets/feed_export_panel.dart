@@ -100,7 +100,7 @@ class FeedExportPanel extends StatelessWidget {
                   ),
                 ),
               Text(
-                'Background music is optional. Source video audio is muted.',
+                'Background music and original video audio settings apply from the Audio tab.',
                 style: mutedStyle,
               ),
               const SizedBox(height: 12),

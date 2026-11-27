@@ -18,7 +18,7 @@
 
 Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfaces. Choose a template, add your media, customize the UI, and export a reel. Projects save locally and can be shared as portable backups.
 
-> **New in 0.15:** Material Design 3 editors, selectable color themes, smoother Streetview transitions, and Android background export with progress notifications. [Release notes](docs/releases/v0.15.0.md).
+> **New in 0.17:** Streetview 3D building orbits with multi-wall placement and tap-to-pick walls, 60 fps Material 3 Expressive motion, source clip audio mixing with music fade-out, and live video in FYP app launch/close exports. [Releases](https://github.com/jc-tanedo/mockareel/releases).
 
 ## Templates
 
@@ -27,6 +27,7 @@ Mockareel is a Flutter editor for 9:16 videos that recreate familiar app interfa
 | **Maps place story** | A map or photo header, editable place details and buttons, horizontal media cards, movable text, optional featured review, and light/dark output. |
 | **TikTok FYP scroll** | Typed search or a home-screen opening, editable posts and engagement counts, timed vertical swipes, and an optional app-close ending. |
 | **[Streetview journey](docs/streetview.md)** | A captured Maps opening, per-media locations and Street View overlays, directional movement or return-to-Maps transitions, and an optional map ending. |
+| **[Streetview 3D](docs/streetview.md#streetview-3d)** | Interactive 3D building orbits from Google Photorealistic 3D Tiles or open building footprints, distinct same-pin walls with tap-to-pick and shuffle controls, photo depth walkthroughs, and aerial cross-pin flights. |
 
 All templates support photos, trimmed video, animated GIFs with timing/loop controls, framing controls and optional background music. The FYP home screen includes iPhone, Android, Pixel and Samsung One UI presets, plus controls for using a supplied screenshot without duplicate overlays. Each preset uses its own layout and editable app artwork based on home-screen references.
 
@@ -39,7 +40,7 @@ All templates support photos, trimmed video, animated GIFs with timing/loop cont
 [Full user guide →](docs/user-guide.md)
 
 - **Output:** 1080 × 1920 MP4 at 60 fps with Material 3 Expressive motion; Maps also exports transparent/full PNG stills.
-- **Audio:** choose background music from your device. Source video audio is muted.
+- **Audio:** choose background music from your device with volume, start offset, loop, and end fade-out; optionally mix original video clip audio with per-clip mute.
 - **Projects:** autosave on device; `.mockareel` backups include media and editable settings.
 - **Maps:** Browser search and map-header capture need no API key. Optional API access is under **Advanced · Google Maps**. [Configure Maps →](docs/google-maps.md)
 
@@ -61,7 +62,7 @@ The app uses Dart for editing, models and storage, with Android Media3 for video
 
 ## Status
 
-Mockareel is an early preview. Automated checks cover models, editor interactions, project backups and rendered UI surfaces. Device testing has covered Maps lookup/header capture, GIF playback and MP4 export. Browser lookup depends on Google's page layout; manual editing, uploaded headers and optional API access remain available. App launch/close exports use a still of the first/last post.
+Mockareel is an early preview. Automated checks cover models, editor interactions, project backups and rendered UI surfaces. Device testing has covered Maps lookup/header capture, GIF playback and MP4 export. Browser lookup depends on Google's page layout; manual editing, uploaded headers and optional API access remain available. App launch/close exports render live video inside the opening and closing window on OS home-screen presets (custom video wallpapers retain a post still inside the window).
 
 ## Contributing
 

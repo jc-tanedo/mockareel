@@ -14,11 +14,14 @@ permissions:
   contents: read
 concurrency:
   group: android-debug-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   build:
     runs-on: self-hosted
     timeout-minutes: 45
+    concurrency:
+      group: android-self-hosted-build
+      cancel-in-progress: false
     env:
       MOCKAREEL_REQUIRE_DEBUG_SIGNING: ${{ github.event_name != 'pull_request' }}
     steps:

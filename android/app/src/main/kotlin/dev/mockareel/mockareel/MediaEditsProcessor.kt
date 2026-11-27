@@ -54,7 +54,7 @@ internal class MediaEditsProcessor(private val context: Context) {
                                 .setStartPositionMs((trim * 1000).roundToLong())
                                 .setEndPositionMs(((trim + duration) * 1000).roundToLong()).build())
                             else source.setImageDurationMs(100)
-                            val item = EditedMediaItem.Builder(source.build()).setRemoveAudio(true).setFrameRate(M3Motion.EXPORT_FPS)
+                            val item = EditedMediaItem.Builder(source.build()).setRemoveAudio(!video).setFrameRate(M3Motion.EXPORT_FPS)
                                 .setEffects(Effects(emptyList(), listOf(
                                     Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT),
                                     MediaEditsEffect(spec),

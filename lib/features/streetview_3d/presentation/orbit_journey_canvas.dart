@@ -2,11 +2,13 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:mockareel/model/audio_mix.dart';
 import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/model/streetview_motion.dart';
 import 'package:mockareel/model/streetview_timeline.dart';
+import 'package:mockareel/services/streetview_capture_plan.dart';
 import 'package:mockareel/widgets/media_frame.dart';
 import 'package:mockareel/widgets/streetview_arrows.dart';
 import 'package:mockareel/widgets/streetview_map_scene.dart';
@@ -55,8 +57,8 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final plan = scene.kind == 'map' || scene.kind == 'ending-map';
     // Leave at least three movement samples even for a short arrow tap.
     const step = 1 / M3Motion.exportFps;
-    final lastFrame =
-        ((scene.duration * M3Motion.exportFps).ceil() - 1) / M3Motion.exportFps;
+    final timing = StreetviewCapturePlan.orbitMapTiming(scene.duration);
+    final lastFrame = timing.lastFrame;
     final tapSeconds = arrow
         ? min(.14, max(0.0, lastFrame - 3 * step))
         : StreetviewTimeline.rippleSeconds;
@@ -73,9 +75,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final mapHandoff = entering || back;
     // Use the existing scene budget. The final encoded frame reaches the
     // exact first pose of the following scene, even at the shortest duration.
-    final flightStart = back
-        ? min(.2, lastFrame * .25)
-        : max(0.0, lastFrame - min(.85, lastFrame * .62));
+    final flightStart = back ? min(.2, lastFrame * .25) : timing.flightStart;
     final flightFraction =
         ((elapsed - flightStart) / max(step, lastFrame - flightStart)).clamp(
           0.0,
@@ -126,6 +126,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
           clip: item,
           position: seconds,
           playing: playing && active && media && position < project.duration,
+          volume: AudioMix.clipVolume(project, item),
         );
       }
       return Positioned.fill(
@@ -334,7 +335,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
         : (place.latitude != null && place.longitude != null)
         ? '${place.latitude!.toStringAsFixed(5)}, ${place.longitude!.toStringAsFixed(5)}'
         : '';
-    final entryTap = min(StreetviewTimeline.rippleSeconds, flightStart);
+    final entryTap = timing.entryTap;
     final ripple = back
         ? elapsed / max(step, flightStart)
         : entering
@@ -343,6 +344,18 @@ class OrbitJourneyCanvas extends StatelessWidget {
     Widget canvas(OrbitDolly? dolly, OrbitScene? source) {
       final dualWorld =
           arrow && dolly != null && dolly.distinctWalls && source != null;
+      final crossPinFlight =
+          arrow && dolly != null && !dolly.sharedWorld && t > .04 && t < .96;
+      final flightCueAlpha = crossPinFlight ? sin(t * pi).clamp(0.0, 1.0) : 0.0;
+      String placeLabel(StreetviewMedia m) => m.streetviewTitle.isNotEmpty
+          ? m.streetviewTitle
+          : m.place.name.isNotEmpty
+          ? m.place.name
+          : m.place.address;
+      final fromPlaceName = crossPinFlight ? placeLabel(settings) : '';
+      final toPlaceName = crossPinFlight
+          ? placeLabel(project.clips[index + 1].streetview)
+          : '';
       final indices = <int>[
         for (
           int j = max(0, index - 1);
@@ -492,6 +505,55 @@ class OrbitJourneyCanvas extends StatelessWidget {
                       },
                     ),
                   ),
+                if (crossPinFlight)
+                  IgnorePointer(
+                    child: CustomPaint(
+                      painter: _FlightRoutePainter(
+                        from: dolly.departure.anchor,
+                        to: dolly.arrival.anchor,
+                        progress: t,
+                        alpha: flightCueAlpha,
+                        dark: project.darkOutput,
+                      ),
+                    ),
+                  ),
+                if (crossPinFlight &&
+                    chrome.showLocation &&
+                    fromPlaceName.isNotEmpty &&
+                    toPlaceName.isNotEmpty &&
+                    fromPlaceName != toPlaceName)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 42,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: flightCueAlpha,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Text(
+                              '$fromPlaceName → $toPlaceName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (hudOpacity > 0 &&
                     chrome.showLocation &&
                     locationText.isNotEmpty)
@@ -626,4 +688,69 @@ class _OutsidePlane extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(_OutsidePlane old) => pose.matrix != old.pose.matrix;
+}
+
+class _FlightRoutePainter extends CustomPainter {
+  final Offset from, to;
+  final double progress, alpha;
+  final bool dark;
+  const _FlightRoutePainter({
+    required this.from,
+    required this.to,
+    required this.progress,
+    required this.alpha,
+    required this.dark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (alpha <= 0.01) return;
+    final span = (to - from).distance;
+    if (span <= 18) return;
+    final lift = min(56.0, span * .28);
+    final control = (from + to) / 2 - Offset(0, lift);
+    final accent = dark ? const Color(0xffb8e2ff) : const Color(0xffffffff);
+    final trackPaint = Paint()
+      ..color = Colors.black.withValues(alpha: .28 * alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round;
+    final routePaint = Paint()
+      ..color = accent.withValues(alpha: .72 * alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    Offset pointAt(double u) {
+      final inv = 1.0 - u;
+      return from * (inv * inv) + control * (2 * inv * u) + to * (u * u);
+    }
+
+    for (var s = 0; s < 14; s++) {
+      final a = pointAt(s / 14);
+      final b = pointAt((s + .45) / 14);
+      canvas.drawLine(a, b, trackPaint);
+      canvas.drawLine(a, b, routePaint);
+    }
+    final u = (progress * progress * (3 - 2 * progress)).clamp(0.0, 1.0);
+    final head = pointAt(u);
+    canvas.drawCircle(
+      head,
+      6.5,
+      Paint()..color = accent.withValues(alpha: .28 * alpha),
+    );
+    canvas.drawCircle(
+      head,
+      3.5,
+      Paint()..color = Colors.white.withValues(alpha: .95 * alpha),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_FlightRoutePainter old) =>
+      old.from != from ||
+      old.to != to ||
+      old.progress != progress ||
+      old.alpha != alpha ||
+      old.dark != dark;
 }

@@ -412,7 +412,7 @@ void testStreetviewExport(
             }
             checks['ending map animated'] =
                 (frames[endingMapIndex] as List).length == 30 &&
-                (orbit || (frames[endingMapIndex] as List).toSet().length == 1);
+                (frames[endingMapIndex] as List).toSet().length == 1;
             checks['video retained'] =
                 clips[secondMediaIndex]['isVideo'] == true;
             checks['edited source retained'] =

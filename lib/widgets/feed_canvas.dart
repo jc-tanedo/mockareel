@@ -1,4 +1,5 @@
 import '../model/app_window_motion.dart';
+import '../model/audio_mix.dart';
 import '../model/feed_timeline.dart';
 import '../model/m3_motion.dart';
 import 'dart:math';
@@ -32,8 +33,13 @@ class FeedCanvas extends StatelessWidget {
     this.posters = const {},
   });
 
-  Widget _media(ReelClip c, double elapsed, {bool still = false, bool? play}) =>
-      still || posterOnly
+  Widget _media(
+    ReelClip c,
+    double elapsed, {
+    bool still = false,
+    bool? play,
+    bool mute = false,
+  }) => still || posterOnly
       ? ClipPoster(
           clip: c,
           position: elapsed,
@@ -45,6 +51,7 @@ class FeedCanvas extends StatelessWidget {
           clip: c,
           position: elapsed.clamp(0, max(0, c.duration - .001)),
           playing: play ?? playing,
+          volume: mute ? 0 : AudioMix.clipVolume(project, c),
         );
 
   Widget _postLayer(
@@ -53,6 +60,9 @@ class FeedCanvas extends StatelessWidget {
     AppWindowFrame? window,
     bool home = false,
     bool hold = false,
+    bool hideMedia = false,
+    bool? play,
+    bool mute = false,
     double? top,
     double contentScale = 1.0,
   }) {
@@ -78,12 +88,13 @@ class FeedCanvas extends StatelessWidget {
                 scale: contentScale,
                 child: Stack(
                   children: [
-                    if (!overlayOnly || home)
+                    if (!hideMedia && (!overlayOnly || home))
                       Positioned.fill(
                         child: _media(
                           c,
                           elapsed,
-                          play: playing && !home && !hold,
+                          play: play ?? (playing && !home && !hold),
+                          mute: mute || home || hold,
                         ),
                       ),
                     Positioned.fill(child: FeedPostSurface(post: c.post)),
@@ -221,58 +232,115 @@ class FeedCanvas extends StatelessWidget {
         elapsed: elapsed,
         hold: f.homeSeconds,
       );
-      children.add(
-        Positioned.fill(
-          child: Stack(
-            children: [
-              if (!overlayOnly && home != null)
-                Positioned.fill(child: _media(home, elapsed % home.duration)),
-              Positioned.fill(
-                child: Transform.scale(
-                  scale: window.backdropScale,
-                  child: RepaintBoundary(
-                    child: HomeSurface(
-                      settings: f,
-                      transparentBackground: home != null,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: window.backdropShade),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (f.showIcons && window.iconRippleProgress > 0) {
-        final icon = f.launchIcon;
-        children.add(
-          Positioned(
-            key: const ValueKey('home-icon-ripple'),
-            left: icon.left,
-            top: icon.top,
-            width: icon.size,
-            height: icon.size,
+      final windowClip = project.clips.isEmpty
+          ? null
+          : project.clips[opening ? 0 : project.clips.length - 1];
+      final liveWindow =
+          home == null && windowClip != null && windowClip.isTimed;
+      Widget homeBackdrop() => Stack(
+        children: [
+          if (!overlayOnly && home != null)
+            Positioned.fill(
+              child: _media(home, elapsed % home.duration, mute: true),
+            ),
+          Positioned.fill(
             child: Transform.scale(
-              scale: window.iconPressScale,
-              child: M3InkRipple(
-                progress: window.iconRippleProgress,
-                borderRadius: BorderRadius.circular(icon.radius),
+              scale: window.backdropScale,
+              child: RepaintBoundary(
+                child: HomeSurface(
+                  settings: f,
+                  transparentBackground: home != null,
+                ),
               ),
             ),
           ),
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: window.backdropShade),
+            ),
+          ),
+          if (f.showIcons && window.iconRippleProgress > 0)
+            Positioned(
+              key: const ValueKey('home-icon-ripple'),
+              left: f.launchIcon.left,
+              top: f.launchIcon.top,
+              width: f.launchIcon.size,
+              height: f.launchIcon.size,
+              child: Transform.scale(
+                scale: window.iconPressScale,
+                child: M3InkRipple(
+                  progress: window.iconRippleProgress,
+                  borderRadius: BorderRadius.circular(f.launchIcon.radius),
+                ),
+              ),
+            ),
+        ],
+      );
+      final windowTime = windowClip == null
+          ? 0.0
+          : opening
+          ? (liveWindow
+                ? (elapsed - f.homeSeconds).clamp(0.0, windowClip.duration)
+                : 0.0)
+          : (liveWindow
+                ? max(
+                    0.0,
+                    windowClip.duration -
+                        AppWindowMotion.closeSeconds +
+                        elapsed,
+                  )
+                : windowClip.duration);
+      if (overlayOnly && liveWindow && window.opacity > 0) {
+        final windowRect = Rect.fromLTWH(
+          window.left,
+          window.top,
+          window.width,
+          window.height,
         );
-      }
-      if (project.clips.isNotEmpty) {
-        final c = project.clips[opening ? 0 : project.clips.length - 1];
-        // Preload the opening video even while its app tile is invisible. The
-        // same player and widget ancestry continue into/out of the feed scene.
         children.add(
-          _postLayer(c, opening ? 0 : c.duration, window: window, home: true),
+          Positioned.fill(
+            child: ClipPath(
+              clipper: _InvertedRRectClipper(windowRect, window.radius),
+              child: homeBackdrop(),
+            ),
+          ),
         );
+        if (window.opacity < 0.999) {
+          children.add(
+            Positioned.fill(
+              child: ClipPath(
+                clipper: _WindowRRectClipper(windowRect, window.radius),
+                child: Opacity(
+                  opacity: (1.0 - window.opacity).clamp(0.0, 1.0),
+                  child: homeBackdrop(),
+                ),
+              ),
+            ),
+          );
+        }
+        children.add(
+          _postLayer(
+            windowClip,
+            windowTime,
+            window: window,
+            home: true,
+            hideMedia: true,
+            mute: true,
+          ),
+        );
+      } else {
+        children.add(Positioned.fill(child: homeBackdrop()));
+        if (windowClip != null) {
+          children.add(
+            _postLayer(
+              windowClip,
+              windowTime,
+              window: window,
+              home: true,
+              mute: true,
+            ),
+          );
+        }
       }
     }
     return FittedBox(
@@ -297,4 +365,34 @@ class FeedCanvas extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InvertedRRectClipper extends CustomClipper<Path> {
+  final Rect rect;
+  final double radius;
+  const _InvertedRRectClipper(this.rect, this.radius);
+
+  @override
+  Path getClip(Size size) => Path()
+    ..fillType = PathFillType.evenOdd
+    ..addRect(Offset.zero & size)
+    ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+
+  @override
+  bool shouldReclip(_InvertedRRectClipper old) =>
+      rect != old.rect || radius != old.radius;
+}
+
+class _WindowRRectClipper extends CustomClipper<Path> {
+  final Rect rect;
+  final double radius;
+  const _WindowRRectClipper(this.rect, this.radius);
+
+  @override
+  Path getClip(Size size) =>
+      Path()..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+
+  @override
+  bool shouldReclip(_WindowRRectClipper old) =>
+      rect != old.rect || radius != old.radius;
 }

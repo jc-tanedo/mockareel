@@ -39,6 +39,7 @@ class MapsEditorInspector extends StatelessWidget {
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
   final ValueChanged<OrbitScene> onShuffleWall;
+  final void Function(OrbitScene, String) onSelectWall;
 
   const MapsEditorInspector({
     super.key,
@@ -71,6 +72,7 @@ class MapsEditorInspector extends StatelessWidget {
     required this.onChanged,
     required this.onPreviewUpdated,
     required this.onShuffleWall,
+    required this.onSelectWall,
   });
 
   Widget _addMediaButton() => OutlinedButton.icon(
@@ -145,6 +147,7 @@ class MapsEditorInspector extends StatelessWidget {
         onChanged: onChanged,
         onPreviewUpdated: onPreviewUpdated,
         onShuffleWall: onShuffleWall,
+        onSelectWall: onSelectWall,
       ),
       3 => AudioEditor(
         project: project,

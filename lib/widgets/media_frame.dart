@@ -11,12 +11,14 @@ class MediaFrame extends StatefulWidget {
   final ReelClip clip;
   final double position;
   final bool playing;
+  final double volume;
   final Future<String> Function(ReelClip)? gifVideoBuilder;
   const MediaFrame({
     super.key,
     required this.clip,
     this.position = 0,
     this.playing = false,
+    this.volume = 0,
     this.gifVideoBuilder,
   });
   @override
@@ -30,6 +32,7 @@ class _MediaFrameState extends State<MediaFrame> {
   bool _preparing = false;
   int _generation = 0;
   String _loadedStamp = '';
+  double _lastVolume = -1;
   bool _syncing = false, _syncAgain = false, _forceSync = false;
   String get _gifStamp => EditedMedia.stamp(widget.clip);
   @override
@@ -41,6 +44,7 @@ class _MediaFrameState extends State<MediaFrame> {
   Future<void> _load() async {
     final generation = ++_generation;
     _loadedStamp = _gifStamp;
+    _lastVolume = -1;
     final previous = _video;
     _video = null;
     _error = null;
@@ -78,7 +82,9 @@ class _MediaFrameState extends State<MediaFrame> {
         return;
       }
       _video = controller;
-      await controller.setVolume(0);
+      final initialVol = widget.playing ? widget.volume.clamp(0.0, 1.0) : 0.0;
+      await controller.setVolume(initialVol);
+      _lastVolume = initialVol;
       await _sync(force: true);
       if (mounted) setState(() {});
     } catch (_) {
@@ -132,6 +138,17 @@ class _MediaFrameState extends State<MediaFrame> {
         // play/seek cannot overtake the timeline's final pause.
         if (!play && (controller.value.isPlaying || forced)) {
           await controller.pause();
+        }
+        if (!current()) {
+          _syncAgain = mounted;
+          continue;
+        }
+        final desiredVol = play
+            ? widget.volume.clamp(0.0, 1.0).toDouble()
+            : 0.0;
+        if (forced || (_lastVolume - desiredVol).abs() > .005) {
+          await controller.setVolume(desiredVol);
+          _lastVolume = desiredVol;
         }
         if (!current()) {
           _syncAgain = mounted;

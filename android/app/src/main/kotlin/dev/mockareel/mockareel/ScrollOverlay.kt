@@ -242,6 +242,33 @@ internal object FeedMotion {
         val q = M3Motion.quantize(elapsed, duration)
         return M3Motion.lerp(0.94, 1.0, M3Motion.defaultSpatial.at(q, duration)).toFloat()
     }
+    /** Counterpart of AppWindowMotion.at for live video inside home-open/close exports. */
+    fun windowTransform(elapsed: Double, duration: Double, config: Map<String, Any>): FloatArray {
+        val opening = config["opening"] != false
+        val hold = ((config["hold"] as? Number)?.toDouble() ?: 0.0).coerceAtLeast(0.0)
+        val iconLeft = (config["iconLeft"] as? Number)?.toDouble() ?: 0.0
+        val iconTop = (config["iconTop"] as? Number)?.toDouble() ?: 0.0
+        val iconSize = ((config["iconSize"] as? Number)?.toDouble() ?: 56.0).coerceAtLeast(1.0)
+        val q = if (elapsed >= duration) duration else M3Motion.quantize(elapsed, duration)
+        val u = if (opening) {
+            ((q - hold) / 0.55).coerceIn(0.0, 1.0)
+        } else {
+            1.0 - (q / 0.45).coerceIn(0.0, 1.0)
+        }
+        val spatial = if (opening) {
+            M3Motion.slowSpatial.eval(u)
+        } else {
+            1.0 - M3Motion.defaultSpatial.eval(1.0 - u)
+        }
+        val left = iconLeft * (1.0 - spatial)
+        val top = iconTop * (1.0 - spatial)
+        val width = max(1.0, iconSize + (360.0 - iconSize) * spatial)
+        val height = max(1.0, iconSize + (640.0 - iconSize) * spatial)
+        val coverScale = max(width / 360.0, height / 640.0).toFloat()
+        val tx = (2.0 * (left + width / 2.0) / 360.0 - 1.0).toFloat()
+        val ty = (1.0 - 2.0 * (top + height / 2.0) / 640.0).toFloat()
+        return floatArrayOf(coverScale, tx, ty)
+    }
     fun frame(elapsed: Double, count: Int): Int =
         if (count <= 0) -1 else (elapsed * M3Motion.EXPORT_FPS).roundToInt().coerceIn(0, count - 1)
 }

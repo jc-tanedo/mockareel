@@ -177,25 +177,28 @@ class OrbitPainter extends CustomPainter {
     }
     final clipBounds = canvas.getLocalClipBounds();
     final land = dark ? const Color(0xff273545) : const Color(0xffc4d1bd);
+    final horizon = dark ? const Color(0xff233747) : const Color(0xffcad9cf);
+    const sunDir = Offset(0.79, 0.61);
+    double hazeAt(Offset world) =>
+        (((world - camera.focus).distance - 180.0) / 360.0).clamp(0.0, 0.62);
+
     if (!foregroundOnly) {
       canvas.drawColor(land, BlendMode.src);
       for (var z = 0; z < 24; z++) {
         for (var x = 0; x < 24; x++) {
           final p = Offset(x * 50.0 - 600, z * 50.0 - 600), i = z * 25 + x;
           final heights = scene.grid;
-          face(
-            [
-              project(p, heights[i]),
-              project(p + const Offset(50, 0), heights[i + 1]),
-              project(p + const Offset(50, 50), heights[i + 26]),
-              project(p + const Offset(0, 50), heights[i + 25]),
-            ],
-            Color.lerp(
-              land,
-              Colors.black,
-              ((heights[i + 1] - heights[i]) / 90 + .08).clamp(0, 0.35),
-            )!,
-          );
+          final cellColor = Color.lerp(
+            land,
+            Colors.black,
+            ((heights[i + 1] - heights[i]) / 90 + .08).clamp(0, 0.35),
+          )!;
+          face([
+            project(p, heights[i]),
+            project(p + const Offset(50, 0), heights[i + 1]),
+            project(p + const Offset(50, 50), heights[i + 26]),
+            project(p + const Offset(0, 50), heights[i + 25]),
+          ], Color.lerp(cellColor, horizon, hazeAt(p + const Offset(25, 25)))!);
         }
       }
     }
@@ -208,20 +211,64 @@ class OrbitPainter extends CustomPainter {
         continue;
       }
       if (foregroundOnly) continue;
-      face(
-        [for (final p in f.points) project(p, scene.elevation(p))],
-        f.height == -3
-            ? Colors.blueGrey
-            : f.height == -2
-            ? const Color(0xff608568)
-            : dark
-            ? const Color(0xff556572)
-            : const Color(0xffe1dfd4),
-      );
+      final baseFeature = f.height == -3
+          ? (dark ? const Color(0xff385772) : Colors.blueGrey)
+          : f.height == -2
+          ? (dark ? const Color(0xff3e614e) : const Color(0xff608568))
+          : dark
+          ? const Color(0xff556572)
+          : const Color(0xffe1dfd4);
+      face([
+        for (final p in f.points) project(p, scene.elevation(p)),
+      ], Color.lerp(baseFeature, horizon, hazeAt(f.center))!);
     }
     buildings.sort((a, b) => depth(a.center).compareTo(depth(b.center)));
+    if (!foregroundOnly) {
+      for (final b in buildings) {
+        if (b.height < 4) continue;
+        final haze = hazeAt(b.center);
+        if (haze >= 0.58) continue;
+        final shadowLen = min(b.height * 0.42, 32.0);
+        final base = scene.elevation(b.center);
+        final shadowPoly = [
+          for (final p in b.points) project(p + sunDir * shadowLen, base),
+        ];
+        final shadowPath = Path()..addPolygon(shadowPoly, true);
+        if (shadowPath.getBounds().overlaps(clipBounds)) {
+          canvas.drawPath(
+            shadowPath,
+            brush
+              ..color = Colors.black.withValues(
+                alpha: (dark ? 0.22 : 0.13) * (1 - haze),
+              ),
+          );
+        }
+      }
+      if (camera.mount case final mount?) {
+        final halfW = OrbitWallMount.defaultWidth * mount.sizeFactor * 0.5;
+        final base = scene.elevation(mount.center) + mount.baseAbovePin;
+        final a0 = mount.center - mount.tangent * halfW;
+        final b0 = mount.center + mount.tangent * halfW;
+        final reach = sunDir * 4.5 + mount.normal * 3.0;
+        final contact = [
+          project(a0, base),
+          project(b0, base),
+          project(b0 + reach, base),
+          project(a0 + reach, base),
+        ];
+        face(contact, Colors.black.withValues(alpha: dark ? 0.26 : 0.16));
+      }
+    }
+    final bandPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.05
+      ..strokeCap = StrokeCap.butt;
+    final roofEdgePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
     for (final b in buildings) {
       final base = scene.elevation(b.center),
+          haze = hazeAt(b.center),
           top = [for (final p in b.points) project(p, base + b.height)];
       final bottom = [for (final p in b.points) project(p, base)];
       final bounds =
@@ -241,16 +288,67 @@ class OrbitPainter extends CustomPainter {
       for (final i in sides) {
         final j = (i + 1) % top.length;
         final edge = b.points[j] - b.points[i];
-        face(
-          [bottom[i], bottom[j], top[j], top[i]],
-          Color.lerp(
-            wallColor,
-            const Color(0xff172431),
-            .21 - .16 * cos(edge.direction),
-          )!,
-        );
+        final len = max(1e-6, edge.distance);
+        final lit = (edge.dx * sunDir.dx + edge.dy * sunDir.dy) / len;
+        final shadedWall = Color.lerp(
+          wallColor,
+          const Color(0xff172431),
+          (.21 - .15 * lit).clamp(0.05, 0.36),
+        )!;
+        final visibleWall = Color.lerp(shadedWall, horizon, haze)!;
+        final quad = [bottom[i], bottom[j], top[j], top[i]];
+        face(quad, visibleWall);
+        if (b.height >= 12 && haze < 0.45) {
+          final spanW = (bottom[j] - bottom[i]).distance;
+          final spanH = (bottom[i] - top[i]).distance;
+          if (spanW >= 18 && spanH >= 18) {
+            final floors = min(8, ((b.height - 4.0) / 5.0).floor());
+            if (floors >= 1) {
+              // Opaque lerp + clip inside the wall quad ensures pixel-identical
+              // results between foregroundOnly and base renders.
+              bandPaint.color = Color.lerp(
+                visibleWall,
+                dark ? const Color(0xffb5d8f0) : const Color(0xff1b2c3b),
+                (dark ? 0.14 : 0.11) * (1 - haze),
+              )!;
+              for (var k = 1; k <= floors; k++) {
+                final frac = (3.5 + (k - 1) * 4.5) / b.height;
+                if (frac >= 0.86) break;
+                final pL = Offset.lerp(bottom[i], top[i], frac)!;
+                final pR = Offset.lerp(bottom[j], top[j], frac)!;
+                canvas.drawLine(
+                  Offset.lerp(pL, pR, 0.14)!,
+                  Offset.lerp(pL, pR, 0.86)!,
+                  bandPaint,
+                );
+              }
+            }
+          }
+        }
       }
-      face(top, b.color(roof: true, dark: dark));
+      final roofFill = Color.lerp(
+        b.color(roof: true, dark: dark),
+        horizon,
+        haze,
+      )!;
+      final roofPath = Path()..addPolygon(top, true);
+      if (roofPath.getBounds().overlaps(clipBounds)) {
+        canvas.drawPath(roofPath, brush..color = roofFill);
+        if (haze < 0.52) {
+          canvas.save();
+          canvas.clipPath(roofPath);
+          canvas.drawPath(
+            roofPath,
+            roofEdgePaint
+              ..color = Color.lerp(
+                roofFill,
+                dark ? const Color(0xffcfe6f7) : Colors.white,
+                (dark ? 0.18 : 0.28) * (1 - haze),
+              )!,
+          );
+          canvas.restore();
+        }
+      }
     }
     if (!foregroundOnly) {
       canvas.drawCircle(origin, 5, brush..color = Colors.white);

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../features/streetview_3d/model/orbit_scene.dart';
+import '../features/streetview_3d/model/orbit_wall_placement.dart';
 import '../features/streetview_3d/presentation/orbit_location_picker.dart';
 import '../features/streetview_3d/presentation/orbit_map.dart';
+import '../features/streetview_3d/presentation/orbit_wall_picker.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
 import 'clip_strip.dart';
@@ -28,6 +30,7 @@ class MapsTimelineEditor extends StatelessWidget {
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
   final ValueChanged<OrbitScene> onShuffleWall;
+  final void Function(OrbitScene, String) onSelectWall;
 
   const MapsTimelineEditor({
     super.key,
@@ -47,6 +50,7 @@ class MapsTimelineEditor extends StatelessWidget {
     required this.onChanged,
     required this.onPreviewUpdated,
     required this.onShuffleWall,
+    required this.onSelectWall,
   });
 
   Widget _framingControl(
@@ -409,32 +413,81 @@ class MapsTimelineEditor extends StatelessWidget {
                       OrbitSceneBuilder(
                         path: project.clips[selectedIndex].streetview.mapPath,
                         builder: (scene, failed) {
-                          final media = project.clips[selectedIndex].streetview;
+                          final activeClip = project.clips[selectedIndex];
+                          final media = activeClip.streetview;
                           final count = scene?.walls.length ?? 0;
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              count == 1
-                                  ? 'Only one suitable wall'
-                                  : count == 0
-                                  ? 'Media at pin'
-                                  : '$count suitable walls',
-                            ),
-                            subtitle: Text(
-                              scene?.describeWall(media.wallId) ??
-                                  (failed
-                                      ? 'Could not read the saved geometry.'
-                                      : media.mapPath == null
-                                      ? 'Choose a pin with 3D geometry to place this clip.'
-                                      : 'Checking geometry…'),
-                            ),
-                            trailing: count > 1
-                                ? TextButton.icon(
-                                    icon: const Icon(Icons.shuffle),
-                                    label: const Text('Shuffle wall'),
-                                    onPressed: () => onShuffleWall(scene!),
-                                  )
-                                : null,
+                          void openPicker() {
+                            if (scene == null || count <= 1) return;
+                            final siblingWalls = <String, int>{};
+                            for (var i = 0; i < project.clips.length; i++) {
+                              final sibling = project.clips[i];
+                              final wallId = sibling.streetview.wallId;
+                              if (sibling != activeClip &&
+                                  wallId != null &&
+                                  OrbitWallPlacement.samePin(
+                                    media,
+                                    sibling.streetview,
+                                  )) {
+                                siblingWalls.putIfAbsent(wallId, () => i + 1);
+                              }
+                            }
+                            showOrbitWallPicker(
+                              context: context,
+                              scene: scene,
+                              selectedWallId: media.wallId,
+                              siblingWalls: siblingWalls,
+                              dark: project.darkOutput,
+                              onSelected: (id) => onSelectWall(scene, id),
+                            );
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                onTap: count > 1 ? openPicker : null,
+                                title: Text(
+                                  count == 1
+                                      ? 'Only one suitable wall'
+                                      : count == 0
+                                      ? 'Media at pin'
+                                      : '$count suitable walls',
+                                ),
+                                subtitle: Text(
+                                  scene?.describeWall(media.wallId) ??
+                                      (failed
+                                          ? 'Could not read the saved geometry.'
+                                          : media.mapPath == null
+                                          ? 'Choose a pin with 3D geometry to place this clip.'
+                                          : 'Checking geometry…'),
+                                ),
+                                trailing: count > 1
+                                    ? const Icon(Icons.chevron_right)
+                                    : null,
+                              ),
+                              if (count > 1)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      TextButton.icon(
+                                        icon: const Icon(
+                                          Icons.touch_app_outlined,
+                                        ),
+                                        label: const Text('Pick wall'),
+                                        onPressed: openPicker,
+                                      ),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.shuffle),
+                                        label: const Text('Shuffle wall'),
+                                        onPressed: () => onShuffleWall(scene!),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           );
                         },
                       ),

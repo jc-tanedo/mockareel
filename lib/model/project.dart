@@ -58,7 +58,7 @@ class StoryTag {
 
 class MusicTrack {
   String path, name;
-  double sourceDuration, trimStart, volume;
+  double sourceDuration, trimStart, volume, fadeOutSeconds;
   bool loop;
   MusicTrack({
     required this.path,
@@ -67,6 +67,7 @@ class MusicTrack {
     this.trimStart = 0,
     this.volume = .7,
     this.loop = true,
+    this.fadeOutSeconds = 0,
   }) {
     normalize();
   }
@@ -76,6 +77,9 @@ class MusicTrack {
         ? trimStart.clamp(0, max(0, sourceDuration - .1)).toDouble()
         : 0;
     volume = volume.isFinite ? volume.clamp(0, 1).toDouble() : .7;
+    fadeOutSeconds = fadeOutSeconds.isFinite
+        ? fadeOutSeconds.clamp(0, 5).toDouble()
+        : 0;
   }
 
   factory MusicTrack.fromJson(Map<String, dynamic> j) => MusicTrack(
@@ -85,6 +89,7 @@ class MusicTrack {
     trimStart: (j['trimStart'] as num?)?.toDouble() ?? 0,
     volume: (j['volume'] as num?)?.toDouble() ?? .7,
     loop: j['loop'] != false,
+    fadeOutSeconds: (j['fadeOutSeconds'] as num?)?.toDouble() ?? 0,
   );
   Map<String, dynamic> toJson() => {
     'path': path,
@@ -93,6 +98,7 @@ class MusicTrack {
     'trimStart': trimStart,
     'volume': volume,
     'loop': loop,
+    'fadeOutSeconds': fadeOutSeconds,
   };
 }
 
@@ -168,6 +174,7 @@ class ReelProject implements StreetviewJourney {
   final List<ReelClip> clips;
   final List<StoryTag> tags;
   MusicTrack? music;
+  double clipAudioVolume;
   DateTime updatedAt;
   ReelProject({
     String? id,
@@ -196,6 +203,7 @@ class ReelProject implements StreetviewJourney {
     List<ReelClip>? clips,
     List<StoryTag>? tags,
     this.music,
+    double clipAudioVolume = 0,
     DateTime? updatedAt,
   }) : storyChromeClose = storyChromeClose ?? (storyChrome ?? false),
        storyChromeText = storyChromeText ?? (storyChrome ?? false),
@@ -212,6 +220,9 @@ class ReelProject implements StreetviewJourney {
        slideSeconds = slideSeconds.isFinite
            ? slideSeconds.clamp(.15, .8).toDouble()
            : .48,
+       clipAudioVolume = clipAudioVolume.isFinite
+           ? clipAudioVolume.clamp(0, 1).toDouble()
+           : 0,
        id = id ?? newId(),
        place = place ?? PlaceDetails(),
        clips = clips ?? [],
@@ -283,6 +294,7 @@ class ReelProject implements StreetviewJourney {
     music: json['music'] == null
         ? null
         : MusicTrack.fromJson(Map<String, dynamic>.from(json['music'] as Map)),
+    clipAudioVolume: (json['clipAudioVolume'] as num?)?.toDouble() ?? 0,
     storyChromeClose:
         json['storyChromeClose'] as bool? ?? (json['storyChrome'] == true),
     storyChromeText:
@@ -321,6 +333,7 @@ class ReelProject implements StreetviewJourney {
     'storyBadge': storyBadge,
     'tags': tags.map((t) => t.toJson()).toList(),
     'music': music?.toJson(),
+    'clipAudioVolume': clipAudioVolume,
     'storyChrome': storyChrome,
     'storyChromeClose': storyChromeClose,
     'storyChromeText': storyChromeText,

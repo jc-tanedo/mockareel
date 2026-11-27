@@ -10,7 +10,7 @@ class ReelClip {
   final String id, path, name;
   final bool isVideo;
   double sourceDuration;
-  bool isGif, loopGif;
+  bool isGif, loopGif, muted;
   double duration, trimStart, cardWidth, cardHeight, zoom, panX;
   String caption;
   FeedPost post;
@@ -24,6 +24,7 @@ class ReelClip {
     this.sourceDuration = 0,
     this.isGif = false,
     this.loopGif = true,
+    this.muted = false,
     this.duration = 3.5,
     this.trimStart = 0,
     this.caption = '',
@@ -82,6 +83,7 @@ class ReelClip {
     sourceDuration: (json['sourceDuration'] as num?)?.toDouble() ?? 0,
     isGif: json['isGif'] == true,
     loopGif: json['loopGif'] != false,
+    muted: json['muted'] == true,
     duration: (json['duration'] as num?)?.toDouble() ?? 3.5,
     trimStart: (json['trimStart'] as num?)?.toDouble() ?? 0,
     caption: json['caption'] as String? ?? '',
@@ -107,6 +109,7 @@ class ReelClip {
     'sourceDuration': sourceDuration,
     'isGif': isGif,
     'loopGif': loopGif,
+    'muted': muted,
     'duration': duration,
     'trimStart': trimStart,
     'caption': caption,

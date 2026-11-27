@@ -10,13 +10,13 @@ on:
         type: string
 permissions:
   contents: read
-concurrency:
-  group: android-release-${{ inputs.tag || github.ref_name }}
-  cancel-in-progress: false
 jobs:
   build:
     runs-on: self-hosted
     timeout-minutes: 45
+    concurrency:
+      group: android-self-hosted-build
+      cancel-in-progress: false
     outputs:
       artifact-attempt: ${{ steps.upload.outputs.attempt }}
       tag: ${{ steps.version.outputs.tag }}
@@ -87,6 +87,9 @@ jobs:
     needs: build
     runs-on: self-hosted
     timeout-minutes: 10
+    concurrency:
+      group: android-release-publish-${{ inputs.tag || github.ref_name }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:

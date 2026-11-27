@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../features/streetview_3d/presentation/orbit_journey_canvas.dart';
+import '../model/audio_mix.dart';
 import '../model/m3_motion.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
@@ -151,6 +152,7 @@ class StreetviewCanvas extends StatelessWidget {
                             scene.kind == 'media' &&
                             c.id == clip.id &&
                             position < project.duration,
+                        volume: AudioMix.clipVolume(project, c),
                       ),
               if (c.streetview.showArrows)
                 Opacity(opacity: map ? 0 : 1, child: const StreetviewArrows()),

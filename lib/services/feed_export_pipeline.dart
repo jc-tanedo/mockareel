@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import '../model/app_window_motion.dart';
 import '../model/export_phase.dart';
 import '../model/feed_timeline.dart';
 import '../model/m3_motion.dart';
@@ -134,10 +135,18 @@ class FeedExportPipeline {
         transitions.add(transition);
         overlayDurations.add(animated);
 
-        ReelClip? source = isPost
+        final isHome = s.kind.startsWith('home');
+        final openingHome = s.kind == 'home-open';
+        final homeWindowClip =
+            isHome && project.feed.homeMedia == null && project.clips.isNotEmpty
+            ? project.clips[openingHome ? 0 : project.clips.length - 1]
+            : null;
+        final liveHomeWindow = homeWindowClip != null && homeWindowClip.isTimed;
+        final ReelClip? source = isPost
             ? project.clips[s.postIndex]
-            : s.kind.startsWith('home')
-            ? project.feed.homeMedia
+            : isHome
+            ? (project.feed.homeMedia ??
+                  (liveHomeWindow ? homeWindowClip : null))
             : null;
 
         if (source == null) {
@@ -152,12 +161,32 @@ class FeedExportPipeline {
             ).toJson(),
           );
         } else {
+          var trimStart = source.trimStart;
+          if (liveHomeWindow &&
+              !openingHome &&
+              source.isVideo &&
+              !source.isGif &&
+              !source.effectiveEdits.active) {
+            final endPos = source.trimStart + source.duration;
+            trimStart =
+                source.sourceDuration >= endPos + AppWindowMotion.closeSeconds
+                ? endPos
+                : max(source.trimStart, endPos - AppWindowMotion.closeSeconds);
+          }
           clips.add({
             ...source.toJson(),
+            'trimStart': trimStart,
             'duration': s.duration,
             'loopSource': !isPost && source.isTimed,
             'loopDuration': source.duration,
+            if (!isPost) 'keepAudio': false,
             if (postSearch > 0) 'searchEnterDuration': postSearch,
+            if (liveHomeWindow)
+              'windowMotion': AppWindowMotion.native(
+                icon: project.feed.launchIcon,
+                opening: openingHome,
+                hold: project.feed.homeSeconds,
+              ),
           });
         }
       }
@@ -181,6 +210,7 @@ class FeedExportPipeline {
         frames: frames,
         transitions: transitions,
         overlayDurations: overlayDurations,
+        clipAudioVolume: project.clipAudioVolume,
         music: project.music,
       );
 

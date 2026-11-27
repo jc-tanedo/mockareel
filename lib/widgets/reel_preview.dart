@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../model/audio_mix.dart';
 import '../model/feed_timeline.dart';
 import '../model/project.dart';
 import '../model/streetview_timeline.dart';
@@ -162,6 +163,7 @@ class _TimelinePreviewState extends State<TimelinePreview>
             key: ValueKey(p.music!.path),
             track: p.music!,
             position: _position,
+            totalDuration: _duration,
             playing: _playing,
           ),
         Center(
@@ -356,6 +358,7 @@ class ReelCanvas extends StatelessWidget {
                             )
                           : 0,
                       playing: i == index && playbackActive,
+                      volume: AudioMix.clipVolume(project, clip),
                     )
                   : ClipPoster(
                       key: ValueKey('poster-${clip.id}-${i < index}'),

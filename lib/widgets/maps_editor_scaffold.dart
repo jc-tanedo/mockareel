@@ -57,6 +57,7 @@ class MapsEditorScaffold extends StatelessWidget {
   final VoidCallback onChanged;
   final VoidCallback onPreviewUpdated;
   final ValueChanged<OrbitScene> onShuffleWall;
+  final void Function(OrbitScene, String) onSelectWall;
   final Widget Function(double height) previewBuilder;
   final Widget captureStage;
   final Widget exportPreview;
@@ -106,6 +107,7 @@ class MapsEditorScaffold extends StatelessWidget {
     required this.onChanged,
     required this.onPreviewUpdated,
     required this.onShuffleWall,
+    required this.onSelectWall,
     required this.previewBuilder,
     required this.captureStage,
     required this.exportPreview,
@@ -240,6 +242,7 @@ class MapsEditorScaffold extends StatelessWidget {
                                 onChanged: onChanged,
                                 onPreviewUpdated: onPreviewUpdated,
                                 onShuffleWall: onShuffleWall,
+                                onSelectWall: onSelectWall,
                               ),
                             ),
                           ),

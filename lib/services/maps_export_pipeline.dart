@@ -394,9 +394,7 @@ class MapsExportPipeline {
           final cached = <String, String>{};
           for (var f = 0; f < count; f++) {
             if (isCancelled()) throw const FormatException('Export cancelled');
-            final key = orbit
-                ? 'frame-$f'
-                : StreetviewCapturePlan.key(project, scene, f);
+            final key = StreetviewCapturePlan.key(project, scene, f);
             onProgress(.35 * (i + f / max(1, count)) / scenes.length);
             onStatus('Preparing journey scene ${i + 1} of ${scenes.length}…');
             final path = cached[key] ??= await captureAt(
@@ -453,6 +451,7 @@ class MapsExportPipeline {
                   'trimStart': 0.0,
                   'zoom': 1.0,
                   'panX': 0.0,
+                  'keepAudio': false,
                 },
         );
       }
@@ -475,6 +474,7 @@ class MapsExportPipeline {
         frames: frames,
         transitions: List.filled(clips.length, 0),
         overlayDurations: overlayDurations,
+        clipAudioVolume: project.clipAudioVolume,
         music: project.music,
       );
 

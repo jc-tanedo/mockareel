@@ -1,18 +1,22 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../model/audio_mix.dart';
 import '../model/project.dart';
 
 /// Audio follows the reel clock, including scrubs and loops of the trimmed track.
 class MusicPlayback extends StatefulWidget {
   final MusicTrack track;
   final double position;
+  final double totalDuration;
   final bool playing;
   const MusicPlayback({
     super.key,
     required this.track,
     required this.position,
+    this.totalDuration = 0,
     required this.playing,
   });
   @override
@@ -75,7 +79,20 @@ class _MusicPlaybackState extends State<MusicPlayback> {
             (m.loop
                 ? widget.position % remaining
                 : widget.position.clamp(0, remaining));
-        await _controller.setVolume(m.volume);
+        final effectiveTotal = m.loop
+            ? (widget.totalDuration > 0 ? widget.totalDuration : remaining)
+            : min(
+                remaining,
+                widget.totalDuration > 0 ? widget.totalDuration : remaining,
+              );
+        await _controller.setVolume(
+          AudioMix.musicGain(
+            position: widget.position,
+            totalDuration: effectiveTotal,
+            volume: m.volume,
+            fadeOutSeconds: m.fadeOutSeconds,
+          ),
+        );
         if (!mounted) break;
         if ((_controller.value.position.inMilliseconds / 1000 - seconds).abs() >
                 .25 ||

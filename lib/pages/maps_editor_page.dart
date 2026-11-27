@@ -132,44 +132,65 @@ class _MapsEditorPageState extends State<MapsEditorPage>
     if (!_wallPlacement.choose(clip, _project.clips, scene, shuffle: true)) {
       return;
     }
-    if (scene.walls.length >= 2) {
-      for (var i = 0; i < _project.clips.length; i++) {
-        final sibling = _project.clips[i];
-        if (sibling == clip ||
-            !OrbitWallPlacement.samePin(clip.streetview, sibling.streetview) ||
-            sibling.streetview.wallId != clip.streetview.wallId) {
-          continue;
-        }
-        final prevMatch =
-            i > 0 &&
-            OrbitWallPlacement.samePin(
-              _project.clips[i - 1].streetview,
-              sibling.streetview,
-            ) &&
-            _project.clips[i - 1].streetview.wallId == previous;
-        final nextMatch =
-            i + 1 < _project.clips.length &&
-            OrbitWallPlacement.samePin(
-              _project.clips[i + 1].streetview,
-              sibling.streetview,
-            ) &&
-            _project.clips[i + 1].streetview.wallId == previous;
-        if (previous != null &&
-            scene.walls.containsKey(previous) &&
-            !prevMatch &&
-            !nextMatch) {
-          sibling.streetview.wallId = previous;
-          sibling.streetview.visitedWalls = {
-            ...sibling.streetview.visitedWalls.where(scene.walls.containsKey),
-            previous,
-          }.toList();
-        } else {
-          _wallPlacement.choose(sibling, _project.clips, scene);
-        }
-      }
-    }
+    _resolveSiblingWallCollisions(clip, previous, scene);
     _wallPreviewRevision = _previewRevision = newId();
     _change();
+  }
+
+  void _selectWall(OrbitScene scene, String wallId) {
+    final clip = _project.clips[_selected];
+    final previous = clip.streetview.wallId;
+    if (previous == wallId || !scene.walls.containsKey(wallId)) return;
+    clip.streetview.wallId = wallId;
+    clip.streetview.visitedWalls = {
+      ...clip.streetview.visitedWalls.where(scene.walls.containsKey),
+      wallId,
+    }.toList();
+    _resolveSiblingWallCollisions(clip, previous, scene);
+    _wallPreviewRevision = _previewRevision = newId();
+    _change();
+  }
+
+  void _resolveSiblingWallCollisions(
+    ReelClip clip,
+    String? previous,
+    OrbitScene scene,
+  ) {
+    if (scene.walls.length < 2) return;
+    for (var i = 0; i < _project.clips.length; i++) {
+      final sibling = _project.clips[i];
+      if (sibling == clip ||
+          !OrbitWallPlacement.samePin(clip.streetview, sibling.streetview) ||
+          sibling.streetview.wallId != clip.streetview.wallId) {
+        continue;
+      }
+      final prevMatch =
+          i > 0 &&
+          OrbitWallPlacement.samePin(
+            _project.clips[i - 1].streetview,
+            sibling.streetview,
+          ) &&
+          _project.clips[i - 1].streetview.wallId == previous;
+      final nextMatch =
+          i + 1 < _project.clips.length &&
+          OrbitWallPlacement.samePin(
+            _project.clips[i + 1].streetview,
+            sibling.streetview,
+          ) &&
+          _project.clips[i + 1].streetview.wallId == previous;
+      if (previous != null &&
+          scene.walls.containsKey(previous) &&
+          !prevMatch &&
+          !nextMatch) {
+        sibling.streetview.wallId = previous;
+        sibling.streetview.visitedWalls = {
+          ...sibling.streetview.visitedWalls.where(scene.walls.containsKey),
+          previous,
+        }.toList();
+      } else {
+        _wallPlacement.choose(sibling, _project.clips, scene);
+      }
+    }
   }
 
   final _failedPins = <(String, double?, double?)>{};
@@ -844,6 +865,7 @@ class _MapsEditorPageState extends State<MapsEditorPage>
       onChanged: _change,
       onPreviewUpdated: _updatePreview,
       onShuffleWall: _shuffleWall,
+      onSelectWall: _selectWall,
       previewBuilder: (height) => _preview(maxHeight: height),
       captureStage: OffscreenCaptureStage(
         captureKey: _captureKey,

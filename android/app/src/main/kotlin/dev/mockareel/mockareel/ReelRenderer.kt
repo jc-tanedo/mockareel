@@ -15,6 +15,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.media3.common.C
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.GainProcessor
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -366,13 +368,21 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         )
     }
 
+    private fun constantGain(volume: Float): List<AudioProcessor> =
+        if (volume >= 0.999f) emptyList() else listOf(GainProcessor(object : GainProcessor.GainProvider {
+            override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int) = volume
+            override fun isUnityUntil(samplePosition: Long, sampleRate: Int): Long = C.TIME_UNSET
+        }))
+
     private fun buildFeedItems(
         clips: List<Map<String, Any>>, overlays: List<String>, posters: List<String>, cache: PosterCache,
         frames: List<List<String>>, transitions: List<Number>, overlayDurations: List<Number>,
-    ): List<EditedMediaItem> {
+        clipAudioVolume: Float, fileHasAudio: (String) -> Boolean,
+    ): Pair<List<EditedMediaItem>, Boolean> {
         require(frames.size == clips.size && transitions.size == clips.size) { "Missing feed scene plan" }
         frames.flatten().forEach { require(File(it).isFile) { "A feed UI frame is missing" } }
-        return clips.flatMapIndexed { index, clip ->
+        var anyClipAudio = false
+        val result = clips.flatMapIndexed { index, clip ->
             val total = (clip["duration"] as Number).toDouble()
             require(total.isFinite() && total > 0 && total <= 30) { "Invalid scene duration" }
             require(File(overlays[index]).isFile) { "A feed overlay is missing" }
@@ -381,6 +391,15 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             val trim = (clip["trimStart"] as? Number)?.toDouble() ?: 0.0
             val available = if (loop) min((clip["loopDuration"] as Number).toDouble(), (clip["sourceDuration"] as Number).toDouble() - trim) else total
             require(available > 0) { "Invalid source duration" }
+            val clipPath = clip["path"] as String
+            val keepClipAudio = video && clip["muted"] != true && clip["keepAudio"] != false &&
+                clipAudioVolume > 0f && fileHasAudio(clipPath)
+            val clipAudioProcessors = if (keepClipAudio) {
+                anyClipAudio = true
+                constantGain(clipAudioVolume)
+            } else {
+                emptyList()
+            }
             val (sw, sh) = cache.dimensions(posters[index])
             val aspect = sw.toFloat() / sh
             val cardAspect = 1080f / 1920f
@@ -394,7 +413,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             while (offset < total - .0001) {
                 val segment = min(available, total - offset)
                 val sceneOffset = offset
-                val media = MediaItem.Builder().setUri(Uri.fromFile(File(clip["path"] as String)))
+                val media = MediaItem.Builder().setUri(Uri.fromFile(File(clipPath)))
                 if (video) media.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
                     .setStartPositionMs((trim * 1000).roundToLong())
                     .setEndPositionMs(((trim + segment) * 1000).roundToLong()).build())
@@ -437,17 +456,28 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                                 val s = FeedMotion.searchEnterScale(localElapsed, searchEnter)
                                 postScale(s, s)
                             }
+                            val windowMotion = clip["windowMotion"] as? Map<String, Any>
+                            if (windowMotion != null) {
+                                val tr = FeedMotion.windowTransform(localElapsed, total, windowMotion)
+                                postScale(tr[0], tr[0])
+                                postTranslate(tr[1], tr[2])
+                            }
                             postTranslate(0f, -2 * entry / 640f)
                         }
                     },
                     OverlayEffect(listOf(FeedFrameOverlay(overlays[index], frames[index], clock, sceneOffset, overlayDuration)))
                 )
-                items.add(EditedMediaItem.Builder(media.build()).setFrameRate(M3Motion.EXPORT_FPS).setRemoveAudio(true)
-                    .setEffects(Effects(emptyList(), effects)).build())
+                val itemBuilder = EditedMediaItem.Builder(media.build())
+                    .setFrameRate(M3Motion.EXPORT_FPS)
+                    .setRemoveAudio(!keepClipAudio)
+                    .setEffects(Effects(clipAudioProcessors, effects))
+                if (!video) itemBuilder.setDurationUs((segment * 1000).roundToLong() * 1000L)
+                items.add(itemBuilder.build())
                 offset += segment
             }
             items
         }
+        return result to anyClipAudio
     }
 
     private fun start(call: MethodCall, result: MethodChannel.Result) {
@@ -470,6 +500,13 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         slideFrames.flatten().forEach { require(File(it).isFile) { "A slide frame is missing" } }
         val backgroundColor = call.argument<Number>("backgroundColor")?.toInt() ?: android.graphics.Color.WHITE
         val progressColor = call.argument<Number>("progressColor")?.toInt() ?: android.graphics.Color.rgb(26, 115, 232)
+        val clipAudioVolume = (call.argument<Number>("clipAudioVolume")?.toFloat() ?: 0f).coerceIn(0f, 1f)
+        val hasAudioCache = mutableMapOf<String, Boolean>()
+        val fileHasAudio: (String) -> Boolean = { path ->
+            hasAudioCache.getOrPut(path) {
+                try { inspect(path)["hasAudio"] == true } catch (_: Exception) { false }
+            }
+        }
         var globalStart = 0.0
         val cards = clips.mapIndexed { i, c -> CardSpec(
             layout.gallery.width() * ((c["cardWidth"] as? Number)?.toFloat() ?: .78f).coerceIn(.45f, 1f),
@@ -478,18 +515,31 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             ((c["panX"] as? Number)?.toFloat() ?: 0f).coerceIn(-1f, 1f), starts[i], ends[i]) }
         pending = result
         val cache = PosterCache(); posterCache = cache
+        var anyClipAudio = false
         val items = if (call.argument<String>("template") == "tiktok-feed") {
-            buildFeedItems(clips, overlays, starts, cache,
+            val (built, hasAudio) = buildFeedItems(clips, overlays, starts, cache,
                 call.argument<List<List<String>>>("sceneFrames") ?: emptyList(),
                 call.argument<List<Number>>("transitions") ?: emptyList(),
-                call.argument<List<Number>>("overlayDurations") ?: emptyList())
+                call.argument<List<Number>>("overlayDurations") ?: emptyList(),
+                clipAudioVolume, fileHasAudio)
+            anyClipAudio = hasAudio
+            built
         } else clips.mapIndexed { index, clip ->
             val sceneStart = globalStart
             globalStart += (clip["duration"] as Number).toDouble()
             val durationMs = ((clip["duration"] as Number).toDouble() * 1000).toLong()
             require(durationMs in 1..30000) { "Invalid clip duration" }
             val isVideo = clip["isVideo"] == true
-            val media = MediaItem.Builder().setUri(Uri.fromFile(File(clip["path"] as String)))
+            val clipPath = clip["path"] as String
+            val keepClipAudio = isVideo && clip["muted"] != true && clip["keepAudio"] != false &&
+                clipAudioVolume > 0f && fileHasAudio(clipPath)
+            val clipAudioProcessors = if (keepClipAudio) {
+                anyClipAudio = true
+                constantGain(clipAudioVolume)
+            } else {
+                emptyList()
+            }
+            val media = MediaItem.Builder().setUri(Uri.fromFile(File(clipPath)))
             if (isVideo) {
                 val startMs = ((clip["trimStart"] as Number).toDouble() * 1000).toLong()
                 media.setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
@@ -523,10 +573,19 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 },
                 OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames, backgroundColor, progressColor, slideFrames.getOrElse(index) { emptyList() })))
             )
-            EditedMediaItem.Builder(media.build()).setFrameRate(M3Motion.EXPORT_FPS).setRemoveAudio(true)
-                .setEffects(Effects(emptyList(), effects)).build()
+            val itemBuilder = EditedMediaItem.Builder(media.build())
+                .setFrameRate(M3Motion.EXPORT_FPS)
+                .setRemoveAudio(!keepClipAudio)
+                .setEffects(Effects(clipAudioProcessors, effects))
+            if (!isVideo) itemBuilder.setDurationUs(durationMs * 1000L)
+            itemBuilder.build()
         }
-        val sequences = mutableListOf(EditedMediaItemSequence.Builder(items).build())
+        val primarySequence = if (anyClipAudio) {
+            EditedMediaItemSequence.withAudioAndVideoFrom(items)
+        } else {
+            EditedMediaItemSequence.Builder(items).build()
+        }
+        val sequences = mutableListOf(primarySequence)
         val music = call.argument<Map<String, Any>>("music")
         if (music != null) {
             val path = music["path"] as String
@@ -537,16 +596,27 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
             val startMs = (((music["trimStart"] as? Number)?.toDouble() ?: 0.0) * 1000).toLong().coerceIn(0, max(0, sourceMs - 100))
             val reelMs = clips.sumOf { ((it["duration"] as Number).toDouble() * 1000).toLong() }
             val volume = ((music["volume"] as? Number)?.toFloat() ?: .7f).coerceIn(0f, 1f)
-            val gain = GainProcessor(object : GainProcessor.GainProvider {
-                override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int) = volume
-                override fun isUnityUntil(samplePosition: Long, sampleRate: Int): Long = if (volume == 1f) androidx.media3.common.C.TIME_END_OF_SOURCE else androidx.media3.common.C.TIME_UNSET
-            })
-            val audio = MediaItem.Builder().setUri(Uri.fromFile(File(path)))
-                .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs)
-                    .setEndPositionMs(min(sourceMs, startMs + reelMs)).build()).build()
-            val audioItem = EditedMediaItem.Builder(audio).setRemoveVideo(true)
-                .setEffects(Effects(listOf(gain), emptyList())).build()
-            sequences.add(EditedMediaItemSequence.Builder(audioItem).setIsLooping(music["loop"] != false).build())
+            val fadeOutMs = ((music["fadeOutSeconds"] as? Number)?.toDouble() ?: 0.0).coerceIn(0.0, 5.0) * 1000.0
+            val segments = AudioMix.planMusicSegments(sourceMs, startMs, reelMs, music["loop"] != false)
+            if (segments.isNotEmpty()) {
+                val totalAudioMs = segments.last().let { it.timelineOffsetMs + (it.endMs - it.startMs) }.toDouble()
+                val musicItems = segments.map { seg ->
+                    val gain = GainProcessor(object : GainProcessor.GainProvider {
+                        override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int): Float {
+                            val elapsedMs = if (sampleRate > 0) samplePosition * 1000.0 / sampleRate else 0.0
+                            return AudioMix.fadeOutGain(seg.timelineOffsetMs + elapsedMs, totalAudioMs, volume, fadeOutMs)
+                        }
+                        override fun isUnityUntil(samplePosition: Long, sampleRate: Int): Long =
+                            if (AudioMix.isUnity(volume, fadeOutMs)) C.TIME_END_OF_SOURCE else C.TIME_UNSET
+                    })
+                    val audio = MediaItem.Builder().setUri(Uri.fromFile(File(path)))
+                        .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
+                            .setStartPositionMs(seg.startMs).setEndPositionMs(seg.endMs).build()).build()
+                    EditedMediaItem.Builder(audio).setRemoveVideo(true)
+                        .setEffects(Effects(listOf(gain), emptyList())).build()
+                }
+                sequences.add(EditedMediaItemSequence.withAudioFrom(musicItems))
+            }
         }
         val composition = Composition.Builder(sequences)
             .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL).build()

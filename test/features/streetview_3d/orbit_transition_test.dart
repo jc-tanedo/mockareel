@@ -13,6 +13,7 @@ import 'package:mockareel/features/streetview_3d/presentation/orbit_journey_canv
 import 'package:mockareel/features/streetview_3d/presentation/orbit_map.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_timeline.dart';
+import 'package:mockareel/services/streetview_capture_plan.dart';
 import 'package:mockareel/widgets/streetview_arrows.dart';
 
 void main() {
@@ -559,6 +560,58 @@ void main() {
         tester.widget<OrbitMapView>(find.byType(OrbitMapView)).camera.zoom,
         greaterThan(1.0),
       );
+    },
+  );
+
+  test(
+    'cross-pin flights gain extra mid-flight altitude and StreetviewCapturePlan deduplicates 3D map holds',
+    () {
+      PlaceDetails pin(double lat, double lon) =>
+          PlaceDetails(name: 'Pin', latitude: lat, longitude: lon);
+      final flat = OrbitScene([], List.filled(625, 0), 'Flat');
+      final shortHop = OrbitDolly.between(
+        StreetviewMedia(place: pin(35.0, 139.0), mapPath: 'a.json'),
+        StreetviewMedia(place: pin(35.0002, 139.0002), mapPath: 'b.json'),
+        flat,
+        flat,
+        .5,
+      );
+      final longFlight = OrbitDolly.between(
+        StreetviewMedia(place: pin(35.0, 139.0), mapPath: 'a.json'),
+        StreetviewMedia(place: pin(35.003, 139.003), mapPath: 'b.json'),
+        flat,
+        flat,
+        .5,
+      );
+      expect(longFlight.sharedWorld, isFalse);
+      expect(longFlight.departure.lift, greaterThan(shortHop.departure.lift));
+      expect(longFlight.departure.tilt, greaterThan(shortHop.departure.tilt));
+      expect(longFlight.departure.zoom, closeTo(longFlight.arrival.zoom, 1e-9));
+
+      final project = ReelProject(
+        template: 'streetview-3d',
+        streetview: StreetviewSettings(openingMapSeconds: 1.5, endOnMap: true),
+        clips: [
+          ReelClip(
+            id: 'c0',
+            path: 'a.png',
+            name: 'A',
+            isVideo: false,
+            duration: 2,
+          ),
+        ],
+      );
+      final scenes = StreetviewTimeline.scenes(project);
+      final opening = scenes.firstWhere((s) => s.kind == 'map');
+      final ending = scenes.firstWhere((s) => s.kind == 'ending-map');
+      expect(StreetviewCapturePlan.key(project, opening, 0), 'hold');
+      expect(StreetviewCapturePlan.key(project, opening, 1), 'hold');
+      expect(
+        StreetviewCapturePlan.key(project, opening, 89),
+        startsWith('frame-'),
+      );
+      expect(StreetviewCapturePlan.key(project, ending, 0), 'static');
+      expect(StreetviewCapturePlan.key(project, ending, 45), 'static');
     },
   );
 }
