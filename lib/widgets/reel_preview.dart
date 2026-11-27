@@ -8,6 +8,7 @@ import '../model/template_layout.dart';
 import '../theme/output_palette.dart';
 import 'feed_canvas.dart';
 import 'media_frame.dart';
+import 'm3_wavy_progress.dart';
 import 'music_playback.dart';
 import 'place_overlay.dart';
 import 'streetview_canvas.dart';
@@ -311,6 +312,10 @@ class ReelCanvas extends StatelessWidget {
     final sheetOffset = animateIntro
         ? TemplateLayout.sheetOffset(project, position)
         : 0.0;
+    final introProgress = animateIntro
+        ? TemplateLayout.sheetRevealProgress(project, position)
+        : 1.0;
+    final slide = TemplateLayout.slideProgress(project, position);
     final starts = TemplateLayout.starts(project);
     final offset = TemplateLayout.offset(project, position);
     final visible = <Widget>[];
@@ -399,6 +404,9 @@ class ReelCanvas extends StatelessWidget {
               child: PlaceOverlay(
                 project: project,
                 index: max(0, index),
+                previousIndex: slide.from,
+                slideProgress: slide.progress,
+                introProgress: introProgress,
                 heroPath: heroPath,
                 showTags: showTags,
                 sheetOffset: sheetOffset,
@@ -411,9 +419,9 @@ class ReelCanvas extends StatelessWidget {
                     TemplateLayout.galleryTop +
                     sheetOffset +
                     TemplateLayout.galleryHeight -
-                    3,
+                    8,
                 width: TemplateLayout.galleryWidth,
-                height: 3,
+                height: 8,
                 child: ClipRect(
                   child: Stack(
                     children: [
@@ -422,15 +430,23 @@ class ReelCanvas extends StatelessWidget {
                         top: 0,
                         width:
                             project.clips[index].cardWidth *
-                            TemplateLayout.galleryWidth *
-                            ((position - project.startOf(index)) /
-                                    project.clips[index].duration)
-                                .clamp(0, 1),
-                        height: 3,
-                        child: ColoredBox(
-                          color: OutputPalette(
-                            dark: project.darkOutput,
-                          ).progress,
+                            TemplateLayout.galleryWidth,
+                        height: 8,
+                        child: CustomPaint(
+                          painter: M3WavyProgressPainter(
+                            progress:
+                                ((position - project.startOf(index)) /
+                                        project.clips[index].duration)
+                                    .clamp(0.0, 1.0),
+                            phase:
+                                (position - project.startOf(index)) * 3.2 * pi,
+                            color: OutputPalette(
+                              dark: project.darkOutput,
+                            ).progress,
+                            strokeWidth: 2.8,
+                            waveLength: 14.0,
+                            waveAmplitude: 1.2,
+                          ),
                         ),
                       ),
                     ],

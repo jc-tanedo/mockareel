@@ -19,28 +19,28 @@ void main() {
         ),
       );
       final search = FeedTimeline.scenes(p).first;
-      final keys = List.generate(84, (i) => FeedCapturePlan.key(p, search, i));
+      final keys = List.generate(168, (i) => FeedCapturePlan.key(p, search, i));
       expect(
         keys.toSet().length,
-        27,
-      ); // Three typed states + 24 moving-dot frames.
-      expect(keys.take(20).toSet().length, 1);
-      expect(keys.skip(60).toSet().length, 24);
-      const opening = FeedScene('home-open', 0, 0, 2.46);
+        51,
+      ); // Three typed states + 48 moving-dot frames at 60 fps.
+      expect(keys.take(40).toSet().length, 1);
+      expect(keys.skip(120).toSet().length, 48);
+      const opening = FeedScene('home-open', 0, 0, 2.55);
       final closing = FeedScene('home-close', 0, 0, p.feed.outroDuration);
       expect(
         List.generate(
-          74,
+          153,
           (i) => FeedCapturePlan.key(p, opening, i),
         ).toSet().length,
-        14,
+        42,
       );
       expect(
         List.generate(
-          71,
+          147,
           (i) => FeedCapturePlan.key(p, closing, i),
         ).toSet().length,
-        12,
+        28,
       );
       const swipe = FeedScene('post', 1, 0, 3);
       expect(

@@ -6,6 +6,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
+import '../model/m3_motion.dart';
 import '../model/project.dart';
 import 'gif_media.dart';
 
@@ -29,12 +30,12 @@ class GifVideos {
     final key = sha256
         .convert(
           utf8.encode(
-            'gif-v1:${request.path}:${stat.size}:${stat.modified.microsecondsSinceEpoch}:${request.trimStart}:${request.duration}:${request.loopGif}',
+            'gif-v2:${request.path}:${stat.size}:${stat.modified.microsecondsSinceEpoch}:${request.trimStart}:${request.duration}:${request.loopGif}',
           ),
         )
         .toString();
     final directory =
-        root ?? Directory('${Directory.systemTemp.path}/mockareel-gif-v1');
+        root ?? Directory('${Directory.systemTemp.path}/mockareel-gif-v2');
     await directory.create(recursive: true);
     final target = File('${directory.path}/$key.mp4');
     if (await target.exists() && await target.length() > 0) {
@@ -160,7 +161,7 @@ class GifVideos {
       for (var i = 0; i < samples.length; i++) {
         if (i == 0 || samples[i] != samples[i - 1]) {
           frames.add({
-            'timeUs': (i * 1000000 / 30).round(),
+            'timeUs': (i * 1000000 / M3Motion.exportFps).round(),
             'path': paths[samples[i]]!,
           });
         }

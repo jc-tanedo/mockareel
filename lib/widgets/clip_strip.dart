@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../model/project.dart';
+import '../theme/m3_motion_curves.dart';
 import 'media_frame.dart';
 
 class ClipStrip extends StatelessWidget {
@@ -36,7 +37,8 @@ class ClipStrip extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 onTap: () => onSelectClip(i),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: const Duration(milliseconds: 200),
+                  curve: M3Curves.fastEffects,
                   width: (c.duration * 12).clamp(78, 150),
                   decoration: BoxDecoration(
                     color: colors.surfaceContainerLow,

@@ -17,8 +17,46 @@ void main() {
     final info = GifInfo.parse(timedGifFixture);
     expect(info.delaysMs, [100, 200, 300]);
     expect(info.duration, .6);
-    expect(info.samples(.12, .3, false), [1, 1, 1, 1, 1, 1, 2, 2, 2]);
-    expect(info.samples(.55, .3, true), [2, 2, 0, 0, 0, 1, 1, 1, 1]);
+    expect(info.samples(.12, .3, false), [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+    ]);
+    expect(info.samples(.55, .3, true), [
+      2,
+      2,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+    ]);
     final c = ReelClip(
       id: 'gif',
       path: 'gif',
@@ -77,7 +115,7 @@ void main() {
             final args = call.arguments as Map;
             final frames = args['frames'] as List;
             expect(args['duration'], .3);
-            expect(frames.map((f) => f['timeUs']), [0, 200000]);
+            expect(frames.map((f) => f['timeUs']), [0, 183333]);
             expect(frames.map((f) => (f['path'] as String).split('/').last), [
               '1.png',
               '2.png',
@@ -303,7 +341,7 @@ void main() {
             expect(args['duration'], .3);
             expect((args['frames'] as List).map((f) => f['timeUs']), [
               0,
-              200000,
+              183333,
             ]);
             await File(args['output'] as String).writeAsBytes([1, 2, 3]);
             return null;

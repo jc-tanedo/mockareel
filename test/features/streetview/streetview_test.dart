@@ -37,14 +37,14 @@ void main() {
       'map',
       'media',
     ]);
-    expect(p.duration, closeTo(13.4, .000001));
+    expect(p.duration, closeTo(13.6, .000001));
     expect(p.startOf(0), 2);
-    expect(p.startOf(1), 5.45);
+    expect(p.startOf(1), 5.55);
     expect(StreetviewTimeline.at(p, 5).kind, 'arrow');
-    expect(StreetviewTimeline.at(p, 5.45).mediaIndex, 1);
+    expect(StreetviewTimeline.at(p, 5.55).mediaIndex, 1);
     expect(StreetviewTimeline.at(p, p.duration).kind, 'media');
     p.streetview.endOnMap = true;
-    expect(p.duration, closeTo(15.35, .000001));
+    expect(p.duration, closeTo(15.65, .000001));
     expect(StreetviewTimeline.at(p, p.duration).kind, 'ending-map');
   });
   test(
@@ -95,7 +95,7 @@ void main() {
       'transitionSeconds': double.nan,
       'arrow': 'bad',
     });
-    expect(s.transitionSeconds, .45);
+    expect(s.transitionSeconds, .55);
     expect(s.arrow, 'right');
   });
   test(

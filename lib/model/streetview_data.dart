@@ -101,7 +101,7 @@ class StreetviewMedia {
     this.streetviewTitle = '',
     this.transition = 'arrow',
     this.arrow = 'right',
-    this.transitionSeconds = .45,
+    this.transitionSeconds = .55,
   }) : visitedWalls = visitedWalls ?? [],
        walkLayers = walkLayers ?? [],
        walkDepth = walkDepth ?? [],
@@ -153,7 +153,7 @@ class StreetviewMedia {
     streetviewTitle: j['streetviewTitle'] as String? ?? '',
     transition: j['transition'] == 'map' ? 'map' : 'arrow',
     arrow: j['arrow'] == 'left' ? 'left' : 'right',
-    transitionSeconds: _seconds(j['transitionSeconds'], .45, .2, 2),
+    transitionSeconds: _seconds(j['transitionSeconds'], .55, .25, 2),
   );
   Map<String, dynamic> toJson() => {
     'place': place.toJson(),

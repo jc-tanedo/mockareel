@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/features/streetview_3d/data/open_orbit_map.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_scene.dart';
 import 'package:mockareel/features/streetview_3d/model/orbit_wall_placement.dart';
 import 'package:mockareel/features/streetview_3d/presentation/orbit_location_picker.dart';
 import 'package:mockareel/model/maps_web_result.dart';
@@ -339,6 +340,7 @@ void main() {
       expect(clip.streetview.mapPath, location.mapPath);
       expect(clip.streetview.streetviewTitle, 'Artist title');
       await until(() => clip.streetview.wallId != null);
+      await until(() => find.text('Clips').evaluate().isNotEmpty);
       await tester.tap(find.text('Clips').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
@@ -479,6 +481,96 @@ void main() {
       );
       restored.clips.removeAt(0);
       expect(restored.streetview.adoptClipLocations(restored.clips), false);
+    },
+  );
+
+  testWidgets(
+    'shuffling a 2-clip location on a 2-wall scene swaps walls cleanly',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final dir = Directory.systemTemp.createTempSync(
+        'orbit-two-wall-shuffle-',
+      );
+      addTearDown(() => dir.deleteSync(recursive: true));
+      Directory('${dir.path}/media').createSync();
+      final twoWalls = jsonEncode({
+        'grid': List.filled(625, 0),
+        'shapes': [
+          [
+            18,
+            [-200, 90, 200, 90, 200, 220, -200, 220],
+          ],
+          [
+            18,
+            [-200, -220, 200, -220, 200, -90, -200, -90],
+          ],
+        ],
+        'credit': 'Two walls',
+      });
+      final mapFile = File('${dir.path}/two_walls.json')
+        ..writeAsStringSync(twoWalls);
+      final parsed = OrbitScene.decode(twoWalls);
+      expect(parsed.walls, hasLength(2));
+      final w0 = parsed.walls.keys.first;
+      final w1 = parsed.walls.keys.last;
+      final location = OrbitLocation(
+        place: PlaceDetails(name: 'Plaza', latitude: 35, longitude: 139),
+        mapPath: mapFile.path,
+      );
+      final project = ReelProject(template: 'streetview-3d')
+        ..streetview.locations.add(location);
+      project.streetview.addClipsAt(location, project.clips, [
+        ReelClip(
+          id: 'first',
+          path: 'assets/brand/mockareel-mark.png',
+          name: 'First',
+          isVideo: false,
+        ),
+        ReelClip(
+          id: 'second',
+          path: 'assets/brand/mockareel-mark.png',
+          name: 'Second',
+          isVideo: false,
+        ),
+      ]);
+      project.clips[0].streetview.wallId = w0;
+      project.clips[1].streetview.wallId = w1;
+      final store = _PhotoStore()..root = dir;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MapsEditorPage(
+            initialProject: project,
+            store: store,
+            fetchGeometry: (_, _) async => twoWalls,
+          ),
+        ),
+      );
+      Future<void> until(bool Function() condition) async {
+        for (int i = 0; i < 100 && !condition(); i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        expect(condition(), isTrue);
+      }
+
+      await until(() => find.text('Clips').evaluate().isNotEmpty);
+      await tester.tap(find.text('Clips').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final shuffle = find.text('Shuffle wall');
+      await until(() => shuffle.evaluate().isNotEmpty);
+      await tester.ensureVisible(shuffle);
+      await tester.pump();
+      await tester.tap(shuffle);
+      await tester.pump();
+      expect(project.clips[0].streetview.wallId, w1);
+      expect(project.clips[1].streetview.wallId, w0);
+      await tester.pumpWidget(const SizedBox());
     },
   );
 }

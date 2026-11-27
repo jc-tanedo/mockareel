@@ -4,6 +4,7 @@ import '../features/streetview_3d/model/orbit_scene.dart';
 import '../model/export_phase.dart';
 import '../model/project.dart';
 import '../services/project_store.dart';
+import '../theme/m3_motion_curves.dart';
 import 'creation_steps.dart';
 import 'editor_app_bar.dart';
 import 'editor_export_overlay.dart';
@@ -196,7 +197,7 @@ class MapsEditorScaffold extends StatelessWidget {
                           onChanged: onChanged,
                         )
                       : EditorWorkspace(
-                          key: ValueKey('workspace-$tab'),
+                          key: const ValueKey('maps-workspace'),
                           keyboardVisible: keyboard,
                           previewFraction: tab == 1
                               ? .48
@@ -204,36 +205,43 @@ class MapsEditorScaffold extends StatelessWidget {
                               ? .50
                               : .56,
                           previewBuilder: previewBuilder,
-                          inspector: MapsEditorInspector(
-                            onSettings: () => onMenuSelected('settings'),
-                            tab: tab,
-                            project: project,
-                            store: store,
-                            importing: importing,
-                            selectedIndex: selected,
-                            placeTool: placeTool,
-                            timelineTool: timelineTool,
-                            useApiHeaders: useApiHeaders,
-                            apiKey: apiKey,
-                            formControllers: form,
-                            onSelectPlaceTool: onSelectPlaceTool,
-                            onSelectTimelineTool: onSelectTimelineTool,
-                            onSelectClip: onSelectClip,
-                            onRemoveClip: onRemoveClip,
-                            onMoveClip: onMoveClip,
-                            onFindPlace: onFindPlace,
-                            onLoadMap: onLoadMap,
-                            onUploadMap: onUploadMap,
-                            onGoToTimeline: onGoToTimeline,
-                            onGoToPlaceHeader: onGoToPlaceHeader,
-                            onPickMedia: onPickMedia,
-                            onPickMusic: onPickMusic,
-                            onExport: onExport,
-                            onExportPng: onExportPng,
-                            onBackup: onBackup,
-                            onChanged: onChanged,
-                            onPreviewUpdated: onPreviewUpdated,
-                            onShuffleWall: onShuffleWall,
+                          inspector: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            transitionBuilder: M3Curves.fadeSlideTransition,
+                            child: KeyedSubtree(
+                              key: ValueKey('maps-tab-$tab'),
+                              child: MapsEditorInspector(
+                                onSettings: () => onMenuSelected('settings'),
+                                tab: tab,
+                                project: project,
+                                store: store,
+                                importing: importing,
+                                selectedIndex: selected,
+                                placeTool: placeTool,
+                                timelineTool: timelineTool,
+                                useApiHeaders: useApiHeaders,
+                                apiKey: apiKey,
+                                formControllers: form,
+                                onSelectPlaceTool: onSelectPlaceTool,
+                                onSelectTimelineTool: onSelectTimelineTool,
+                                onSelectClip: onSelectClip,
+                                onRemoveClip: onRemoveClip,
+                                onMoveClip: onMoveClip,
+                                onFindPlace: onFindPlace,
+                                onLoadMap: onLoadMap,
+                                onUploadMap: onUploadMap,
+                                onGoToTimeline: onGoToTimeline,
+                                onGoToPlaceHeader: onGoToPlaceHeader,
+                                onPickMedia: onPickMedia,
+                                onPickMusic: onPickMusic,
+                                onExport: onExport,
+                                onExportPng: onExportPng,
+                                onBackup: onBackup,
+                                onChanged: onChanged,
+                                onPreviewUpdated: onPreviewUpdated,
+                                onShuffleWall: onShuffleWall,
+                              ),
+                            ),
                           ),
                         ),
                 ),

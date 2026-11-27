@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../model/export_phase.dart';
 import 'export_monitor.dart';
 
 class EditorExportOverlay extends StatelessWidget {
@@ -22,7 +21,7 @@ class EditorExportOverlay extends StatelessWidget {
     required this.progress,
     required this.position,
     required this.duration,
-    this.format = 'H.264 · 1080 × 1920 · 30 fps',
+    this.format = 'H.264 · 1080 × 1920 · 60 fps',
     required this.preview,
     required this.cancelled,
     this.onCancel,

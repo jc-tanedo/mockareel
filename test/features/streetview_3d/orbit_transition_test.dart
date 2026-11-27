@@ -63,7 +63,7 @@ void main() {
           previous = pose.zoom;
         }
         final end = OrbitMediaPose.at('media', 1, scene: scene);
-        expect(end.sx, inInclusiveRange(.24, .45));
+        expect(end.sx, inInclusiveRange(.45, .66));
         expect(end.zoom, greaterThan(first.zoom));
       }
     },
@@ -194,7 +194,17 @@ void main() {
         );
         expect(
           ending.arrival.matrix.storage,
-          OrbitMediaPose.at('media', 0, scene: scene).matrix.storage,
+          OrbitMediaPose.at(
+            'media',
+            0,
+            scene: scene,
+            orbitDirection: OrbitDolly.arrivalOrbitDirection(
+              source,
+              destination,
+              scene,
+              scene,
+            ),
+          ).matrix.storage,
         );
         var last = -1.0;
         for (final t in [.1, .3, .5, .7, .9]) {
@@ -379,7 +389,7 @@ void main() {
         const Offset(63, 476),
       );
       expect((actual - expected).distance, lessThan(1e-6));
-      await seek(29 / 30);
+      await seek(59 / 60);
       expect(
         tester
             .widgetList<OrbitMapView>(find.byType(OrbitMapView))
@@ -387,6 +397,167 @@ void main() {
             .camera
             .progress,
         closeTo(.35, 1e-9),
+      );
+    },
+  );
+
+  testWidgets(
+    'same-pin distinct walls share one world, keep front faces solid, and hide back faces',
+    (tester) async {
+      final dir = Directory.systemTemp.createTempSync('orbit-dual-wall-');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final boxPath = File('${dir.path}/box.json').path;
+      File(boxPath).writeAsStringSync(
+        '{"credit":"Box","grid":${List.filled(625, 0)},"shapes":[[18,[-10,-10,10,-10,10,10,-10,10]]]}',
+      );
+      late OrbitScene boxScene;
+      await tester.runAsync(() async {
+        boxScene = await OrbitSceneLoader.load(boxPath);
+      });
+      final walls = boxScene.walls.values.toList();
+      expect(walls, hasLength(4));
+      final wallA = walls.first;
+      final wallCorner = walls.firstWhere(
+        (w) =>
+            w.id != wallA.id &&
+            (w.normal.dx * wallA.normal.dx + w.normal.dy * wallA.normal.dy) >
+                -0.5,
+      );
+      final wallBack = walls.firstWhere(
+        (w) =>
+            (w.normal.dx * wallA.normal.dx + w.normal.dy * wallA.normal.dy) <
+            -0.9,
+      );
+
+      final cornerProject = ReelProject(
+        template: 'streetview-3d',
+        clips: [
+          ReelClip(
+            id: 'a',
+            path: 'assets/brand/mockareel-mark.png',
+            name: 'a',
+            isVideo: false,
+            streetview: StreetviewMedia(
+              mapPath: boxPath,
+              wallId: wallA.id,
+              transitionSeconds: 1,
+            ),
+          ),
+          ReelClip(
+            id: 'b',
+            path: 'assets/brand/mockareel-mark.png',
+            name: 'b',
+            isVideo: false,
+            streetview: StreetviewMedia(
+              mapPath: boxPath,
+              wallId: wallCorner.id,
+              transitionSeconds: 1,
+            ),
+          ),
+        ],
+      );
+      final arrowCorner = StreetviewTimeline.scenes(
+        cornerProject,
+      ).singleWhere((s) => s.kind == 'arrow');
+      Future<void> pumpAt(ReelProject proj, double pos) => tester.pumpWidget(
+        MaterialApp(
+          home: OrbitJourneyCanvas(
+            project: proj,
+            position: pos,
+            playing: false,
+            posterOnly: true,
+            overlayOnly: true,
+            posters: const {},
+          ),
+        ),
+      );
+
+      await pumpAt(cornerProject, arrowCorner.start + .57);
+      expect(find.byKey(const ValueKey('orbit-shared-world')), findsOneWidget);
+      expect(find.byType(OrbitMapView), findsOneWidget);
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-a')))
+            .opacity,
+        1.0,
+      );
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-b')))
+            .opacity,
+        1.0,
+      );
+
+      final oppositeProject = ReelProject(
+        template: 'streetview-3d',
+        clips: [
+          ReelClip(
+            id: 'a',
+            path: 'assets/brand/mockareel-mark.png',
+            name: 'a',
+            isVideo: false,
+            streetview: StreetviewMedia(
+              mapPath: boxPath,
+              wallId: wallA.id,
+              transitionSeconds: 1,
+            ),
+          ),
+          ReelClip(
+            id: 'b',
+            path: 'assets/brand/mockareel-mark.png',
+            name: 'b',
+            isVideo: false,
+            streetview: StreetviewMedia(
+              mapPath: boxPath,
+              wallId: wallBack.id,
+              transitionSeconds: 1,
+            ),
+          ),
+        ],
+      );
+      final arrowOpposite = StreetviewTimeline.scenes(
+        oppositeProject,
+      ).singleWhere((s) => s.kind == 'arrow');
+
+      await pumpAt(oppositeProject, arrowOpposite.start);
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-a')))
+            .opacity,
+        1.0,
+      );
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-b')))
+            .opacity,
+        0.0,
+      );
+
+      // Early in the 180° swing, wallB still faces away from the camera.
+      await pumpAt(oppositeProject, arrowOpposite.start + .22);
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-b')))
+            .opacity,
+        0.0,
+      );
+
+      await pumpAt(oppositeProject, arrowOpposite.start + 59 / 60);
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-a')))
+            .opacity,
+        0.0,
+      );
+      expect(
+        tester
+            .widget<Opacity>(find.byKey(const ValueKey('orbit-panel-b')))
+            .opacity,
+        1.0,
+      );
+      expect(
+        tester.widget<OrbitMapView>(find.byType(OrbitMapView)).camera.zoom,
+        greaterThan(1.0),
       );
     },
   );

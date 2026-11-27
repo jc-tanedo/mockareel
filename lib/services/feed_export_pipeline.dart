@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import '../model/export_phase.dart';
 import '../model/feed_timeline.dart';
+import '../model/m3_motion.dart';
 import '../model/project.dart';
 import 'feed_capture_plan.dart';
 import 'native_renderer.dart';
@@ -77,13 +78,17 @@ class FeedExportPipeline {
       final clips = <Map<String, dynamic>>[],
           overlays = <String>[],
           frames = <List<String>>[],
-          transitions = <double>[];
+          transitions = <double>[],
+          overlayDurations = <double>[];
       final scenes = FeedTimeline.scenes(project);
+      final searchExit = FeedTimeline.searchExitDuration(project);
       final totalFrames = scenes.fold<int>(0, (sum, scene) {
-        final animated = scene.kind == 'post'
-            ? FeedTimeline.transition(project, scene.postIndex)
+        final isPost = scene.kind == 'post';
+        final postSearch = isPost && scene.postIndex == 0 ? searchExit : 0.0;
+        final animated = isPost
+            ? max(FeedTimeline.transition(project, scene.postIndex), postSearch)
             : scene.duration;
-        return sum + (animated * 30).ceil() + 1;
+        return sum + (animated * M3Motion.exportFps).ceil() + 1;
       });
 
       var completedFrames = 0;
@@ -94,17 +99,22 @@ class FeedExportPipeline {
         final transition = isPost
             ? FeedTimeline.transition(project, s.postIndex)
             : 0.0;
-        final animated = isPost ? transition : s.duration;
+        final postSearch = isPost && s.postIndex == 0 ? searchExit : 0.0;
+        final animated = isPost ? max(transition, postSearch) : s.duration;
         final sceneFrames = <String>[];
         final cached = <String, String>{};
 
-        for (var frame = 0; frame < (animated * 30).ceil(); frame++) {
+        for (
+          var frame = 0;
+          frame < (animated * M3Motion.exportFps).ceil();
+          frame++
+        ) {
           if (isCancelled()) throw const FormatException('Export cancelled');
           final key = FeedCapturePlan.key(project, s, frame);
           final path = cached[key] ??= await onCapture(
             temp,
             'scene_${i}_$frame',
-            s.start + frame / 30,
+            s.start + frame / M3Motion.exportFps,
             overlay: true,
           );
           sceneFrames.add(path);
@@ -122,6 +132,7 @@ class FeedExportPipeline {
         overlays.add(overlay);
         frames.add(sceneFrames);
         transitions.add(transition);
+        overlayDurations.add(animated);
 
         ReelClip? source = isPost
             ? project.clips[s.postIndex]
@@ -146,6 +157,7 @@ class FeedExportPipeline {
             'duration': s.duration,
             'loopSource': !isPost && source.isTimed,
             'loopDuration': source.duration,
+            if (postSearch > 0) 'searchEnterDuration': postSearch,
           });
         }
       }
@@ -168,6 +180,7 @@ class FeedExportPipeline {
         overlays: overlays,
         frames: frames,
         transitions: transitions,
+        overlayDurations: overlayDurations,
         music: project.music,
       );
 

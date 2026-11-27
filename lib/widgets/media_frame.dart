@@ -2,6 +2,7 @@ import '../services/media_edits.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../model/m3_motion.dart';
 import '../model/project.dart';
 import '../services/native_renderer.dart';
 import '../services/gif_videos.dart';
@@ -112,7 +113,8 @@ class _MediaFrameState extends State<MediaFrame> {
         final clip = _prepared ?? widget.clip;
         final play = widget.playing && widget.position < clip.duration;
         final last = clip.isGif
-            ? ((clip.duration * 30).ceil() - 1) / 30
+            ? ((clip.duration * M3Motion.exportFps).ceil() - 1) /
+                  M3Motion.exportFps
             : clip.duration - .001;
         final target =
             (clip.isGif ? 0 : clip.trimStart) +

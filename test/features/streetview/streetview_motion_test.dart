@@ -50,8 +50,8 @@ void main() {
       // Shared goldens are also tested against the native texture matrix.
       for (final row in [
         [0.0, 52.5287801354672, 518.2630981924528],
-        [1.5, 46.826553827680854, 514.6571419475807],
-        [4.0, 24.492614555768, 539.4973086337196],
+        [1.5, 47.682719393559125, 514.9476741840274],
+        [4.0, 24.14126740681587, 540.0188027953219],
       ]) {
         final point = StreetviewMotion.at(c, row[0]).project(63, 498);
         expect(point.x, closeTo(row[1], .00001));

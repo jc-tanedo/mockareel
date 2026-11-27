@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'reel_clip.dart';
 import 'streetview_data.dart';
 
@@ -17,7 +18,12 @@ class StreetviewScene {
 /// Map and movement durations INCLUDE their final tap ripple. Ripples never add
 /// another scene or extend the output. A return-to-map tap is a separate scene.
 abstract final class StreetviewTimeline {
-  static const rippleSeconds = .2;
+  static const rippleSeconds = .28;
+  static const expandSeconds = .42;
+  static double expandDuration(ReelClip c) =>
+      min(expandSeconds, c.duration * .45);
+  static bool followsMap(StreetviewJourney p, int mediaIndex) =>
+      mediaIndex == 0 || p.clips[mediaIndex - 1].streetview.transition == 'map';
   static List<StreetviewScene> scenes(StreetviewJourney p) {
     if (p.clips.isEmpty) return [];
     final result = <StreetviewScene>[];

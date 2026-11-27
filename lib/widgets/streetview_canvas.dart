@@ -2,10 +2,12 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../features/streetview_3d/presentation/orbit_journey_canvas.dart';
+import '../model/m3_motion.dart';
 import '../model/project.dart';
 import '../model/streetview_layout.dart';
 import '../model/streetview_motion.dart';
 import '../model/streetview_timeline.dart';
+import 'm3_ink_ripple.dart';
 import 'media_frame.dart';
 import 'streetview_camera.dart';
 import 'streetview_chrome.dart';
@@ -44,45 +46,41 @@ class StreetviewCanvas extends StatelessWidget {
     final elapsed = scene.elapsed(position);
     final map = scene.kind == 'map' || scene.kind == 'ending-map',
         movement = scene.kind == 'arrow';
-    final ripple = scene.kind == 'back' || (map && scene.kind != 'ending-map')
+    final tapDur = movement
+        ? StreetviewContainerMotion.arrowTapDuration(scene.duration)
+        : StreetviewTimeline.rippleSeconds;
+    final ripple = map && scene.kind != 'ending-map'
         ? (elapsed - scene.duration + StreetviewTimeline.rippleSeconds) /
               StreetviewTimeline.rippleSeconds
+        : scene.kind == 'back'
+        ? StreetviewContainerMotion.backTapProgress(elapsed, scene.duration)
         : movement
-        ? elapsed / StreetviewTimeline.rippleSeconds
+        ? elapsed / max(.001, tapDur)
         : -1.0;
-    final t = movement
-        ? ((elapsed - StreetviewTimeline.rippleSeconds) /
-                  max(.001, scene.duration - StreetviewTimeline.rippleSeconds))
-              .clamp(0.0, 1.0)
+
+    final rushStart = tapDur * 0.7;
+    final rushU = movement
+        ? ((elapsed - rushStart) / max(.001, scene.duration - rushStart)).clamp(
+            0.0,
+            1.0,
+          )
         : 0.0;
     final direction = settings.arrow == 'left' ? -1.0 : 1.0;
 
-    // 100ms quick transition between map thumbnail and full sized media
-    const transitionSec = 0.1;
     final isMedia = scene.kind == 'media';
     final isBack = scene.kind == 'back';
-    // Arrow handoffs already arrive at full size. Only a map thumbnail
-    // should expand into the next media scene.
-    final followsMap =
-        i == 0 || project.clips[i - 1].streetview.transition == 'map';
-    // Export composites native media at full size, so its overlay must be
-    // fully visible even when captured at the first frame of the scene.
-    final isExpanding =
-        !overlayOnly && isMedia && followsMap && elapsed < transitionSec;
-    final expandProgress = isExpanding
-        ? (elapsed / transitionSec).clamp(0.0, 1.0)
-        : 1.0;
-    final expandT = Curves.easeInOut.transform(expandProgress);
+    final followsMap = StreetviewTimeline.followsMap(project, i);
+    final expandDur = StreetviewTimeline.expandDuration(clip);
+    final isExpanding = isMedia && followsMap && elapsed < expandDur - 1e-9;
 
-    final backStart = max(0.0, scene.duration - transitionSec);
-    final isShrinking = isBack && elapsed >= backStart;
-    final shrinkProgress = isShrinking
-        ? ((elapsed - backStart) / transitionSec).clamp(0.0, 1.0)
-        : 0.0;
-    final shrinkT = Curves.easeInOut.transform(shrinkProgress);
-
-    final hasCardTransition = isExpanding || isShrinking;
-    final cardT = isExpanding ? expandT : (1.0 - shrinkT);
+    final expandState = isExpanding
+        ? StreetviewContainerMotion.expandAt(elapsed, expandDur)
+        : null;
+    final shrinkState = isBack
+        ? StreetviewContainerMotion.shrinkAt(elapsed, scene.duration)
+        : null;
+    final activeState = expandState ?? shrinkState;
+    final hasCardTransition = activeState != null;
 
     const fullRect = Rect.fromLTWH(0, 0, 360, 640);
     const thumbRect = Rect.fromLTWH(
@@ -94,32 +92,37 @@ class StreetviewCanvas extends StatelessWidget {
     final liveMap = map && !posterOnly;
     final activeRect = liveMap
         ? thumbRect
-        : isExpanding
-        ? Rect.lerp(thumbRect, fullRect, expandT)!
-        : isShrinking
-        ? Rect.lerp(fullRect, thumbRect, shrinkT)!
+        : activeState != null
+        ? Rect.fromLTWH(
+            activeState.left,
+            activeState.top,
+            activeState.width,
+            activeState.height,
+          )
         : fullRect;
-    final activeRadius = liveMap
-        ? 12.0
-        : isExpanding
-        ? ui.lerpDouble(12, 0, expandT)!
-        : isShrinking
-        ? ui.lerpDouble(0, 12, shrinkT)!
-        : 0.0;
+    final activeRadius = liveMap ? 12.0 : activeState?.radius ?? 0.0;
+    final chromeOpacity = activeState?.chromeOpacity ?? 1.0;
+    final scrimAlpha = activeState?.scrimAlpha ?? 0.0;
+    final sheetOffset = activeState?.sheetOffset ?? 0.0;
+    final borderAlpha = activeState?.borderAlpha ?? 0.0;
 
-    // Dramatic motion blur and streetview camera rush
-    final blurX = sin(t * pi) * 36.0;
-    final blurY = sin(t * pi) * 8.0;
-    final outgoingScale = (1.0 + pow(t, 1.3) * 0.9).toDouble();
-    final outgoingProgress = pow(t, 1.2).toDouble();
+    // Material 3 Expressive directional rush + motion blur.
+    final rushSpatial = M3Motion.defaultSpatial.eval(rushU);
+    final rushEffects = M3Motion.defaultEffects.eval(rushU);
+    final blurX = sin(rushU * pi) * 32.0;
+    final blurY = sin(rushU * pi) * 7.0;
+    final outgoingScale = 1.0 + rushSpatial * 0.75;
     final outgoingOffset = Offset(
-      -direction * 180 * outgoingProgress,
-      -25 * outgoingProgress,
+      -direction * 170 * rushSpatial,
+      -20 * rushSpatial,
     );
-    final outgoingOpacity = (1.0 - pow(t, 1.8)).clamp(0.0, 1.0).toDouble();
-    final incomingScale = 1.0 + (1.0 - t) * 0.35;
-    final incomingOffset = Offset(direction * 150 * (1.0 - t), 20 * (1.0 - t));
-    final incomingOpacity = pow(t, 0.7).clamp(0.0, 1.0).toDouble();
+    final outgoingOpacity = (1.0 - rushEffects).clamp(0.0, 1.0);
+    final incomingScale = (1.0 + (1.0 - rushSpatial) * 0.30).clamp(0.85, 1.4);
+    final incomingOffset = Offset(
+      direction * 140 * (1.0 - rushSpatial),
+      18 * (1.0 - rushSpatial),
+    );
+    final incomingOpacity = rushEffects.clamp(0.0, 1.0);
 
     Widget image(ReelClip c, double seconds) => ClipPoster(
       clip: c,
@@ -214,11 +217,20 @@ class StreetviewCanvas extends StatelessWidget {
                 if (hasCardTransition || liveMap)
                   Positioned.fill(
                     key: const ValueKey('streetview-map-background'),
-                    child: StreetviewMapScene(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      thumbnail: const SizedBox(),
-                      showThumbnail: false,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        StreetviewMapScene(
+                          settings: settings,
+                          dark: project.darkOutput,
+                          thumbnail: const SizedBox(),
+                          showThumbnail: false,
+                        ),
+                        if (scrimAlpha > 0)
+                          ColoredBox(
+                            color: Colors.black.withValues(alpha: scrimAlpha),
+                          ),
+                      ],
                     ),
                   ),
                 Positioned.fill(
@@ -300,6 +312,18 @@ class StreetviewCanvas extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (hasCardTransition && borderAlpha > 0)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _ContainerBorderPainter(
+                          activeRect,
+                          activeRadius,
+                          borderAlpha,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (liveMap)
                   const Positioned(
                     left: StreetviewLayout.thumbnailLeft,
@@ -336,11 +360,20 @@ class StreetviewCanvas extends StatelessWidget {
                   // Keep the map and held poster mounted for the whole return
                   // scene so decoding cannot interrupt the shrinking card.
                   Positioned.fill(
-                    child: StreetviewMapScene(
-                      settings: settings,
-                      dark: project.darkOutput,
-                      thumbnail: const SizedBox(),
-                      showThumbnail: false,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        StreetviewMapScene(
+                          settings: settings,
+                          dark: project.darkOutput,
+                          thumbnail: const SizedBox(),
+                          showThumbnail: false,
+                        ),
+                        if (scrimAlpha > 0)
+                          ColoredBox(
+                            color: Colors.black.withValues(alpha: scrimAlpha),
+                          ),
+                      ],
                     ),
                   ),
                   Positioned.fromRect(
@@ -357,43 +390,117 @@ class StreetviewCanvas extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (borderAlpha > 0)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _ContainerBorderPainter(
+                            activeRect,
+                            activeRadius,
+                            borderAlpha,
+                          ),
+                        ),
+                      ),
+                    ),
+                ] else if (isExpanding) ...[
+                  // Even-odd cutout keeps the expanding container window
+                  // transparent so the live OpenGL video plays inside it.
+                  Positioned.fill(
+                    child: ClipPath(
+                      clipper: _InvertedRRectClipper(activeRect, activeRadius),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          StreetviewMapScene(
+                            settings: settings,
+                            dark: project.darkOutput,
+                            thumbnail: const SizedBox(),
+                            showThumbnail: false,
+                          ),
+                          if (scrimAlpha > 0)
+                            ColoredBox(
+                              color: Colors.black.withValues(alpha: scrimAlpha),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (borderAlpha > 0)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _ContainerBorderPainter(
+                            activeRect,
+                            activeRadius,
+                            borderAlpha,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (clip.streetview.showArrows)
+                    Positioned.fromRect(
+                      rect: activeRect,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(activeRadius),
+                        child: Opacity(
+                          opacity: chromeOpacity,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: SizedBox(
+                              width: 360,
+                              height: 640,
+                              child: media(clip, elapsed, pixels: false),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ] else
                   Positioned.fill(
                     child: movement
                         ? transition()
-                        : media(
-                            clip,
-                            isBack ? clip.duration : elapsed,
-                            pixels: isBack,
-                          ),
+                        : media(clip, elapsed, pixels: false),
                   ),
               ],
               if (!map)
                 Positioned.fill(
                   child: Opacity(
-                    opacity: hasCardTransition ? cardT : 1.0,
+                    opacity: chromeOpacity,
                     child: StreetviewChrome(
                       settings: settings,
                       dark: project.darkOutput,
+                      sheetOffset: sheetOffset,
                     ),
                   ),
                 ),
               if (ripple >= 0 && ripple < 1)
-                Positioned(
-                  left: map
-                      ? StreetviewLayout.thumbnailLeft +
-                            StreetviewLayout.thumbnailWidth / 2
-                      : scene.kind == 'back'
-                      ? 333
-                      : arrow.x,
-                  top: map
-                      ? StreetviewLayout.thumbnailTop +
-                            StreetviewLayout.thumbnailHeight / 2
-                      : scene.kind == 'back'
-                      ? 35
-                      : arrow.y,
-                  child: _Ripple(progress: ripple),
-                ),
+                if (map)
+                  Positioned.fromRect(
+                    rect: thumbRect,
+                    child: M3InkRipple(
+                      progress: ripple,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  )
+                else if (isBack)
+                  Positioned(
+                    right: 12,
+                    top: 20,
+                    width: 30,
+                    height: 30,
+                    child: M3InkRipple(
+                      progress: ripple,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  )
+                else
+                  Positioned(
+                    left: arrow.x - 32,
+                    top: arrow.y - 32,
+                    width: 64,
+                    height: 64,
+                    child: M3InkRipple(progress: ripple, softEdge: true),
+                  ),
             ],
           ),
         ),
@@ -402,26 +509,42 @@ class StreetviewCanvas extends StatelessWidget {
   }
 }
 
-class _Ripple extends StatelessWidget {
-  final double progress;
-  const _Ripple({required this.progress});
+class _InvertedRRectClipper extends CustomClipper<Path> {
+  final Rect rect;
+  final double radius;
+  const _InvertedRRectClipper(this.rect, this.radius);
+
   @override
-  Widget build(BuildContext context) => Transform.translate(
-    offset: const Offset(-24, -24),
-    child: Transform.scale(
-      scale: .3 + progress,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: .45 * (1 - progress)),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 1 - progress),
-            width: 2,
-          ),
-        ),
-      ),
-    ),
-  );
+  Path getClip(Size size) => Path()
+    ..fillType = PathFillType.evenOdd
+    ..addRect(Offset.zero & size)
+    ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+
+  @override
+  bool shouldReclip(_InvertedRRectClipper old) =>
+      rect != old.rect || radius != old.radius;
+}
+
+class _ContainerBorderPainter extends CustomPainter {
+  final Rect rect;
+  final double radius;
+  final double alpha;
+  const _ContainerBorderPainter(this.rect, this.radius, this.alpha);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (alpha <= 0) return;
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = Colors.white.withValues(alpha: (0.6 * alpha).clamp(0.0, 1.0))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ContainerBorderPainter old) =>
+      rect != old.rect || radius != old.radius || alpha != old.alpha;
 }

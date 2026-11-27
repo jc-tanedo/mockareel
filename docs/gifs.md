@@ -12,7 +12,7 @@ Select the clip and open **Timing** (Maps) or **Timing & frame** (FYP):
 - **Start / Trim start** selects the source offset.
 - **Loop GIF**, enabled by default, repeats the source cycle from that starting phase until the clip duration is filled. Turn it off to select one continuous source portion; duration and start are then constrained to the available source.
 
-Scrubbing and pausing use the selected segment's video clock. A timing change prepares a new segment after a short debounce. Frame delays are preserved on the app's 30 fps output clock; extremely short source frames are sampled accordingly. Zero/10 ms GIF delays follow common browser behavior (100 ms).
+Scrubbing and pausing use the selected segment's video clock. A timing change prepares a new segment after a short debounce. Frame delays are preserved on the app's 60 fps output clock; extremely short source frames are sampled accordingly. Zero/10 ms GIF delays follow common browser behavior (100 ms).
 
 ## Preparation and cache
 

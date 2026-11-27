@@ -92,7 +92,7 @@ void main() {
               .where((command) => command.split(':')[1] == '${first.playerId}')
               .length;
           final commands = heldCommands();
-          expect(first.value.position.inMilliseconds, 2966);
+          expect(first.value.position.inMilliseconds, 2983);
           await show(start + slide + .01);
           expect(
             heldCommands(),
@@ -237,7 +237,7 @@ void main() {
           isTrue,
         );
         expect(platform.commands.last, startsWith('pause:'));
-        expect(controller.value.position.inMilliseconds, 966);
+        expect(controller.value.position.inMilliseconds, 983);
         final count = platform.commands.length;
         await Future<void>.delayed(const Duration(milliseconds: 120));
         await tester.pump();

@@ -10,6 +10,8 @@ class OrbitMediaPose {
   final double turn, tilt, distanceScale, lift;
   final Offset focus;
   final OrbitWallMount? mount;
+  final bool closeApproach;
+  final int orbitDirection;
   const OrbitMediaPose(
     this.progress, {
     this.mount,
@@ -18,17 +20,30 @@ class OrbitMediaPose {
     this.distanceScale = 1,
     this.focus = Offset.zero,
     this.lift = 0,
+    this.closeApproach = false,
+    this.orbitDirection = 1,
   });
   double get _framing => (progress / .35).clamp(0.0, 1.0);
+  double get aimLift => mount == null
+      ? 0
+      : OrbitWallMount.defaultHeight * mount!.sizeFactor * .25;
   double get zoom {
     final wall = mount;
-    if (wall == null) return (1 + .74 * progress) * distanceScale;
+    if (wall == null) return (1 + .92 * progress) * distanceScale;
+
+    final detailZoom = 2.15 / pow(wall.sizeFactor, .92);
+    if (closeApproach) {
+      final s = ((progress - .35) / .65).clamp(0.0, 1.0);
+      final ease = s * (2 - s);
+      final startZoom = max(1.0, detailZoom * .88);
+      return exp(log(startZoom) + ease * (log(detailZoom) - log(startZoom))) *
+          distanceScale;
+    }
 
     // Establish the location at 450 m across, independent of facade size.
     // Move closer in log space so a small wall doesn't cause a sudden jump.
     final t = ((progress - .45) / .48).clamp(0.0, 1.0);
     final approach = t * t * (3 - 2 * t);
-    final detailZoom = 1.45 / pow(wall.sizeFactor, .86);
     return exp(approach * log(detailZoom)) * distanceScale;
   }
 
@@ -39,15 +54,25 @@ class OrbitMediaPose {
     double t, {
     OrbitScene? scene,
     String? wallId,
+    bool closeApproach = false,
+    int orbitDirection = 1,
   }) {
-    final u = Curves.easeInOut.transform(t.clamp(0.0, 1.0));
+    final x = t.clamp(0.0, 1.0);
+    final u = kind == 'media' && closeApproach
+        ? x * (2 - x)
+        : Curves.easeInOut.transform(x);
     final progress = switch (kind) {
       'map' || 'ending-map' => .35 * u,
       'media' => .35 + .65 * u,
       'back' => 1.0 - u,
       _ => 1.0,
     };
-    return OrbitMediaPose(progress, mount: scene?.wallFor(wallId));
+    return OrbitMediaPose(
+      progress,
+      mount: scene?.wallFor(wallId),
+      closeApproach: closeApproach,
+      orbitDirection: orbitDirection < 0 ? -1 : 1,
+    );
   }
 
   /// Interpolate a north-up overhead view into the attached media camera.
@@ -57,16 +82,23 @@ class OrbitMediaPose {
     double world, {
     required bool returning,
     String? wallId,
+    int orbitDirection = 1,
   }) {
+    final dir = orbitDirection < 0 ? -1 : 1;
     final end = OrbitMediaPose.at(
       'media',
       returning ? 1 : 0,
       scene: scene,
       wallId: wallId,
+      orbitDirection: dir,
     );
     if (world >= 1) return end;
     final progress = world * end.progress;
-    final base = OrbitMediaPose(progress, mount: end.mount);
+    final base = OrbitMediaPose(
+      progress,
+      mount: end.mount,
+      orbitDirection: dir,
+    );
     final heading = atan2(sin(end.heading), cos(end.heading)) * world;
     final zoom = exp(log(.9) * (1 - world) + log(end.zoom) * world);
     final pitch = atan2(.77, .64) * (1 - world);
@@ -81,21 +113,27 @@ class OrbitMediaPose {
       turn: heading - base.heading,
       tilt: pitch,
       distanceScale: zoom / base.zoom,
+      orbitDirection: dir,
       // Match the centre of the 2D map above its place sheet at takeoff.
       focus:
           Offset(sin(heading), cos(heading)) * offset +
           (end.mount?.center ?? Offset.zero) * (world - base._framing),
-      lift: (end.mount?.baseAbovePin ?? 0) * (world - base._framing),
+      lift:
+          ((end.mount?.baseAbovePin ?? 0) + end.aimLift) *
+          (world - base._framing),
     );
   }
 
-  static double _heading(double progress, double turn, OrbitWallMount? mount) =>
-      (-65 + 26 * progress) * pi / 180 +
-      turn +
-      (mount == null
-          ? 0
-          : OrbitWallMount.defaultHeading - mount.tangent.direction);
-  double get heading => _heading(progress, turn, mount);
+  static double _heading(
+    double progress,
+    double turn,
+    OrbitWallMount? mount,
+    int orbitDirection,
+  ) =>
+      (-13 + 26 * progress) * pi / 180 * (orbitDirection < 0 ? -1 : 1) +
+      turn -
+      (mount?.tangent.direction ?? OrbitWallMount.defaultHeading);
+  double get heading => _heading(progress, turn, mount, orbitDirection);
   double get yaw =>
       heading + (mount?.tangent.direction ?? OrbitWallMount.defaultHeading);
   static final _defaultNormal = Offset(
@@ -110,6 +148,10 @@ class OrbitMediaPose {
           (p.dx - anchor.dx) * normal.dx + (p.dy - anchor.dy) * normal.dy > 0,
     );
   }
+
+  double get frontFacing => cos(yaw);
+  double depthOf(Offset worldPoint) =>
+      worldPoint.dx * sin(heading) + worldPoint.dy * cos(heading);
 
   double get depthScale => .64 * cos(tilt) + .77 * sin(tilt);
   double get heightScale => .77 * cos(tilt) - .64 * sin(tilt);
@@ -127,7 +169,7 @@ class OrbitMediaPose {
 
   Offset pin(Size size, double scale) {
     final target = focus + (mount?.center ?? Offset.zero) * _framing;
-    final height = lift + (mount?.baseAbovePin ?? 0) * _framing;
+    final height = lift + ((mount?.baseAbovePin ?? 0) + aimLift) * _framing;
     return Offset(size.width * .5, size.height * .54) -
         _project(target, height, scale);
   }

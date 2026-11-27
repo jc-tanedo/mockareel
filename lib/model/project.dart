@@ -189,9 +189,9 @@ class ReelProject implements StreetviewJourney {
     this.mapHeaderPath,
     this.mapSource = 'upload',
     this.mapZoom = 15,
-    double sheetIntroSeconds = .9,
+    double sheetIntroSeconds = .65,
     FeaturedReview? review,
-    double slideSeconds = .42,
+    double slideSeconds = .48,
     PlaceDetails? place,
     List<ReelClip>? clips,
     List<StoryTag>? tags,
@@ -207,11 +207,11 @@ class ReelProject implements StreetviewJourney {
        feed = feed ?? FeedSettings(),
        sheetIntroSeconds = sheetIntroSeconds.isFinite
            ? sheetIntroSeconds.clamp(0, 2).toDouble()
-           : .9,
+           : .65,
        review = review ?? FeaturedReview(),
        slideSeconds = slideSeconds.isFinite
            ? slideSeconds.clamp(.15, .8).toDouble()
-           : .42,
+           : .48,
        id = id ?? newId(),
        place = place ?? PlaceDetails(),
        clips = clips ?? [],
@@ -305,7 +305,7 @@ class ReelProject implements StreetviewJourney {
     review: FeaturedReview.fromJson(
       Map<String, dynamic>.from(json['review'] as Map? ?? {}),
     ),
-    slideSeconds: (json['slideSeconds'] as num?)?.toDouble() ?? .42,
+    slideSeconds: (json['slideSeconds'] as num?)?.toDouble() ?? .48,
     place: PlaceDetails.fromJson(
       Map<String, dynamic>.from(json['place'] as Map? ?? {}),
     ),

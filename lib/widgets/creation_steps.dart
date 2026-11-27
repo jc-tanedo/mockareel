@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_motion_curves.dart';
 
 class CreationSteps extends StatelessWidget {
   static const labels = ['Place', 'Timeline', 'Text', 'Audio', 'Export'];
@@ -109,56 +110,63 @@ class CreationSteps extends StatelessWidget {
                                       ),
                                       AnimatedContainer(
                                         duration: const Duration(
-                                          milliseconds: 240,
+                                          milliseconds: 350,
                                         ),
-                                        curve: Curves.easeOutBack,
+                                        curve: M3Curves.fastSpatial,
                                         width: selected == i ? 34 : 24,
                                         height: 24,
                                         margin: const EdgeInsets.symmetric(
                                           horizontal: 4,
                                         ),
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                            milliseconds: 180,
                                           ),
-                                          color: selected == i
-                                              ? colors.primary
-                                              : (i < completed.length &&
-                                                    completed[i])
-                                              ? colors.secondaryContainer
-                                              : colors.surfaceContainerHigh,
-                                          border: Border.all(
+                                          curve: M3Curves.fastEffects,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             color: selected == i
                                                 ? colors.primary
                                                 : (i < completed.length &&
                                                       completed[i])
-                                                ? colors.primary.withValues(
-                                                    alpha: 0.5,
-                                                  )
-                                                : colors.outlineVariant,
+                                                ? colors.secondaryContainer
+                                                : colors.surfaceContainerHigh,
+                                            border: Border.all(
+                                              color: selected == i
+                                                  ? colors.primary
+                                                  : (i < completed.length &&
+                                                        completed[i])
+                                                  ? colors.primary.withValues(
+                                                      alpha: 0.5,
+                                                    )
+                                                  : colors.outlineVariant,
+                                            ),
                                           ),
-                                        ),
-                                        child:
-                                            (i < completed.length &&
-                                                    completed[i]) &&
-                                                selected != i
-                                            ? Icon(
-                                                Icons.check,
-                                                size: 14,
-                                                color:
-                                                    colors.onSecondaryContainer,
-                                              )
-                                            : Text(
-                                                '${i + 1}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: selected == i
-                                                      ? colors.onPrimary
-                                                      : colors.onSurfaceVariant,
+                                          child:
+                                              (i < completed.length &&
+                                                      completed[i]) &&
+                                                  selected != i
+                                              ? Icon(
+                                                  Icons.check,
+                                                  size: 14,
+                                                  color: colors
+                                                      .onSecondaryContainer,
+                                                )
+                                              : Text(
+                                                  '${i + 1}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: selected == i
+                                                        ? colors.onPrimary
+                                                        : colors
+                                                              .onSurfaceVariant,
+                                                  ),
                                                 ),
-                                              ),
+                                        ),
                                       ),
                                       Expanded(
                                         child: Divider(

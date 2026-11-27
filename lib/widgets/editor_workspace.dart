@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/m3_motion_curves.dart';
 
 /// A stable preview stage and a separate scrolling inspector,
 /// like a media editor.
@@ -171,8 +172,8 @@ class InspectorTabs extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 8),
                 child: AnimatedScale(
                   scale: selected == i ? 1.02 : 1.0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
+                  duration: const Duration(milliseconds: 280),
+                  curve: M3Curves.fastSpatial,
                   child: ChoiceChip(
                     label: Text(
                       labels[i],

@@ -10,10 +10,12 @@ export 'streetview_arrows.dart';
 class StreetviewChrome extends StatelessWidget {
   final StreetviewMedia settings;
   final bool dark;
+  final double sheetOffset;
   const StreetviewChrome({
     super.key,
     required this.settings,
     required this.dark,
+    this.sheetOffset = 0,
   });
 
   @override
@@ -113,10 +115,13 @@ class StreetviewChrome extends StatelessWidget {
           left: 0,
           right: 0,
           bottom: 0,
-          child: StreetviewPlaceSheet(
-            settings: settings,
-            dark: dark,
-            map: false,
+          child: Transform.translate(
+            offset: Offset(0, sheetOffset),
+            child: StreetviewPlaceSheet(
+              settings: settings,
+              dark: dark,
+              map: false,
+            ),
           ),
         ),
     ],

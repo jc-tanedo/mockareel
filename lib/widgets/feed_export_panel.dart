@@ -63,7 +63,7 @@ class FeedExportPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '1080 × 1920 · 30 fps · MP4',
+                        '1080 × 1920 · 60 fps · MP4',
                         style: textTheme.bodySmall?.copyWith(
                           color: colors.onSurfaceVariant,
                         ),

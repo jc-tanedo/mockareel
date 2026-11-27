@@ -368,7 +368,7 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
 
     private fun buildFeedItems(
         clips: List<Map<String, Any>>, overlays: List<String>, posters: List<String>, cache: PosterCache,
-        frames: List<List<String>>, transitions: List<Number>,
+        frames: List<List<String>>, transitions: List<Number>, overlayDurations: List<Number>,
     ): List<EditedMediaItem> {
         require(frames.size == clips.size && transitions.size == clips.size) { "Missing feed scene plan" }
         frames.flatten().forEach { require(File(it).isFile) { "A feed UI frame is missing" } }
@@ -401,32 +401,48 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                 else media.setImageDurationMs((segment * 1000).roundToLong())
                 val clock = ClipClock()
                 val transition = transitions[index].toDouble()
+                val overlayDuration = overlayDurations.getOrNull(index)?.toDouble() ?: (if (transition > 0) transition else total)
                 val effects = listOf<androidx.media3.common.Effect>(
                     Crop(cx - fx, cx + fx, -fy, fy),
                     Presentation.createForWidthAndHeight(1080, 1920, Presentation.LAYOUT_SCALE_TO_FIT),
                     MatrixTransformation { timeUs ->
                         clock.begin(timeUs)
-                        val entry = FeedMotion.entry(sceneOffset + clock.elapsed(timeUs), transition)
+                        val localElapsed = sceneOffset + clock.elapsed(timeUs)
+                        val entry = FeedMotion.entry(localElapsed, transition)
                         Matrix().apply {
                             val camera = clip["cameraMotion"] as? Map<String, Any>
                             val planeFrames = clip["orbitPlaneFrames"] as? List<*>
                             if (!planeFrames.isNullOrEmpty()) {
-                                val frame = ((sceneOffset + clock.elapsed(timeUs)) * 30).roundToInt().coerceIn(0, planeFrames.lastIndex)
+                                val frame = (localElapsed * M3Motion.EXPORT_FPS).roundToInt().coerceIn(0, planeFrames.lastIndex)
                                 val coefficients = planeFrames[frame] as List<*>
                                 setValues(FloatArray(9) { (coefficients[it] as Number).toFloat() })
                             } else if (camera != null) {
-                                setValues(StreetviewMotion.matrix(sceneOffset + clock.elapsed(timeUs), total, camera))
+                                setValues(StreetviewMotion.matrix(localElapsed, total, camera))
                             } else if (clip["slowPanZoom"] == true) {
-                                val t = ((sceneOffset + clock.elapsed(timeUs)) / total).coerceIn(0.0, 1.0).toFloat()
+                                val t = (localElapsed / total).coerceIn(0.0, 1.0).toFloat()
                                 postScale(1 + t * .06f, 1 + t * .06f)
                                 postTranslate(-2 * t * 8 / 360f, 0f)
+                            }
+                            val expand = clip["containerExpand"] as? Map<String, Any>
+                            if (expand != null) {
+                                val expandDur = (expand["duration"] as? Number)?.toDouble() ?: 0.0
+                                if (expandDur > 0.0 && localElapsed < expandDur) {
+                                    val tr = StreetviewMotion.expandTransform(localElapsed, expandDur, expand)
+                                    postScale(tr[0], tr[0])
+                                    postTranslate(tr[1], tr[2])
+                                }
+                            }
+                            val searchEnter = (clip["searchEnterDuration"] as? Number)?.toDouble() ?: 0.0
+                            if (searchEnter > 0.0 && localElapsed < searchEnter) {
+                                val s = FeedMotion.searchEnterScale(localElapsed, searchEnter)
+                                postScale(s, s)
                             }
                             postTranslate(0f, -2 * entry / 640f)
                         }
                     },
-                    OverlayEffect(listOf(FeedFrameOverlay(overlays[index], frames[index], clock, sceneOffset, if (transition > 0) transition else total)))
+                    OverlayEffect(listOf(FeedFrameOverlay(overlays[index], frames[index], clock, sceneOffset, overlayDuration)))
                 )
-                items.add(EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
+                items.add(EditedMediaItem.Builder(media.build()).setFrameRate(M3Motion.EXPORT_FPS).setRemoveAudio(true)
                     .setEffects(Effects(emptyList(), effects)).build())
                 offset += segment
             }
@@ -445,11 +461,13 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         val ends = requireNotNull(call.argument<List<String>>("endPosters"))
         require(starts.size == clips.size && ends.size == clips.size) { "Missing scene thumbnails" }
         val layout = SheetLayout.from(requireNotNull(call.argument<Map<String, Number>>("layout")))
-        val slideSeconds = call.argument<Number>("slideSeconds")?.toDouble() ?: .42
+        val slideSeconds = call.argument<Number>("slideSeconds")?.toDouble() ?: .48
         val introFrames = call.argument<List<String>>("introFrames") ?: emptyList()
+        val slideFrames = call.argument<List<List<String>>>("slideFrames") ?: emptyList()
         val introSeconds = call.argument<Number>("sheetIntroSeconds")?.toDouble() ?: 0.0
         require(introSeconds.isFinite() && introSeconds in 0.0..2.0) { "Invalid reveal duration" }
         introFrames.forEach { require(File(it).isFile) { "An intro frame is missing" } }
+        slideFrames.flatten().forEach { require(File(it).isFile) { "A slide frame is missing" } }
         val backgroundColor = call.argument<Number>("backgroundColor")?.toInt() ?: android.graphics.Color.WHITE
         val progressColor = call.argument<Number>("progressColor")?.toInt() ?: android.graphics.Color.rgb(26, 115, 232)
         var globalStart = 0.0
@@ -463,7 +481,8 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
         val items = if (call.argument<String>("template") == "tiktok-feed") {
             buildFeedItems(clips, overlays, starts, cache,
                 call.argument<List<List<String>>>("sceneFrames") ?: emptyList(),
-                call.argument<List<Number>>("transitions") ?: emptyList())
+                call.argument<List<Number>>("transitions") ?: emptyList(),
+                call.argument<List<Number>>("overlayDurations") ?: emptyList())
         } else clips.mapIndexed { index, clip ->
             val sceneStart = globalStart
             globalStart += (clip["duration"] as Number).toDouble()
@@ -502,9 +521,9 @@ class ReelRenderer(private val context: Context) : MethodChannel.MethodCallHandl
                     val y = 1 - 2 * (layout.gallery.centerY() + shift) / layout.height
                     Matrix().apply { postScale(scale, scale); postTranslate(x, y) }
                 },
-                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames, backgroundColor, progressColor)))
+                OverlayEffect(listOf(ScrollOverlay(layout, cards, index, transition, overlayFile.path, cache, clock, sceneStart, durationMs / 1000.0, introSeconds, introFrames, backgroundColor, progressColor, slideFrames.getOrElse(index) { emptyList() })))
             )
-            EditedMediaItem.Builder(media.build()).setFrameRate(30).setRemoveAudio(true)
+            EditedMediaItem.Builder(media.build()).setFrameRate(M3Motion.EXPORT_FPS).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), effects)).build()
         }
         val sequences = mutableListOf(EditedMediaItemSequence.Builder(items).build())

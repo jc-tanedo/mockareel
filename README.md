@@ -38,7 +38,7 @@ All templates support photos, trimmed video, animated GIFs with timing/loop cont
 
 [Full user guide →](docs/user-guide.md)
 
-- **Output:** 1080 × 1920 MP4 at 30 fps; Maps also exports transparent/full PNG stills.
+- **Output:** 1080 × 1920 MP4 at 60 fps with Material 3 Expressive motion; Maps also exports transparent/full PNG stills.
 - **Audio:** choose background music from your device. Source video audio is muted.
 - **Projects:** autosave on device; `.mockareel` backups include media and editable settings.
 - **Maps:** Browser search and map-header capture need no API key. Optional API access is under **Advanced · Google Maps**. [Configure Maps →](docs/google-maps.md)

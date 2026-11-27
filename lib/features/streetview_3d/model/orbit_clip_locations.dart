@@ -7,10 +7,7 @@ import 'orbit_location.dart';
 extension OrbitClipAssignment on OrbitLocation {
   void assign(ReelClip clip) {
     final media = clip.streetview;
-    if (media.locationId != id &&
-        (media.place.latitude != place.latitude ||
-            media.place.longitude != place.longitude ||
-            media.mapPath != mapPath)) {
+    if (media.locationId != id) {
       media.wallId = null;
       media.visitedWalls.clear();
     }

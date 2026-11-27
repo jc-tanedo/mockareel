@@ -11,6 +11,7 @@ import '../services/feed_export_pipeline.dart';
 import '../services/media_importer.dart';
 import '../services/native_renderer.dart';
 import '../services/project_store.dart';
+import '../theme/m3_motion_curves.dart';
 import '../widgets/audio_editor.dart';
 import '../widgets/creation_steps.dart';
 import '../widgets/editor_app_bar.dart';
@@ -312,43 +313,50 @@ class _FeedEditorPageState extends State<FeedEditorPage>
                             startAtBeginning: _tab != 1,
                             maxHeight: height,
                           ),
-                          inspector: switch (_tab) {
-                            0 => FeedSequenceEditor(
-                              project: p,
-                              busy: _busy,
-                              onPickHome: _pickHome,
-                              onChanged: _change,
-                            ),
-                            1 => FeedPostsEditor(
-                              project: p,
-                              selectedIndex: _selected,
-                              postTool: _postTool,
-                              busy: _busy,
-                              onPickMedia: _pickMedia,
-                              onSelectPost: (i) {
-                                setState(() => _selected = i);
+                          inspector: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            transitionBuilder: M3Curves.fadeSlideTransition,
+                            child: KeyedSubtree(
+                              key: ValueKey('feed-tab-$_tab'),
+                              child: switch (_tab) {
+                                0 => FeedSequenceEditor(
+                                  project: p,
+                                  busy: _busy,
+                                  onPickHome: _pickHome,
+                                  onChanged: _change,
+                                ),
+                                1 => FeedPostsEditor(
+                                  project: p,
+                                  selectedIndex: _selected,
+                                  postTool: _postTool,
+                                  busy: _busy,
+                                  onPickMedia: _pickMedia,
+                                  onSelectPost: (i) {
+                                    setState(() => _selected = i);
+                                  },
+                                  onSelectTool: (i) {
+                                    setState(() => _postTool = i);
+                                  },
+                                  onRemovePost: _removePost,
+                                  onMovePost: _move,
+                                  onPickAvatar: _pickAvatar,
+                                  onChanged: _change,
+                                ),
+                                2 => AudioEditor(
+                                  project: p,
+                                  importing: _busy,
+                                  onPick: _pickMusic,
+                                  onChanged: _change,
+                                ),
+                                _ => FeedExportPanel(
+                                  project: p,
+                                  busy: _busy,
+                                  onExport: _export,
+                                  onBackup: _backup,
+                                ),
                               },
-                              onSelectTool: (i) {
-                                setState(() => _postTool = i);
-                              },
-                              onRemovePost: _removePost,
-                              onMovePost: _move,
-                              onPickAvatar: _pickAvatar,
-                              onChanged: _change,
                             ),
-                            2 => AudioEditor(
-                              project: p,
-                              importing: _busy,
-                              onPick: _pickMusic,
-                              onChanged: _change,
-                            ),
-                            _ => FeedExportPanel(
-                              project: p,
-                              busy: _busy,
-                              onExport: _export,
-                              onBackup: _backup,
-                            ),
-                          },
+                          ),
                         ),
                 ),
               ],

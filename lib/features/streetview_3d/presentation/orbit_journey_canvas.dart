@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
 import 'package:mockareel/model/streetview_layout.dart';
 import 'package:mockareel/model/streetview_motion.dart';
@@ -9,6 +10,7 @@ import 'package:mockareel/model/streetview_timeline.dart';
 import 'package:mockareel/widgets/media_frame.dart';
 import 'package:mockareel/widgets/streetview_arrows.dart';
 import 'package:mockareel/widgets/streetview_map_scene.dart';
+import '../data/orbit_scene_loader.dart';
 import '../model/orbit_dolly.dart';
 import '../model/orbit_media_pose.dart';
 import '../model/orbit_scene.dart';
@@ -30,6 +32,13 @@ class OrbitJourneyCanvas extends StatelessWidget {
     required this.posters,
   });
 
+  static double _faceVisibility(OrbitMediaPose pose) {
+    final facing = pose.frontFacing;
+    if (facing <= .02) return 0;
+    if (facing >= .14) return 1;
+    return M3Motion.cameraEase((facing - .02) / .12);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scene = StreetviewTimeline.at(project, position),
@@ -45,12 +54,17 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final clip = project.clips[index], settings = clip.streetview;
     final plan = scene.kind == 'map' || scene.kind == 'ending-map';
     // Leave at least three movement samples even for a short arrow tap.
-    final lastFrame = ((scene.duration * 30).ceil() - 1) / 30;
+    const step = 1 / M3Motion.exportFps;
+    final lastFrame =
+        ((scene.duration * M3Motion.exportFps).ceil() - 1) / M3Motion.exportFps;
     final tapSeconds = arrow
-        ? min(StreetviewTimeline.rippleSeconds, max(0.0, lastFrame - 3 / 30))
+        ? min(.14, max(0.0, lastFrame - 3 * step))
+        : StreetviewTimeline.rippleSeconds;
+    final rippleDuration = arrow
+        ? min(StreetviewTimeline.rippleSeconds * .8, max(step, lastFrame))
         : StreetviewTimeline.rippleSeconds;
     final t = arrow
-        ? ((elapsed - tapSeconds) / max(1 / 30, lastFrame - tapSeconds)).clamp(
+        ? ((elapsed - tapSeconds) / max(step, lastFrame - tapSeconds)).clamp(
             0.0,
             1.0,
           )
@@ -63,11 +77,11 @@ class OrbitJourneyCanvas extends StatelessWidget {
         ? min(.2, lastFrame * .25)
         : max(0.0, lastFrame - min(.85, lastFrame * .62));
     final flightFraction =
-        ((elapsed - flightStart) / max(1 / 30, lastFrame - flightStart)).clamp(
+        ((elapsed - flightStart) / max(step, lastFrame - flightStart)).clamp(
           0.0,
           1.0,
         );
-    final eased = Curves.easeInOut.transform(flightFraction);
+    final eased = M3Motion.cameraEase(flightFraction);
     final world = back
         ? 1 - eased
         : entering
@@ -78,12 +92,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
     final returningToNext = back && index + 1 < project.clips.length;
     final planClip = returningToNext ? project.clips[index + 1] : clip;
     final mapOpacity =
-        1 - Curves.easeInOut.transform((world / .67).clamp(0.0, 1.0));
-    final hudOpacity = Curves.easeInOut.transform(
+        1 - M3Motion.defaultEffects.eval((world / .67).clamp(0.0, 1.0));
+    final hudOpacity = M3Motion.defaultEffects.eval(
       ((world - .62) / .38).clamp(0.0, 1.0),
     );
     final direction = settings.arrow == 'left' ? -1 : 1;
-    final blend = Curves.easeInOut.transform(((t - .25) / .5).clamp(0.0, 1.0));
+    final blend = M3Motion.defaultEffects.eval(
+      ((t - .25) / .5).clamp(0.0, 1.0),
+    );
     Widget shot(int i, OrbitDolly? dolly) {
       final item = project.clips[i];
       final active = i == index, incoming = arrow && i == index + 1;
@@ -118,6 +134,20 @@ class OrbitJourneyCanvas extends StatelessWidget {
           path: path,
           builder: (geometry, failed) {
             final travelling = dolly != null && (active || incoming);
+            final dualWall = travelling && dolly.distinctWalls;
+            final close =
+                active &&
+                media &&
+                OrbitDolly.continuesSamePin(project.clips, i, geometry);
+            final orbitDir = OrbitDolly.orbitDirectionFor(
+              project.clips,
+              i,
+              (p) => p == null
+                  ? null
+                  : p == path
+                  ? geometry
+                  : OrbitSceneLoader.cached(p),
+            );
             final pose = travelling
                 ? (incoming ? dolly.arrival : dolly.departure)
                 : active && mapHandoff
@@ -126,13 +156,39 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     world,
                     returning: back,
                     wallId: item.streetview.wallId,
+                    orbitDirection: orbitDir,
                   )
                 : OrbitMediaPose.at(
                     active ? scene.kind : 'media',
                     active ? fraction : 0,
                     scene: geometry,
                     wallId: item.streetview.wallId,
+                    closeApproach: close,
+                    orbitDirection: orbitDir,
                   );
+            final double panelOpacity;
+            if (dualWall) {
+              final endRamp = active
+                  ? (t <= .82
+                        ? 1.0
+                        : 1.0 -
+                              M3Motion.defaultEffects.eval(
+                                ((t - .82) / .18).clamp(0.0, 1.0),
+                              ))
+                  : (t >= .18
+                        ? 1.0
+                        : M3Motion.defaultEffects.eval(
+                            (t / .18).clamp(0.0, 1.0),
+                          ));
+              panelOpacity = (_faceVisibility(pose) * endRamp).clamp(0.0, 1.0);
+            } else {
+              panelOpacity = travelling && active ? 1 - blend : 1.0;
+            }
+            final arrowOpacity = dualWall
+                ? (active
+                      ? M3Motion.fadeThroughOut(t)
+                      : M3Motion.fadeThroughIn(t))
+                : (travelling && active ? 1 - blend : hudOpacity);
             final map = Stack(
               fit: StackFit.expand,
               children: [
@@ -167,13 +223,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
             final worldView = Stack(
               fit: StackFit.expand,
               children: [
-                if (!(travelling && dolly.sharedWorld && incoming))
+                if (!dualWall && !(travelling && dolly.sharedWorld && incoming))
                   if (timedHole)
                     ClipPath(clipper: _OutsidePlane(pose), child: map)
                   else
                     map,
                 Opacity(
-                  opacity: travelling && active ? 1 - blend : 1,
+                  key: ValueKey('orbit-panel-${item.id}'),
+                  opacity: panelOpacity,
                   child: Transform(
                     transform: pose.matrix,
                     child: DecoratedBox(
@@ -187,10 +244,12 @@ class OrbitJourneyCanvas extends StatelessWidget {
                 ),
                 if (geometry != null &&
                     geometry.atlas == null &&
-                    (pose.mount != null || (travelling && t > 0 && t < 1)))
+                    panelOpacity > 0 &&
+                    (pose.mount != null || (travelling && t > 0 && t < 1)) &&
+                    (!dualWall || pose.frontFacing > .02))
                   IgnorePointer(
                     child: Opacity(
-                      opacity: pose.mount != null
+                      opacity: dualWall || pose.mount != null
                           ? 1
                           : min(1.0, 8 * t * (1 - t)),
                       child: CustomPaint(
@@ -208,7 +267,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                 if (item.streetview.showArrows &&
                     (media || arrow || mapHandoff))
                   Opacity(
-                    opacity: travelling && active ? 1 - blend : hudOpacity,
+                    opacity: arrowOpacity,
                     child: Transform(
                       transform: pose.groundFrom(
                         OrbitMediaPose.at(
@@ -216,13 +275,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
                           1,
                           scene: geometry,
                           wallId: item.streetview.wallId,
+                          orbitDirection: orbitDir,
                         ),
                       ),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
                           const StreetviewArrows(),
-                          if (arrow && active && elapsed < tapSeconds)
+                          if (arrow && active && elapsed < rippleDuration)
                             _TapRipple(
                               center: Offset(
                                 direction < 0
@@ -234,7 +294,10 @@ class OrbitJourneyCanvas extends StatelessWidget {
                                 StreetviewLayout.arrowTop +
                                     StreetviewLayout.arrowHeight / 2,
                               ),
-                              progress: elapsed / tapSeconds,
+                              progress: (elapsed / rippleDuration).clamp(
+                                0.0,
+                                1.0,
+                              ),
                             ),
                         ],
                       ),
@@ -243,7 +306,9 @@ class OrbitJourneyCanvas extends StatelessWidget {
               ],
             );
             return Opacity(
-              opacity: active
+              opacity: dualWall
+                  ? 1
+                  : active
                   ? 1
                   : incoming
                   ? blend
@@ -271,171 +336,227 @@ class OrbitJourneyCanvas extends StatelessWidget {
         : '';
     final entryTap = min(StreetviewTimeline.rippleSeconds, flightStart);
     final ripple = back
-        ? elapsed / max(1 / 30, flightStart)
+        ? elapsed / max(step, flightStart)
         : entering
-        ? (elapsed - flightStart + entryTap) / max(1 / 30, entryTap)
+        ? (elapsed - flightStart + entryTap) / max(step, entryTap)
         : -1.0;
-    Widget canvas(OrbitDolly? dolly, OrbitScene? source) => FittedBox(
-      child: SizedBox(
-        width: 360,
-        height: 640,
-        child: DefaultTextStyle(
-          style: const TextStyle(color: Colors.white, fontFamily: 'Roboto'),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (arrow)
-                ColoredBox(
-                  color: project.darkOutput
-                      ? const Color(0xff233747)
-                      : const Color(0xffcad9cf),
-                ),
-              Opacity(
-                opacity: world == 0 ? 0 : 1,
-                child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(
-                    sigmaX: sin(t * pi) * 2.5,
-                    sigmaY: sin(t * pi) * 1.0,
+    Widget canvas(OrbitDolly? dolly, OrbitScene? source) {
+      final dualWorld =
+          arrow && dolly != null && dolly.distinctWalls && source != null;
+      final indices = <int>[
+        for (
+          int j = max(0, index - 1);
+          j <= min(index + 1, project.clips.length - 1);
+          j++
+        )
+          if (!overlayOnly || j == index || (arrow && j == index + 1)) j,
+      ];
+      if (dualWorld) {
+        final activePos = indices.indexOf(index);
+        final nextPos = indices.indexOf(index + 1);
+        if (activePos >= 0 && nextPos >= 0) {
+          final depthA = dolly.departure.depthOf(
+            dolly.departure.mount?.center ?? Offset.zero,
+          );
+          final depthB = dolly.departure.depthOf(
+            dolly.arrival.mount?.center ?? Offset.zero,
+          );
+          final swap = depthA > depthB;
+          if (swap && activePos < nextPos || !swap && activePos > nextPos) {
+            indices[activePos] = index + 1;
+            indices[nextPos] = index;
+          }
+        }
+      }
+      return FittedBox(
+        child: SizedBox(
+          width: 360,
+          height: 640,
+          child: DefaultTextStyle(
+            style: const TextStyle(color: Colors.white, fontFamily: 'Roboto'),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (arrow)
+                  ColoredBox(
+                    color: project.darkOutput
+                        ? const Color(0xff233747)
+                        : const Color(0xffcad9cf),
                   ),
-                  enabled: arrow && t > 0,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      for (
-                        int j = max(0, index - 1);
-                        j <= min(index + 1, project.clips.length - 1);
-                        j++
-                      )
-                        if (!overlayOnly ||
-                            j == index ||
-                            (arrow && j == index + 1))
-                          shot(j, dolly),
-                    ],
-                  ),
-                ),
-              ),
-              if ((plan || back) && mapOpacity > 0)
-                Positioned.fill(
-                  child: OrbitSceneBuilder(
-                    path: planClip.streetview.mapPath,
-                    builder: (geometry, _) {
-                      final path = project.streetview
-                          .locationFor(planClip)
-                          ?.overviewPath;
-                      final fallback = OrbitPlanMap(
-                        scene: geometry,
-                        dark: project.darkOutput,
-                        name: planClip.streetview.place.name,
-                      );
-                      final ending =
-                          scene.kind == 'ending-map' ||
-                          (back && !returningToNext);
-                      final mapView = StreetviewMapScene(
-                        settings: planClip.streetview,
-                        dark: project.darkOutput,
-                        basemap: path == null
-                            ? fallback
-                            : Image.file(
-                                File(path),
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, _, _) => fallback,
-                              ),
-                        thumbnail: ClipPoster(
-                          clip: planClip,
-                          position: ending ? planClip.duration : 0,
-                          resolvedPath: ending
-                              ? posters['${planClip.id}:end']
-                              : posters[planClip.id],
-                        ),
-                      );
-                      if (world == 0) return mapView;
-                      // Carry the flat map sheet in the same projection as the
-                      // descending camera while the raised scenery takes over.
-                      final camera = OrbitMediaPose.mapFlight(
-                        back ? source : geometry,
-                        world,
-                        returning: back,
-                        wallId: settings.wallId,
-                      );
-                      final overhead = OrbitMediaPose.mapFlight(
-                        back ? source : geometry,
-                        0,
-                        returning: back,
-                        wallId: settings.wallId,
-                      );
-                      return Opacity(
-                        opacity: mapOpacity,
-                        child: Transform(
-                          transform: camera.groundFrom(overhead),
-                          child: mapView,
-                        ),
-                      );
-                    },
+                Opacity(
+                  opacity: world == 0 ? 0 : 1,
+                  child: ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(
+                      sigmaX: sin(t * pi) * (dualWorld ? .45 : 2.5),
+                      sigmaY: sin(t * pi) * (dualWorld ? .2 : 1.0),
+                    ),
+                    enabled: arrow && t > 0,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (dualWorld)
+                          Positioned.fill(
+                            key: const ValueKey('orbit-shared-world'),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ColoredBox(
+                                  color: project.darkOutput
+                                      ? const Color(0xff233747)
+                                      : const Color(0xffcad9cf),
+                                ),
+                                OrbitMapView(
+                                  scene: source,
+                                  failed: false,
+                                  camera: dolly.departure,
+                                  dark: project.darkOutput,
+                                  zoom: dolly.departure.zoom,
+                                ),
+                              ],
+                            ),
+                          ),
+                        for (final j in indices) shot(j, dolly),
+                      ],
+                    ),
                   ),
                 ),
-              if (hudOpacity > 0 &&
-                  chrome.showLocation &&
-                  locationText.isNotEmpty)
-                Positioned(
-                  left: 16,
-                  right: 60,
-                  top: 22,
-                  child: Opacity(
-                    opacity: hudOpacity,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          [
-                            locationText,
-                            if (chrome.date.isNotEmpty) chrome.date,
-                          ].join(' · '),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13),
+                if ((plan || back) && mapOpacity > 0)
+                  Positioned.fill(
+                    child: OrbitSceneBuilder(
+                      path: planClip.streetview.mapPath,
+                      builder: (geometry, _) {
+                        final path = project.streetview
+                            .locationFor(planClip)
+                            ?.overviewPath;
+                        final fallback = OrbitPlanMap(
+                          scene: geometry,
+                          dark: project.darkOutput,
+                          name: planClip.streetview.place.name,
+                        );
+                        final ending =
+                            scene.kind == 'ending-map' ||
+                            (back && !returningToNext);
+                        final mapView = StreetviewMapScene(
+                          settings: planClip.streetview,
+                          dark: project.darkOutput,
+                          basemap: path == null
+                              ? fallback
+                              : Image.file(
+                                  File(path),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, _, _) => fallback,
+                                ),
+                          thumbnail: ClipPoster(
+                            clip: planClip,
+                            position: ending ? planClip.duration : 0,
+                            resolvedPath: ending
+                                ? posters['${planClip.id}:end']
+                                : posters[planClip.id],
+                          ),
+                        );
+                        if (world == 0) return mapView;
+                        final mapOrbitDir = OrbitDolly.orbitDirectionFor(
+                          project.clips,
+                          index,
+                          (p) => p == null
+                              ? null
+                              : p == settings.mapPath
+                              ? source
+                              : p == planClip.streetview.mapPath
+                              ? geometry
+                              : OrbitSceneLoader.cached(p),
+                        );
+                        // Carry the flat map sheet in the same projection as the
+                        // descending camera while the raised scenery takes over.
+                        final camera = OrbitMediaPose.mapFlight(
+                          back ? source : geometry,
+                          world,
+                          returning: back,
+                          wallId: settings.wallId,
+                          orbitDirection: mapOrbitDir,
+                        );
+                        final overhead = OrbitMediaPose.mapFlight(
+                          back ? source : geometry,
+                          0,
+                          returning: back,
+                          wallId: settings.wallId,
+                          orbitDirection: mapOrbitDir,
+                        );
+                        return Opacity(
+                          opacity: mapOpacity,
+                          child: Transform(
+                            transform: camera.groundFrom(overhead),
+                            child: mapView,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (hudOpacity > 0 &&
+                    chrome.showLocation &&
+                    locationText.isNotEmpty)
+                  Positioned(
+                    left: 16,
+                    right: 60,
+                    top: 22,
+                    child: Opacity(
+                      opacity: hudOpacity,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            [
+                              locationText,
+                              if (chrome.date.isNotEmpty) chrome.date,
+                            ].join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              if (chrome.showControls && hudOpacity > 0)
-                Positioned(
-                  right: 17,
-                  top: 23,
-                  child: Opacity(
-                    opacity: hudOpacity,
-                    child: const CircleAvatar(
-                      radius: 17,
-                      backgroundColor: Colors.black54,
-                      child: Icon(Icons.close, color: Colors.white, size: 18),
+                if (chrome.showControls && hudOpacity > 0)
+                  Positioned(
+                    right: 17,
+                    top: 23,
+                    child: Opacity(
+                      opacity: hudOpacity,
+                      child: const CircleAvatar(
+                        radius: 17,
+                        backgroundColor: Colors.black54,
+                        child: Icon(Icons.close, color: Colors.white, size: 18),
+                      ),
                     ),
                   ),
-                ),
-              if (ripple > 0 && ripple < 1)
-                _TapRipple(
-                  center: back
-                      ? const Offset(326, 40)
-                      : const Offset(
-                          StreetviewLayout.thumbnailLeft +
-                              StreetviewLayout.thumbnailWidth / 2,
-                          StreetviewLayout.thumbnailTop +
-                              StreetviewLayout.thumbnailHeight / 2,
-                        ),
-                  progress: ripple,
-                ),
-            ],
+                if (ripple > 0 && ripple < 1)
+                  _TapRipple(
+                    center: back
+                        ? const Offset(326, 40)
+                        : const Offset(
+                            StreetviewLayout.thumbnailLeft +
+                                StreetviewLayout.thumbnailWidth / 2,
+                            StreetviewLayout.thumbnailTop +
+                                StreetviewLayout.thumbnailHeight / 2,
+                          ),
+                    progress: ripple,
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
+
     // Keep the player subtree mounted as the route comes in and out of view.
     final next = arrow ? project.clips[index + 1].streetview : null;
     return OrbitSceneBuilder(
@@ -445,7 +566,24 @@ class OrbitJourneyCanvas extends StatelessWidget {
         builder: (destination, _) => canvas(
           next == null
               ? null
-              : OrbitDolly.between(settings, next, source, destination, t),
+              : OrbitDolly.between(
+                  settings,
+                  next,
+                  source,
+                  destination,
+                  t,
+                  departureDirection: OrbitDolly.orbitDirectionFor(
+                    project.clips,
+                    index,
+                    (p) => p == null
+                        ? null
+                        : p == settings.mapPath
+                        ? source
+                        : p == next.mapPath
+                        ? destination
+                        : OrbitSceneLoader.cached(p),
+                  ),
+                ),
           source,
         ),
       ),

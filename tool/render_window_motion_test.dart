@@ -91,16 +91,16 @@ void main() {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  row('LAUNCH', [0, .04, .08, .12, .2, .32, .46], .5),
+                  row('LAUNCH', [0, .05, .10, .18, .28, .42, .55], .5),
                   const SizedBox(height: 12),
                   row('CLOSE', [
                     0,
-                    .03,
-                    .06,
-                    .09,
-                    .15,
-                    .24,
-                    .36,
+                    .04,
+                    .08,
+                    .14,
+                    .22,
+                    .33,
+                    .45,
                   ], p.feed.introDuration + 1),
                 ],
               ),

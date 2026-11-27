@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/features/streetview_3d/data/orbit_scene_loader.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_dolly.dart';
 import 'package:mockareel/features/streetview_3d/model/orbit_media_pose.dart';
+import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
-import 'package:mockareel/model/streetview_layout.dart';
+import 'package:mockareel/model/streetview_motion.dart';
 import 'package:mockareel/pages/maps_editor_page.dart';
 import 'package:mockareel/services/media_edits.dart';
 import 'package:mockareel/services/native_renderer.dart';
@@ -197,7 +199,7 @@ void testStreetviewExport(
           if (call.method == 'cancel') return null;
           if (call.method == 'thumbnail') {
             final path = (call.arguments as Map)['path'] as String;
-            return path.contains('source-edits-v2') ? p.clips[1].path : path;
+            return path.contains('source-edits-v3') ? p.clips[1].path : path;
           }
           if (call.method == 'processMedia') {
             final args = call.arguments as Map;
@@ -212,18 +214,34 @@ void testStreetviewExport(
             final args = call.arguments as Map;
             final frames = args['sceneFrames'] as List;
             final overlays = args['overlays'] as List;
-            checks['opening map animated'] = (frames[0] as List).length == 15;
-            checks['static media retains attribution'] =
-                await alpha(overlays[1] as String, 60, 100) > 0;
-            checks['static media retains controls'] =
-                await alpha(overlays[1] as String, 975, 90) > 0;
-            checks['static media retains place sheet'] =
-                await alpha(overlays[1] as String, 540, 1800) > 0;
+            final clips = args['clips'] as List;
+            checks['opening map animated'] = (frames[0] as List).length == 30;
+            if (!orbit) {
+              checks['opening map hold deduplicated'] =
+                  (frames[0] as List).toSet().length < 30;
+              checks['opening media expands from thumbnail'] =
+                  (frames[1] as List).length == 14 &&
+                  (clips[1]['containerExpand'] as Map)['duration'] == 0.225;
+              checks['opening expand cutout transparent'] =
+                  await alpha(frames[1][0] as String, 53 * 3, 511 * 3) == 0 &&
+                  await alpha(frames[1][0] as String, 540, 800) == 255;
+              checks['static media retains attribution'] =
+                  await alpha(overlays[1] as String, 60, 100) > 0;
+              checks['static media retains controls'] =
+                  await alpha(overlays[1] as String, 975, 90) > 0;
+              checks['static media retains place sheet'] =
+                  await alpha(overlays[1] as String, 540, 1800) > 0;
+            }
             if (orbit) {
               checks['photo camera is rendered every frame'] =
-                  (frames[1] as List).length == 15 &&
+                  (frames[1] as List).length == 30 &&
                   await hasMedia(frames[1].last as String);
               final flight = frames[2] as List;
+              int orbitDirFor(int index) => OrbitDolly.orbitDirectionFor(
+                p.clips,
+                index,
+                (path) => path == null ? null : OrbitSceneLoader.cached(path),
+              );
               if (transition == 'arrow') {
                 Future<Offset> panelCenter(int i, double time) async {
                   final scene = await OrbitSceneLoader.load(
@@ -235,6 +253,9 @@ void testStreetviewExport(
                           time,
                           scene: scene,
                           wallId: p.clips[i].streetview.wallId,
+                          closeApproach:
+                              samePin && transition == 'arrow' && i == 1,
+                          orbitDirection: orbitDirFor(i),
                         ).matrix,
                         const Offset(180, 320),
                       ) *
@@ -243,20 +264,26 @@ void testStreetviewExport(
 
                 final from = await panelCenter(0, 1),
                     to = await panelCenter(1, 0);
+                final midChanged = samePin
+                    ? !listEquals(
+                        await File(flight.first).readAsBytes(),
+                        await File(flight[flight.length ~/ 2]).readAsBytes(),
+                      )
+                    : !await hasMedia(
+                        flight[flight.length - 3],
+                        x: from.dx.round(),
+                        y: from.dy.round(),
+                      );
                 checks['dolly leaves the outgoing panel and reaches the next panel'] =
                     await hasMedia(
                       flight.first,
                       x: from.dx.round(),
                       y: from.dy.round(),
                     ) &&
-                    (samePin
-                        ? p.clips.first.streetview.wallId !=
-                              p.clips.last.streetview.wallId
-                        : !await hasMedia(
-                            flight[5],
-                            x: from.dx.round(),
-                            y: from.dy.round(),
-                          )) &&
+                    midChanged &&
+                    (!samePin ||
+                        p.clips.first.streetview.wallId !=
+                            p.clips.last.streetview.wallId) &&
                     await hasMedia(
                       flight.last,
                       x: to.dx.round(),
@@ -290,6 +317,7 @@ void testStreetviewExport(
                 1,
                 scene: wall,
                 wallId: p.clips.last.streetview.wallId,
+                orbitDirection: orbitDirFor(1),
               );
               final center =
                   MatrixUtils.transformPoint(
@@ -327,9 +355,11 @@ void testStreetviewExport(
                       matrices[f] as List,
                       OrbitMediaPose.at(
                         'media',
-                        f / 30 / p.clips.last.duration,
+                        f / M3Motion.exportFps / p.clips.last.duration,
                         scene: wall,
                         wallId: p.clips.last.streetview.wallId,
+                        closeApproach: samePin && transition == 'arrow',
+                        orbitDirection: orbitDirFor(1),
                       ).native,
                     ),
                   ).every((matches) => matches);
@@ -348,27 +378,23 @@ void testStreetviewExport(
                   await alpha(overlays[1] as String, 540, 800) == 0;
             }
             checks['movement composited'] =
-                await alpha(frames[2][4] as String, 540, 800) == 255;
+                await alpha(frames[2][8] as String, 540, 800) == 255;
             for (final index in orbit ? <int>[] : [2, returnIndex]) {
               final sceneFrames = frames[index] as List;
               for (var frame = 0; frame < sceneFrames.length; frame++) {
                 final back = index == returnIndex || transition == 'map';
-                final elapsed = frame / 30;
+                final elapsed = frame / M3Motion.exportFps;
                 final duration =
                     p.clips[index == 2 ? 0 : 1].streetview.transitionSeconds;
-                final t = back
-                    ? ((elapsed - duration + .1) / .1).clamp(0.0, 1.0)
-                    : 0.0;
-                final rect = Rect.lerp(
-                  const Rect.fromLTWH(0, 0, 360, 640),
-                  const Rect.fromLTWH(
-                    StreetviewLayout.thumbnailLeft,
-                    StreetviewLayout.thumbnailTop,
-                    StreetviewLayout.thumbnailWidth,
-                    StreetviewLayout.thumbnailHeight,
-                  ),
-                  Curves.easeInOut.transform(t),
-                )!;
+                final rect = back
+                    ? () {
+                        final s = StreetviewContainerMotion.shrinkAt(
+                          elapsed,
+                          duration,
+                        );
+                        return Rect.fromLTWH(s.left, s.top, s.width, s.height);
+                      }()
+                    : const Rect.fromLTWH(0, 0, 360, 640);
                 checks['scene $index frame $frame contains media'] =
                     await hasMedia(
                       sceneFrames[frame] as String,
@@ -385,13 +411,13 @@ void testStreetviewExport(
               }
             }
             checks['ending map animated'] =
-                (frames[endingMapIndex] as List).length == 15;
-            final clips = args['clips'] as List;
+                (frames[endingMapIndex] as List).length == 30 &&
+                (orbit || (frames[endingMapIndex] as List).toSet().length == 1);
             checks['video retained'] =
                 clips[secondMediaIndex]['isVideo'] == true;
             checks['edited source retained'] =
                 (clips[secondMediaIndex]['path'] as String).contains(
-                  'source-edits-v2',
+                  'source-edits-v3',
                 );
             checks['UI is never source-processed'] =
                 effectInputs.length == 1 &&
@@ -401,7 +427,7 @@ void testStreetviewExport(
             checks['camera plan retained'] =
                 (clips[secondMediaIndex]['cameraMotion'] as Map)['turn'] == 8.0;
             checks['moving arrows captured'] =
-                (frames[secondMediaIndex] as List).length == 15;
+                (frames[secondMediaIndex] as List).length == 30;
             checks['video blur ignored'] =
                 ((effectInputs.single['edits'] as Map)['spots'] as List)
                     .isEmpty;

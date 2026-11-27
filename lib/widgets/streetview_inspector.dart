@@ -361,7 +361,7 @@ class _StreetviewInspectorState extends State<StreetviewInspector> {
                 ? 'Movement including tap'
                 : 'Back control including tap',
             _s.transitionSeconds,
-            .2,
+            .25,
             2,
             (v) => _s.transitionSeconds = v,
           ),

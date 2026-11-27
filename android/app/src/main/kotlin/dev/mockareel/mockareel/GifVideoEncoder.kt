@@ -15,7 +15,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
-/** One 30 fps image source, with timestamped GIF frames over a black matte.
+/** One 60 fps image source, with timestamped GIF frames over a black matte.
  * Using one asset avoids per-frame image-loader startup and duration rounding. */
 @UnstableApi
 class GifVideoEncoder(private val context: Context) : MethodChannel.MethodCallHandler {
@@ -33,7 +33,7 @@ class GifVideoEncoder(private val context: Context) : MethodChannel.MethodCallHa
             val height = requireNotNull(call.argument<Number>("height")).toInt()
             require(width in 64..1080 && height in 64..1080 && width % 2 == 0 && height % 2 == 0)
             val frames = requireNotNull(call.argument<List<Map<String, Any>>>("frames"))
-            require(frames.isNotEmpty() && frames.size <= 900)
+            require(frames.isNotEmpty() && frames.size <= 1800)
             val paths = frames.map { it["path"] as String }
             val times = frames.map { (it["timeUs"] as Number).toLong() }
             require(times.first() == 0L && times.zipWithNext().all { it.first < it.second })
@@ -45,7 +45,7 @@ class GifVideoEncoder(private val context: Context) : MethodChannel.MethodCallHa
             require(!target.exists())
             pending = result; output = target
             val source = MediaItem.Builder().setUri(Uri.fromFile(base)).setImageDurationMs((duration * 1000).toLong().coerceAtLeast(1)).build()
-            val item = EditedMediaItem.Builder(source).setFrameRate(30).setRemoveAudio(true)
+            val item = EditedMediaItem.Builder(source).setFrameRate(M3Motion.EXPORT_FPS).setRemoveAudio(true)
                 .setEffects(Effects(emptyList(), listOf(
                     Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT),
                     OverlayEffect(listOf(GifOverlay(paths, times))),
