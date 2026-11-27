@@ -62,18 +62,100 @@ class OrbitDolly {
     return a != null && b != null && a.id != b.id;
   }
 
+  static int arrivalOrbitDirection(
+    StreetviewMedia from,
+    StreetviewMedia to,
+    OrbitScene? source,
+    OrbitScene? destination, {
+    int departureDirection = 1,
+  }) {
+    final depDir = departureDirection < 0 ? -1 : 1;
+    final fromMount = source?.wallFor(from.wallId);
+    final toMount = destination?.wallFor(to.wallId);
+    final pins = pinOffset(from.place, to.place);
+    final shared = isSharedWorld(from, to);
+    final side = from.arrow == 'left' ? -1 : 1;
+    if (fromMount != null && toMount != null) {
+      final sourceCenterH = OrbitMediaPose(.675, mount: fromMount).heading;
+      final targetCenterH = OrbitMediaPose(.675, mount: toMount).heading;
+      final wallTurn = atan2(
+        sin(targetCenterH - sourceCenterH),
+        cos(targetCenterH - sourceCenterH),
+      );
+      if (wallTurn.abs() > pi * .92) return side;
+      if (wallTurn.abs() > .35) return wallTurn > 0 ? 1 : -1;
+      final midH = sourceCenterH + wallTurn * .5;
+      final fallback =
+          Offset(cos(sourceCenterH), -sin(sourceCenterH)) * (side * .8);
+      final displacement = pins ?? (shared ? Offset.zero : fallback * 150);
+      final span = displacement.distance;
+      final limit = source?.atlas != null || destination?.atlas != null
+          ? 120.0
+          : 450.0;
+      final delta =
+          displacement * (span > limit ? limit / span : 1) +
+          toMount.center -
+          fromMount.center;
+      final lateral = delta.dx * cos(midH) - delta.dy * sin(midH);
+      if (lateral.abs() > 1.0) return lateral > 0 ? 1 : -1;
+      return shared ? side : depDir;
+    }
+    return shared ? side : depDir;
+  }
+
+  static int orbitDirectionFor(
+    List<ReelClip> clips,
+    int index,
+    OrbitScene? Function(String? mapPath) sceneFor,
+  ) {
+    if (index <= 0 || index >= clips.length) return 1;
+    var dir = 1;
+    for (int i = 0; i < index; i++) {
+      final prev = clips[i].streetview;
+      final curr = clips[i + 1].streetview;
+      if (prev.transition == 'map') {
+        dir = 1;
+        continue;
+      }
+      dir = arrivalOrbitDirection(
+        prev,
+        curr,
+        sceneFor(prev.mapPath),
+        sceneFor(curr.mapPath),
+        departureDirection: dir,
+      );
+    }
+    return dir;
+  }
+
   factory OrbitDolly.between(
     StreetviewMedia from,
     StreetviewMedia to,
     OrbitScene? source,
     OrbitScene? destination,
-    double t,
-  ) {
+    double t, {
+    int departureDirection = 1,
+    int? arrivalDirection,
+  }) {
+    final depDir = departureDirection < 0 ? -1 : 1;
+    final arrDir =
+        (arrivalDirection ??
+                arrivalOrbitDirection(
+                  from,
+                  to,
+                  source,
+                  destination,
+                  departureDirection: depDir,
+                )) <
+            0
+        ? -1
+        : 1;
     final start = OrbitMediaPose.at(
       'media',
       1,
       scene: source,
       wallId: from.wallId,
+      orbitDirection: depDir,
     );
     final pins = pinOffset(from.place, to.place);
     final samePin = pins != null && pins.distance < 1;
@@ -90,6 +172,7 @@ class OrbitDolly {
       scene: destination,
       wallId: to.wallId,
       closeApproach: distinctWalls,
+      orbitDirection: arrDir,
     );
     final origin = start.mount?.center ?? Offset.zero;
     final target = end.mount?.center ?? Offset.zero;
@@ -109,6 +192,9 @@ class OrbitDolly {
     final x = t.clamp(0.0, 1.0),
         u = x * x * x * (x * (6 * x - 15) + 10),
         arc = 4 * u * (1 - u);
+    final uRot = distinctWalls
+        ? x * x * (3 - 2 * x) + .25 * x * x * (x - 1)
+        : u;
     final progress = 1 - .65 * u;
     var rotation = atan2(
       sin(end.heading - start.heading),
@@ -117,7 +203,7 @@ class OrbitDolly {
     if (rotation.abs() > pi * .92) {
       rotation = side * rotation.abs();
     }
-    final heading = start.heading + rotation * u;
+    final heading = start.heading + rotation * uRot;
     final turnFraction = (rotation.abs() / pi).clamp(0.0, 1.0);
     final push = distinctWalls
         ? () {
@@ -138,9 +224,9 @@ class OrbitDolly {
       final avgWall =
           OrbitWallMount.defaultWidth *
           ((start.mount!.sizeFactor + end.mount!.sizeFactor) / 2);
-      final spanMeters = max(delta.distance * 1.65 + avgWall * .9, 55.0);
+      final spanMeters = max(delta.distance * 1.45 + avgWall * .85, 42.0);
       final frameBothZoom = (450.0 / spanMeters).clamp(1.0, nominalZoom);
-      final turnPullback = 1.0 - .34 * (.45 + .55 * turnFraction);
+      final turnPullback = 1.0 - .30 * (.45 + .55 * turnFraction);
       final transitZoom = min(
         nominalZoom * turnPullback,
         frameBothZoom,
@@ -176,10 +262,12 @@ class OrbitDolly {
         scene == null || scene.atlas != null
         ? 0
         : scene.elevation(center + focus) - scene.elevation(center);
+    double aimHeight(OrbitMediaPose p) =>
+        (p.mount?.baseAbovePin ?? 0) + p.aimLift;
     final altitude =
         lerpDouble(
-          sourceHeight + (start.mount?.baseAbovePin ?? 0),
-          destHeight + (end.mount?.baseAbovePin ?? 0),
+          sourceHeight + aimHeight(start),
+          destHeight + aimHeight(end),
           u,
         )! +
         lerpDouble(
@@ -193,16 +281,18 @@ class OrbitDolly {
         progress,
         mount: endpoint.mount,
         closeApproach: endpoint.closeApproach,
+        orbitDirection: endpoint.orbitDirection,
       );
       return OrbitMediaPose(
         progress,
         mount: endpoint.mount,
         closeApproach: endpoint.closeApproach,
+        orbitDirection: endpoint.orbitDirection,
         focus: focus,
         turn: atan2(sin(heading - base.heading), cos(heading - base.heading)),
         tilt: tilt,
         distanceScale: zoom / base.zoom,
-        lift: altitude - ground - (endpoint.mount?.baseAbovePin ?? 0),
+        lift: altitude - ground - aimHeight(endpoint),
       );
     }
 

@@ -258,8 +258,8 @@ class MapsExportPipeline {
   ) async {
     StreamSubscription<double>? progressSubscription;
     try {
+      final loaded = <String, OrbitScene>{};
       if (project.isStreetview3d) {
-        final loaded = <String, OrbitScene>{};
         for (final c in project.clips) {
           final path = c.streetview.mapPath;
           if (path == null || loaded.containsKey(path)) continue;
@@ -432,6 +432,13 @@ class MapsExportPipeline {
                             project.clips,
                             scene.mediaIndex,
                             geometry,
+                          ),
+                          orbitDirection: OrbitDolly.orbitDirectionFor(
+                            project.clips,
+                            scene.mediaIndex,
+                            (p) => p == clip.streetview.mapPath
+                                ? geometry
+                                : loaded[p],
                           ),
                         ).native,
                     ],

@@ -63,7 +63,7 @@ void main() {
           previous = pose.zoom;
         }
         final end = OrbitMediaPose.at('media', 1, scene: scene);
-        expect(end.sx, inInclusiveRange(.24, .45));
+        expect(end.sx, inInclusiveRange(.45, .66));
         expect(end.zoom, greaterThan(first.zoom));
       }
     },
@@ -194,7 +194,17 @@ void main() {
         );
         expect(
           ending.arrival.matrix.storage,
-          OrbitMediaPose.at('media', 0, scene: scene).matrix.storage,
+          OrbitMediaPose.at(
+            'media',
+            0,
+            scene: scene,
+            orbitDirection: OrbitDolly.arrivalOrbitDirection(
+              source,
+              destination,
+              scene,
+              scene,
+            ),
+          ).matrix.storage,
         );
         var last = -1.0;
         for (final t in [.1, .3, .5, .7, .9]) {

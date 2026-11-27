@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockareel/features/streetview_3d/data/orbit_scene_loader.dart';
+import 'package:mockareel/features/streetview_3d/model/orbit_dolly.dart';
 import 'package:mockareel/features/streetview_3d/model/orbit_media_pose.dart';
 import 'package:mockareel/model/m3_motion.dart';
 import 'package:mockareel/model/project.dart';
@@ -236,6 +237,11 @@ void testStreetviewExport(
                   (frames[1] as List).length == 30 &&
                   await hasMedia(frames[1].last as String);
               final flight = frames[2] as List;
+              int orbitDirFor(int index) => OrbitDolly.orbitDirectionFor(
+                p.clips,
+                index,
+                (path) => path == null ? null : OrbitSceneLoader.cached(path),
+              );
               if (transition == 'arrow') {
                 Future<Offset> panelCenter(int i, double time) async {
                   final scene = await OrbitSceneLoader.load(
@@ -249,6 +255,7 @@ void testStreetviewExport(
                           wallId: p.clips[i].streetview.wallId,
                           closeApproach:
                               samePin && transition == 'arrow' && i == 1,
+                          orbitDirection: orbitDirFor(i),
                         ).matrix,
                         const Offset(180, 320),
                       ) *
@@ -310,6 +317,7 @@ void testStreetviewExport(
                 1,
                 scene: wall,
                 wallId: p.clips.last.streetview.wallId,
+                orbitDirection: orbitDirFor(1),
               );
               final center =
                   MatrixUtils.transformPoint(
@@ -351,6 +359,7 @@ void testStreetviewExport(
                         scene: wall,
                         wallId: p.clips.last.streetview.wallId,
                         closeApproach: samePin && transition == 'arrow',
+                        orbitDirection: orbitDirFor(1),
                       ).native,
                     ),
                   ).every((matches) => matches);

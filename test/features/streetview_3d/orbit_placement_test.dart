@@ -178,6 +178,7 @@ void main() {
     () {
       final a = clip('a').streetview..wallId = city.walls.keys.first;
       final b = clip('b').streetview..wallId = city.walls.keys.last;
+      final arrivalDir = OrbitDolly.arrivalOrbitDirection(a, b, city, city);
       final startEnd = OrbitMediaPose.at(
         'media',
         1,
@@ -190,6 +191,7 @@ void main() {
         scene: city,
         wallId: b.wallId,
         closeApproach: true,
+        orbitDirection: arrivalDir,
       );
       expect(
         OrbitMediaPose.at(
@@ -198,10 +200,21 @@ void main() {
           scene: city,
           wallId: b.wallId,
           closeApproach: true,
+          orbitDirection: arrivalDir,
         ).native,
-        OrbitMediaPose.at('media', 1, scene: city, wallId: b.wallId).native,
+        OrbitMediaPose.at(
+          'media',
+          1,
+          scene: city,
+          wallId: b.wallId,
+          orbitDirection: arrivalDir,
+        ).native,
       );
       expect(endStart.zoom, greaterThan(1.0));
+      expect(
+        OrbitMediaPose.at('media', 1, scene: city, wallId: b.wallId).sx,
+        greaterThanOrEqualTo(.45),
+      );
       for (final t in [0.0, .25, .5, .75, 1.0]) {
         final trip = OrbitDolly.between(a, b, city, city, t);
         expect(trip.sharedWorld, true);
@@ -246,6 +259,142 @@ void main() {
           expect(trip.arrival.native, endStart.native);
         }
       }
+    },
+  );
+  test(
+    'orbit continues rotational and lateral dolly inertia across turns and parallel shifts',
+    () {
+      final base = city.walls.values.first;
+      final baseHeading = OrbitMediaPose(.675, mount: base).heading;
+      double angleTo(OrbitWallMount w) => atan2(
+        sin(OrbitMediaPose(.675, mount: w).heading - baseHeading),
+        cos(OrbitMediaPose(.675, mount: w).heading - baseHeading),
+      );
+      final cw = city.walls.values.firstWhere(
+        (w) => w.id != base.id && angleTo(w) > .35 && angleTo(w) < pi * .92,
+      );
+      final ccw = city.walls.values.firstWhere(
+        (w) => w.id != base.id && angleTo(w) < -.35 && angleTo(w) > -pi * .92,
+      );
+      final from = clip('from').streetview..wallId = base.id;
+      final toCw = clip('cw').streetview..wallId = cw.id;
+      final toCcw = clip('ccw').streetview..wallId = ccw.id;
+
+      expect(OrbitDolly.arrivalOrbitDirection(from, toCw, city, city), 1);
+      expect(OrbitDolly.arrivalOrbitDirection(from, toCcw, city, city), -1);
+
+      final cwStart = OrbitMediaPose.at(
+        'media',
+        0,
+        scene: city,
+        wallId: cw.id,
+        closeApproach: true,
+        orbitDirection: 1,
+      );
+      final cwEnd = OrbitMediaPose.at(
+        'media',
+        1,
+        scene: city,
+        wallId: cw.id,
+        closeApproach: true,
+        orbitDirection: 1,
+      );
+      expect(cwEnd.heading, greaterThan(cwStart.heading));
+
+      final ccwStart = OrbitMediaPose.at(
+        'media',
+        0,
+        scene: city,
+        wallId: ccw.id,
+        closeApproach: true,
+        orbitDirection: -1,
+      );
+      final ccwEnd = OrbitMediaPose.at(
+        'media',
+        1,
+        scene: city,
+        wallId: ccw.id,
+        closeApproach: true,
+        orbitDirection: -1,
+      );
+      expect(ccwEnd.heading, lessThan(ccwStart.heading));
+      expect(
+        OrbitMediaPose.mapFlight(
+          city,
+          1,
+          returning: true,
+          wallId: ccw.id,
+          orbitDirection: -1,
+        ).native,
+        ccwEnd.native,
+      );
+
+      final cwStepEnd =
+          OrbitDolly.between(from, toCw, city, city, 1).arrival.heading -
+          OrbitDolly.between(from, toCw, city, city, .98).arrival.heading;
+      final cwNextStep =
+          OrbitMediaPose.at(
+            'media',
+            .02,
+            scene: city,
+            wallId: cw.id,
+            closeApproach: true,
+            orbitDirection: 1,
+          ).heading -
+          cwStart.heading;
+      expect(cwStepEnd, greaterThan(0));
+      expect(cwNextStep, greaterThan(0));
+
+      final ccwStepEnd =
+          OrbitDolly.between(from, toCcw, city, city, 1).arrival.heading -
+          OrbitDolly.between(from, toCcw, city, city, .98).arrival.heading;
+      final ccwNextStep =
+          OrbitMediaPose.at(
+            'media',
+            .02,
+            scene: city,
+            wallId: ccw.id,
+            closeApproach: true,
+            orbitDirection: -1,
+          ).heading -
+          ccwStart.heading;
+      expect(ccwStepEnd, lessThan(0));
+      expect(ccwNextStep, lessThan(0));
+
+      final row = OrbitScene(
+        [
+          OrbitFootprint(24, const [
+            Offset(-50, -70),
+            Offset(-10, -70),
+            Offset(-10, -40),
+            Offset(-50, -40),
+          ]),
+          OrbitFootprint(24, const [
+            Offset(10, -70),
+            Offset(50, -70),
+            Offset(50, -40),
+            Offset(10, -40),
+          ]),
+        ],
+        grid,
+        'row',
+      );
+      final leftWall = row.walls.values.firstWhere(
+        (w) => w.normal.dy > .9 && w.center.dx < 0,
+      );
+      final rightWall = row.walls.values.firstWhere(
+        (w) => w.normal.dy > .9 && w.center.dx > 0,
+      );
+      final leftMedia = clip('l').streetview..wallId = leftWall.id;
+      final rightMedia = clip('r').streetview..wallId = rightWall.id;
+      expect(
+        OrbitDolly.arrivalOrbitDirection(leftMedia, rightMedia, row, row),
+        1,
+      );
+      expect(
+        OrbitDolly.arrivalOrbitDirection(rightMedia, leftMedia, row, row),
+        -1,
+      );
     },
   );
   test(

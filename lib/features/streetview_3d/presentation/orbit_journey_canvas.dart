@@ -10,6 +10,7 @@ import 'package:mockareel/model/streetview_timeline.dart';
 import 'package:mockareel/widgets/media_frame.dart';
 import 'package:mockareel/widgets/streetview_arrows.dart';
 import 'package:mockareel/widgets/streetview_map_scene.dart';
+import '../data/orbit_scene_loader.dart';
 import '../model/orbit_dolly.dart';
 import '../model/orbit_media_pose.dart';
 import '../model/orbit_scene.dart';
@@ -138,6 +139,15 @@ class OrbitJourneyCanvas extends StatelessWidget {
                 active &&
                 media &&
                 OrbitDolly.continuesSamePin(project.clips, i, geometry);
+            final orbitDir = OrbitDolly.orbitDirectionFor(
+              project.clips,
+              i,
+              (p) => p == null
+                  ? null
+                  : p == path
+                  ? geometry
+                  : OrbitSceneLoader.cached(p),
+            );
             final pose = travelling
                 ? (incoming ? dolly.arrival : dolly.departure)
                 : active && mapHandoff
@@ -146,6 +156,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     world,
                     returning: back,
                     wallId: item.streetview.wallId,
+                    orbitDirection: orbitDir,
                   )
                 : OrbitMediaPose.at(
                     active ? scene.kind : 'media',
@@ -153,6 +164,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                     scene: geometry,
                     wallId: item.streetview.wallId,
                     closeApproach: close,
+                    orbitDirection: orbitDir,
                   );
             final double panelOpacity;
             if (dualWall) {
@@ -263,6 +275,7 @@ class OrbitJourneyCanvas extends StatelessWidget {
                           1,
                           scene: geometry,
                           wallId: item.streetview.wallId,
+                          orbitDirection: orbitDir,
                         ),
                       ),
                       child: Stack(
@@ -442,6 +455,17 @@ class OrbitJourneyCanvas extends StatelessWidget {
                           ),
                         );
                         if (world == 0) return mapView;
+                        final mapOrbitDir = OrbitDolly.orbitDirectionFor(
+                          project.clips,
+                          index,
+                          (p) => p == null
+                              ? null
+                              : p == settings.mapPath
+                              ? source
+                              : p == planClip.streetview.mapPath
+                              ? geometry
+                              : OrbitSceneLoader.cached(p),
+                        );
                         // Carry the flat map sheet in the same projection as the
                         // descending camera while the raised scenery takes over.
                         final camera = OrbitMediaPose.mapFlight(
@@ -449,12 +473,14 @@ class OrbitJourneyCanvas extends StatelessWidget {
                           world,
                           returning: back,
                           wallId: settings.wallId,
+                          orbitDirection: mapOrbitDir,
                         );
                         final overhead = OrbitMediaPose.mapFlight(
                           back ? source : geometry,
                           0,
                           returning: back,
                           wallId: settings.wallId,
+                          orbitDirection: mapOrbitDir,
                         );
                         return Opacity(
                           opacity: mapOpacity,
@@ -540,7 +566,24 @@ class OrbitJourneyCanvas extends StatelessWidget {
         builder: (destination, _) => canvas(
           next == null
               ? null
-              : OrbitDolly.between(settings, next, source, destination, t),
+              : OrbitDolly.between(
+                  settings,
+                  next,
+                  source,
+                  destination,
+                  t,
+                  departureDirection: OrbitDolly.orbitDirectionFor(
+                    project.clips,
+                    index,
+                    (p) => p == null
+                        ? null
+                        : p == settings.mapPath
+                        ? source
+                        : p == next.mapPath
+                        ? destination
+                        : OrbitSceneLoader.cached(p),
+                  ),
+                ),
           source,
         ),
       ),
