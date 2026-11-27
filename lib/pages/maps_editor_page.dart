@@ -70,25 +70,41 @@ class _MapsEditorPageState extends State<MapsEditorPage>
   OrbitLocation? _location;
   OrbitLocation? _fetchingGeometry;
   final _wallPlacement = OrbitWallPlacement();
-  final _checkedPlacement = Expando<(String?, String?, double?, double?)>();
-  (String?, String?, double?, double?) _placementSource(
-    StreetviewMedia media,
-  ) => (
-    media.mapPath,
-    media.locationId,
-    media.place.latitude,
-    media.place.longitude,
-  );
+  final _checkedPlacement = Expando<String>();
+  String _placementKey(List<ReelClip> clips, int index) {
+    final media = clips[index].streetview;
+    final prevWall =
+        index > 0 &&
+            OrbitWallPlacement.samePin(clips[index - 1].streetview, media)
+        ? clips[index - 1].streetview.wallId
+        : null;
+    final earlierMatch =
+        media.wallId != null &&
+        clips
+            .take(index)
+            .any(
+              (other) =>
+                  OrbitWallPlacement.samePin(other.streetview, media) &&
+                  other.streetview.wallId == media.wallId,
+            );
+    return '${media.mapPath}|${media.locationId}|${media.place.latitude}|${media.place.longitude}|${media.wallId}|$prevWall|$earlierMatch';
+  }
+
   String? _wallPreviewRevision;
 
   Future<void> _prepareWalls() async {
     final project = _project;
     if (!project.isStreetview3d) return;
     var changed = false;
-    for (final clip in List.of(project.clips)) {
+    final snapshot = List.of(project.clips);
+    for (var i = 0; i < snapshot.length; i++) {
+      final clip = snapshot[i];
+      final liveIndex = project.clips.indexOf(clip);
+      if (liveIndex < 0) continue;
       final path = clip.streetview.mapPath;
-      final source = _placementSource(clip.streetview);
-      if (path == null || _checkedPlacement[clip] == source) continue;
+      if (path == null) continue;
+      final source = _placementKey(project.clips, liveIndex);
+      if (_checkedPlacement[clip] == source) continue;
       final OrbitScene scene;
       try {
         scene = await OrbitSceneLoader.load(path);
@@ -97,21 +113,60 @@ class _MapsEditorPageState extends State<MapsEditorPage>
         continue;
       }
       if (!mounted || project != _project) return;
-      if (_placementSource(clip.streetview) != source ||
-          !project.clips.contains(clip) ||
-          _checkedPlacement[clip] == source) {
-        continue;
-      }
+      final index = project.clips.indexOf(clip);
+      if (index < 0 || clip.streetview.mapPath != path) continue;
+      final afterLoadSource = _placementKey(project.clips, index);
+      if (_checkedPlacement[clip] == afterLoadSource) continue;
       changed = _wallPlacement.choose(clip, project.clips, scene) || changed;
-      _checkedPlacement[clip] = source;
+      _checkedPlacement[clip] = _placementKey(project.clips, index);
     }
-    if (changed && mounted) _markDirty();
+    if (changed && mounted) {
+      _previewRevision = newId();
+      _markDirty();
+    }
   }
 
   void _shuffleWall(OrbitScene scene) {
     final clip = _project.clips[_selected];
+    final previous = clip.streetview.wallId;
     if (!_wallPlacement.choose(clip, _project.clips, scene, shuffle: true)) {
       return;
+    }
+    if (scene.walls.length >= 2) {
+      for (var i = 0; i < _project.clips.length; i++) {
+        final sibling = _project.clips[i];
+        if (sibling == clip ||
+            !OrbitWallPlacement.samePin(clip.streetview, sibling.streetview) ||
+            sibling.streetview.wallId != clip.streetview.wallId) {
+          continue;
+        }
+        final prevMatch =
+            i > 0 &&
+            OrbitWallPlacement.samePin(
+              _project.clips[i - 1].streetview,
+              sibling.streetview,
+            ) &&
+            _project.clips[i - 1].streetview.wallId == previous;
+        final nextMatch =
+            i + 1 < _project.clips.length &&
+            OrbitWallPlacement.samePin(
+              _project.clips[i + 1].streetview,
+              sibling.streetview,
+            ) &&
+            _project.clips[i + 1].streetview.wallId == previous;
+        if (previous != null &&
+            scene.walls.containsKey(previous) &&
+            !prevMatch &&
+            !nextMatch) {
+          sibling.streetview.wallId = previous;
+          sibling.streetview.visitedWalls = {
+            ...sibling.streetview.visitedWalls.where(scene.walls.containsKey),
+            previous,
+          }.toList();
+        } else {
+          _wallPlacement.choose(sibling, _project.clips, scene);
+        }
+      }
     }
     _wallPreviewRevision = _previewRevision = newId();
     _change();

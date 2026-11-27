@@ -4,8 +4,10 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
 import '../features/streetview_3d/data/orbit_scene_loader.dart';
+import '../features/streetview_3d/model/orbit_dolly.dart';
 import '../features/streetview_3d/model/orbit_media_pose.dart';
 import '../features/streetview_3d/model/orbit_scene.dart';
+import '../features/streetview_3d/model/orbit_wall_placement.dart';
 import '../model/export_phase.dart';
 import '../model/m3_motion.dart';
 import '../model/project.dart';
@@ -256,6 +258,19 @@ class MapsExportPipeline {
   ) async {
     StreamSubscription<double>? progressSubscription;
     try {
+      if (project.isStreetview3d) {
+        final loaded = <String, OrbitScene>{};
+        for (final c in project.clips) {
+          final path = c.streetview.mapPath;
+          if (path == null || loaded.containsKey(path)) continue;
+          try {
+            loaded[path] = await OrbitSceneLoader.loadForExport(path);
+          } catch (_) {
+            // Unreadable captures are reported before export starts if needed.
+          }
+        }
+        OrbitWallPlacement().ensureDistinct(project.clips, loaded);
+      }
       final scenes = StreetviewTimeline.scenes(project);
       final clips = <Map<String, dynamic>>[];
       final overlays = <String>[];
@@ -413,6 +428,11 @@ class MapsExportPipeline {
                           (f / M3Motion.exportFps) / scene.duration,
                           scene: geometry,
                           wallId: clip.streetview.wallId,
+                          closeApproach: OrbitDolly.continuesSamePin(
+                            project.clips,
+                            scene.mediaIndex,
+                            geometry,
+                          ),
                         ).native,
                     ],
                 }

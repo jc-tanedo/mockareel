@@ -247,6 +247,8 @@ void testStreetviewExport(
                           time,
                           scene: scene,
                           wallId: p.clips[i].streetview.wallId,
+                          closeApproach:
+                              samePin && transition == 'arrow' && i == 1,
                         ).matrix,
                         const Offset(180, 320),
                       ) *
@@ -255,20 +257,26 @@ void testStreetviewExport(
 
                 final from = await panelCenter(0, 1),
                     to = await panelCenter(1, 0);
+                final midChanged = samePin
+                    ? !listEquals(
+                        await File(flight.first).readAsBytes(),
+                        await File(flight[flight.length ~/ 2]).readAsBytes(),
+                      )
+                    : !await hasMedia(
+                        flight[flight.length - 3],
+                        x: from.dx.round(),
+                        y: from.dy.round(),
+                      );
                 checks['dolly leaves the outgoing panel and reaches the next panel'] =
                     await hasMedia(
                       flight.first,
                       x: from.dx.round(),
                       y: from.dy.round(),
                     ) &&
-                    (samePin
-                        ? p.clips.first.streetview.wallId !=
-                              p.clips.last.streetview.wallId
-                        : !await hasMedia(
-                            flight[flight.length - 3],
-                            x: from.dx.round(),
-                            y: from.dy.round(),
-                          )) &&
+                    midChanged &&
+                    (!samePin ||
+                        p.clips.first.streetview.wallId !=
+                            p.clips.last.streetview.wallId) &&
                     await hasMedia(
                       flight.last,
                       x: to.dx.round(),
@@ -342,6 +350,7 @@ void testStreetviewExport(
                         f / M3Motion.exportFps / p.clips.last.duration,
                         scene: wall,
                         wallId: p.clips.last.streetview.wallId,
+                        closeApproach: samePin && transition == 'arrow',
                       ).native,
                     ),
                   ).every((matches) => matches);

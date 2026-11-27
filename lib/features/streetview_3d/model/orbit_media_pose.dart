@@ -10,6 +10,7 @@ class OrbitMediaPose {
   final double turn, tilt, distanceScale, lift;
   final Offset focus;
   final OrbitWallMount? mount;
+  final bool closeApproach;
   const OrbitMediaPose(
     this.progress, {
     this.mount,
@@ -18,17 +19,26 @@ class OrbitMediaPose {
     this.distanceScale = 1,
     this.focus = Offset.zero,
     this.lift = 0,
+    this.closeApproach = false,
   });
   double get _framing => (progress / .35).clamp(0.0, 1.0);
   double get zoom {
     final wall = mount;
     if (wall == null) return (1 + .74 * progress) * distanceScale;
 
+    final detailZoom = 1.45 / pow(wall.sizeFactor, .86);
+    if (closeApproach) {
+      final s = ((progress - .35) / .65).clamp(0.0, 1.0);
+      final ease = s * s * (3 - 2 * s);
+      final startZoom = max(1.0, detailZoom * .84);
+      return exp(log(startZoom) + ease * (log(detailZoom) - log(startZoom))) *
+          distanceScale;
+    }
+
     // Establish the location at 450 m across, independent of facade size.
     // Move closer in log space so a small wall doesn't cause a sudden jump.
     final t = ((progress - .45) / .48).clamp(0.0, 1.0);
     final approach = t * t * (3 - 2 * t);
-    final detailZoom = 1.45 / pow(wall.sizeFactor, .86);
     return exp(approach * log(detailZoom)) * distanceScale;
   }
 
@@ -39,6 +49,7 @@ class OrbitMediaPose {
     double t, {
     OrbitScene? scene,
     String? wallId,
+    bool closeApproach = false,
   }) {
     final u = Curves.easeInOut.transform(t.clamp(0.0, 1.0));
     final progress = switch (kind) {
@@ -47,7 +58,11 @@ class OrbitMediaPose {
       'back' => 1.0 - u,
       _ => 1.0,
     };
-    return OrbitMediaPose(progress, mount: scene?.wallFor(wallId));
+    return OrbitMediaPose(
+      progress,
+      mount: scene?.wallFor(wallId),
+      closeApproach: closeApproach,
+    );
   }
 
   /// Interpolate a north-up overhead view into the attached media camera.
@@ -110,6 +125,10 @@ class OrbitMediaPose {
           (p.dx - anchor.dx) * normal.dx + (p.dy - anchor.dy) * normal.dy > 0,
     );
   }
+
+  double get frontFacing => cos(yaw);
+  double depthOf(Offset worldPoint) =>
+      worldPoint.dx * sin(heading) + worldPoint.dy * cos(heading);
 
   double get depthScale => .64 * cos(tilt) + .77 * sin(tilt);
   double get heightScale => .77 * cos(tilt) - .64 * sin(tilt);
